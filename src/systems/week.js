@@ -1,0 +1,135 @@
+// 주 단위 턴 진행
+// 한 주: 5칸 평일 (각각 train/work/rest 선택) + 주말 자동 경기 시뮬레이션
+// 시즌 종료 시 다음 학년/단계 분기
+
+import { state, pushLog } from "../state.js";
+import {
+  applyTraining, applyWork, applyRest, tickConditionWeekly, ageUp, overallScore, applyGameExperience,
+} from "./player.js";
+import { simulateGame } from "./simulator.js";
+import { getPlayerTeam, standings } from "./league.js";
+
+export function createSeason(stage) {
+  return {
+    stage,
+    weekIndex: 0,
+    dayIndex: 0,        // 0..4 (월~금)
+    weekActions: [],    // [{day, action, detail}]
+    weekResults: [],    // 주말 경기 결과
+    seasonResults: [],  // 시즌 전체 경기 결과
+    finished: false,
+  };
+}
+
+// 평일 한 칸(하루) 행동 적용
+export function doDailyAction(action, detail) {
+  const { player, season } = state;
+  if (!season || season.finished) return { ok: false, reason: "시즌없음" };
+  if (season.dayIndex >= 5) return { ok: false, reason: "주말경기대기" };
+
+  let res;
+  if (action === "train") {
+    res = applyTraining(player, detail);
+  } else if (action === "work") {
+    res = applyWork(player);
+  } else if (action === "rest") {
+    res = applyRest(player);
+  } else {
+    return { ok: false, reason: "잘못된행동" };
+  }
+  if (!res.ok) return res;
+
+  season.weekActions.push({ day: season.dayIndex, action, detail, result: res });
+  season.dayIndex++;
+  return { ok: true, result: res };
+}
+
+// 한 주가 끝나면 주말 경기 진행
+export function endWeek() {
+  const { player, league, season } = state;
+  if (season.dayIndex < 5) return { ok: false, reason: "아직주중" };
+
+  // 주말 컨디션/부상 갱신 + 체력 회복
+  tickConditionWeekly(player);
+  player.stamina = Math.min(player.maxStamina, player.stamina + 50);
+
+  // 이번 주 일정
+  const games = league.schedule[season.weekIndex] ?? [];
+  const results = [];
+  for (const g of games) {
+    const r = simulateGame(league, g, player);
+    results.push(r);
+    // 투수 등판 휴식 카운터 (출장 여부와 무관하게 매 경기 진행)
+    if (r.mainPlayer?.roles?.pitch) {
+      player.gamesSinceLastPitch = 0;
+    } else {
+      player.gamesSinceLastPitch = (player.gamesSinceLastPitch ?? 99) + 1;
+    }
+    if (r.mainPlayer && (r.mainPlayer.roles?.bat || r.mainPlayer.roles?.pitch)) {
+      mergeSeasonStats(player, r.mainPlayer);
+      applyGameExperience(player, r.mainPlayer);
+      player.seasonStats.games++;
+    }
+  }
+  season.weekResults = results;
+  season.seasonResults.push(...results);
+  season.weekIndex++;
+  season.dayIndex = 0;
+  season.weekActions = [];
+
+  // 시즌 종료 체크
+  if (season.weekIndex >= league.weeksPerSeason) {
+    season.finished = true;
+    pushLog({ msg: `${league.label} ${player.grade}학년 시즌 종료`, kind: "info" });
+  }
+  return { ok: true, results };
+}
+
+function mergeSeasonStats(player, mainPlayer) {
+  const ss = player.seasonStats;
+  if (mainPlayer.batterBox) {
+    const box = mainPlayer.batterBox;
+    ss.pa += box.pa; ss.ab += box.ab; ss.h += box.h; ss.hr += box.hr;
+    ss.bb += box.bb; ss.k += box.k; ss.tb += box.tb;
+  }
+  if (mainPlayer.pitcherBox) {
+    const box = mainPlayer.pitcherBox;
+    ss.pitchG++;
+    ss.ip += 9;        // 단순화: 선발 9이닝
+    ss.er += box.er ?? 0;
+    ss.pK += box.pK ?? 0;
+    ss.pBB += box.pBB ?? 0;
+    ss.pH += box.pH ?? 0;
+    ss.pHR += box.pHR ?? 0;
+  }
+}
+
+// 시즌 → 다음 시즌으로 진급 (Phase 1: 단순히 학년/나이만 증가, 같은 팀 유지)
+export function advanceToNextSeason() {
+  const { player, league } = state;
+  // 누적 통계로 합산
+  Object.keys(player.seasonStats).forEach(k => {
+    player.careerStats[k] = (player.careerStats[k] ?? 0) + (player.seasonStats[k] ?? 0);
+  });
+  // 시즌 기록 보관 (간단)
+  player.careerHistory.push({
+    age: player.age,
+    grade: player.grade,
+    stage: player.stage,
+    teamName: player.teamName,
+    overall: overallScore(player),
+    stats: { ...player.seasonStats },
+    teamRecord: getPlayerTeam(league)?.record ? { ...getPlayerTeam(league).record } : null,
+    standings: standings(league).slice(0, 5).map(t => ({ name: t.name, w: t.record.w, l: t.record.l })),
+  });
+  // 리셋
+  player.seasonStats = emptyStatsLike(player.seasonStats);
+  ageUp(player);
+  return { stage: player.stage, grade: player.grade };
+}
+
+function emptyStatsLike(s) {
+  const out = {};
+  for (const k of Object.keys(s)) out[k] = 0;
+  return out;
+}
