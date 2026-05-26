@@ -1,5 +1,13 @@
 // 리그 단계별 팀 템플릿
 // stage 값: "high" | "univ" | "pro2" | "pro1" | "japan" | "mlb"
+//
+// 영어 풀은 teams.en.js 에 정의. getStageInfo(stage, locale) 로 locale 분기.
+// 캐릭터/리그 생성 시점의 locale로 풀이 결정되며, 이후 locale 토글해도 이미 생성된
+// team.name 은 유지된다 (저장된 식별자처럼 취급).
+
+import {
+  HIGH_SCHOOL_TEAMS_EN, PRO_TEAMS_EN, UNIV_TEAMS_EN, JAPAN_TEAMS_EN, MLB_TEAMS_EN,
+} from "./teams.en.js";
 
 // 고교는 실력 편차가 크고 평균은 프로보다 한참 낮음 (실제 고교 야구 평균)
 export const HIGH_SCHOOL_TEAMS = [
@@ -41,11 +49,62 @@ export const UNIV_TEAMS = [
   { name: "건국대", region: "서울", strength: 62 },
 ];
 
-export const STAGE_INFO = {
-  high:  { label: "고교야구",   teams: HIGH_SCHOOL_TEAMS, weeksPerSeason: 22, gamesPerWeek: 1 },
-  univ:  { label: "대학야구",   teams: UNIV_TEAMS,        weeksPerSeason: 22, gamesPerWeek: 1 },
-  pro2:  { label: "퓨처스리그", teams: PRO_TEAMS,         weeksPerSeason: 26, gamesPerWeek: 3 },
-  pro1:  { label: "1군",        teams: PRO_TEAMS,         weeksPerSeason: 26, gamesPerWeek: 3 },
-  japan: { label: "일본 프로야구", teams: [],              weeksPerSeason: 26, gamesPerWeek: 3 },
-  mlb:   { label: "메이저리그", teams: [],                weeksPerSeason: 26, gamesPerWeek: 3 },
+export const JAPAN_TEAMS = [
+  { name: "도쿄 자이언츠", region: "도쿄", strength: 80 },
+  { name: "한신 타이거스", region: "오사카", strength: 78 },
+  { name: "히로시마 카프", region: "히로시마", strength: 75 },
+  { name: "요코하마 베이스타스", region: "요코하마", strength: 73 },
+  { name: "주니치 드래곤스", region: "나고야", strength: 72 },
+  { name: "야쿠르트 스왈로즈", region: "도쿄", strength: 70 },
+];
+
+export const MLB_TEAMS = [
+  { name: "LA Dodgers", region: "LA", strength: 85 },
+  { name: "NY Yankees", region: "NY", strength: 84 },
+  { name: "Boston Red Sox", region: "Boston", strength: 80 },
+  { name: "Chicago Cubs", region: "Chicago", strength: 78 },
+  { name: "SF Giants", region: "SF", strength: 76 },
+  { name: "Atlanta Braves", region: "Atlanta", strength: 79 },
+];
+
+// stage 별 시즌 메타 (locale에 영향 없음)
+// 고교: 실제 한국 고교야구 일정 (3월 ~ 8월 말, 약 25주, 권역 풀리그라 주 1경기)
+// 토너먼트 결승전은 별도 모달로 추가 시뮬되므로 정규 리그 + 결승 합치면 시즌당 ~28-32경기.
+const STAGE_META = {
+  high:  { weeksPerSeason: 25, gamesPerWeek: 1 },
+  univ:  { weeksPerSeason: 22, gamesPerWeek: 2 },
+  pro2:  { weeksPerSeason: 26, gamesPerWeek: 3 },
+  pro1:  { weeksPerSeason: 26, gamesPerWeek: 3 },
+  japan: { weeksPerSeason: 26, gamesPerWeek: 3 },
+  mlb:   { weeksPerSeason: 26, gamesPerWeek: 3 },
 };
+
+// stage + locale → 팀 풀
+export function getTeamPool(stage, locale = "ko") {
+  if (locale === "en") {
+    if (stage === "high")  return HIGH_SCHOOL_TEAMS_EN;
+    if (stage === "univ")  return UNIV_TEAMS_EN;
+    if (stage === "pro1" || stage === "pro2") return PRO_TEAMS_EN;
+    if (stage === "japan") return JAPAN_TEAMS_EN;
+    if (stage === "mlb")   return MLB_TEAMS_EN;
+    return [];
+  }
+  if (stage === "high")  return HIGH_SCHOOL_TEAMS;
+  if (stage === "univ")  return UNIV_TEAMS;
+  if (stage === "pro1" || stage === "pro2") return PRO_TEAMS;
+  if (stage === "japan") return JAPAN_TEAMS;
+  if (stage === "mlb")   return MLB_TEAMS;
+  return [];
+}
+
+// stage 정보 = 메타 + 팀 풀. label은 i18n으로 처리 (UI에서 t('stage.<stage>')).
+export function getStageInfo(stage, locale = "ko") {
+  const meta = STAGE_META[stage];
+  if (!meta) return null;
+  return {
+    stage,
+    weeksPerSeason: meta.weeksPerSeason,
+    gamesPerWeek: meta.gamesPerWeek,
+    teams: getTeamPool(stage, locale),
+  };
+}

@@ -1,4 +1,4 @@
-# 야구 인생 (Baseball Career Sim)
+# 나혼자만 자동야구 (Auto Baseball Alone)
 
 주인공이 고교야구부 1학년부터 은퇴까지를 경험하는 웹 기반 커리어 시뮬레이션 게임.
 플레이어는 직접 경기를 조작하지 않고 **훈련 방향**과 **시간 흐름**만 통제하며,
@@ -28,6 +28,7 @@
 | 그래픽 | **SVG (코드 생성)** | Claude Code가 그림 도구 없이 직접 그릴 수 있는 형태 |
 | 상태 저장 | **localStorage** | 서버 불필요, 자동 세이브 |
 | 빌드 | **없음** | `index.html` 정적 서빙만으로 동작 |
+| 다국어 | **i18n 모듈 (KO/EN)** | 키 기반 문자열 테이블. UI 토글로 즉시 전환, 별도 localStorage 키로 영속화 |
 
 외부 의존성 zero. 이미지 파일도 zero. 모든 시각 요소는 코드(SVG) 생성.
 
@@ -40,6 +41,21 @@ python3 -m http.server 8765
 
 > ES Module은 `file://`로 직접 열면 CORS 에러로 동작하지 않음. 반드시 HTTP 서버 경유.
 
+## 언어 / Language
+
+기본 한국어, 영어 지원. 상단 헤더의 **KO / EN** 토글 버튼으로 즉시 전환되며,
+선택한 언어는 `localStorage` (`baseballalone.locale.v1`)에 별도로 저장되어 다음 세션에도 유지된다.
+세이브 데이터와 독립적이라 같은 캐릭터를 다른 언어로 이어서 플레이할 수 있다.
+
+- **UI 라벨/메시지**: 토글 즉시 전환
+- **데이터 (캐릭터 이름, 팀명, 지역명)**: 캐릭터 생성 시점의 언어 풀에서 뽑힌 식별자이며 토글로 바뀌지 않음 (예: 한국어로 만든 "심용기" 캐릭터는 영어 모드에서도 "심용기"로 유지)
+- **로그 메시지**: 작성 시점의 언어로 동결 (시간순 기록의 정합성을 위해)
+
+The game ships with Korean (KO) and English (EN). Use the **KO / EN** toggle in the
+top-right corner — your choice is remembered across sessions and independent of the save file.
+UI labels switch instantly; character/team names that were generated under one language remain
+unchanged when you toggle to the other (they're treated as identifiers, not translations).
+
 ## 게임 흐름
 
 1. **캐릭터 생성**: 이름 · 얼굴(6종) · 재능(8종) · 손잡이(4종)
@@ -48,6 +64,61 @@ python3 -m http.server 8765
 4. **자동 진행**: 평일 자동 훈련, 주말 자동 경기
 5. **일시정지 (⏸)**: 멈춰서 프리셋 변경 / 상태 점검
 6. **시즌 종료**: 자동 일시정지 → 다음 학년 진입 결정
+
+## Phase 1+α (구현 완료 + 확장)
+
+Phase 1 핵심 + UX 보강 + 한국 고교야구 일정 기반 토너먼트/대회 시스템까지.
+
+### 토너먼트 + 결승 라이브 시뮬 (신규)
+한국 고교야구 정규 일정에 맞춘 7개 대회 (`src/data/tournaments.js`):
+
+| 대회 | 기간 | 형식 |
+|---|---|---|
+| 전반기 주말리그 | 3.7 ~ 4.25 | 권역별 풀리그 |
+| 신세계 이마트배 | 3.25 ~ 4.13 | 토너먼트 |
+| 황금사자기 | 5.2 ~ 5.16 | 토너먼트 |
+| 후반기 주말리그 | 5.23 ~ 6.21 | 권역별 풀리그 |
+| 청룡기 | 6.27 ~ 7.11 | 토너먼트 |
+| 대통령배 | 7.18 ~ 7.30 | 토너먼트 |
+| 봉황대기 | 8.6 ~ 8.29 | 토너먼트 |
+
+- 일정 카드 제목 옆에 진행 중인 대회 inline 표시 — `(전반기 주말리그)` 같이
+- 각 토너먼트 종료 주에 결승 진출 굴림 (팀 strength + 선수 OVR 기반 5~55%)
+- **결승 진출 시 시즌 자동 일시정지 + 모달 발동** — 다이아몬드 SVG + 라인 스코어 (1~9이닝 + R) + 점수판 + 이벤트 라이브 로그
+- 우승/준우승 보상 자동 적용 — 모든 능력치 +3, 명성 +25 / 멘탈 +5, 명성 +10
+- **MVP 시스템** — 결승 우승 + 메인 캐릭터 호조건 (타자: 2안타 또는 1홈런 / 투수: 자책 1 이하 + 5K 이상) → 추가 멘탈/명성 보너스 + 토스트 알림
+- 시즌별 대회 기록 (`player.tournamentHistory`) 누적 — 시즌 성적 carousel 슬라이드에 표시
+- 결승 진출 실패 시도 토스트 알림 (`weekly.finalLoss`)
+
+### 휴식기 — 4 카테고리 + 이벤트 풀
+시즌 종료 후 모달로 진행 (`src/systems/offseason.js`):
+
+1. **카테고리 선택** — 특훈 / 전지훈련 / 일반훈련 / 휴식 (+ 조건부 청소년 세계대회 차출)
+   - 청소년 세계대회: `stage="high"` + 종합 60+ + **격년(홀수년)** (WBSC U-18 패턴)
+2. **이벤트 제안** — 카테고리의 풀에서 1개 랜덤. "도전한다 / 거절한다" Yes/No
+3. **굴림** (Yes 시): great 20% / ok 70% / bad 10% → 이벤트 효과 적용
+4. **결과** + "다음 연차 진행하기" → 다음 시즌 (이전 autoMode 유지)
+
+20개 이벤트 — "미치광이 과학자의 투구폼 개조", "전설의 멘토를 만나다", "고백을 받았다" 등 각각 great/ok/bad 결과 텍스트 + 능력치 변화 정의.
+
+### 시즌 중 이벤트 일반화 메커니즘 (인프라)
+`src/systems/seasonEvents.js` — 향후 프로 진출 시 올스타전 / 올림픽 / WBC 추가용 인프라.
+- `SEASON_EVENTS` 카탈로그 + `trigger` 함수 + `state.pendingEvents` 큐
+- `endWeek` 후 자동 체크, `processedEvents`로 중복 방지
+
+### UX/UI
+- **carousel 네비게이션** (← 제목 →): 평일은 5 슬라이드 (훈련방향/시즌성적/능력치/지난경기/리그순위), 시즌종료는 3 슬라이드 (시즌성적/리그순위/능력치)
+- **모달 시스템** — 이어하기 / 세이브 삭제 confirm / 결승전 / 휴식기 / 휴식기 이벤트
+- **토스트 큐** — 부상 발생/MVP/결승 탈락/대성공 알림 자동 표시 (`pushToast(msg, kind)`)
+- **안드로이드 portrait 폭 고정** (`max-width: 412px`) — 데스크탑에서도 같은 폭으로 표시
+- **시즌 종료 화면** — 시즌 1줄 요약 → 커리어 하이 카드 → carousel (시즌성적/리그순위/능력치) → 확인 → 휴식기 모달
+- **일정 카드** 통합 — 제목 + 대회 inline + 재생/속도 토글 + 현재 훈련 + 요일 스트립 (한 카드)
+- **세이브 마이그레이션** — `SAVE_VERSION` 도입, 옛 데이터 자동 변환
+
+### 시간 흐름
+- 시즌 시작 = **3월 1일** (한국 고교 일정), 시즌 길이 **25주**
+- 1학년 = **2027년** → 3학년 = **2029년** (WBSC U-18 격년 패턴)
+- 주당 1경기 (권역 풀리그 단순화), 토너먼트 결승만 별도 모달
 
 ## 어디까지 개발됐나 (Phase 1 완료)
 
@@ -103,23 +174,29 @@ baseballalone/
 ├── index.html
 ├── styles/main.css
 ├── src/
-│   ├── main.js              # 부트스트랩 + tick loop
-│   ├── state.js             # 전역 상태 + 세이브
+│   ├── main.js              # 부트스트랩 + tick loop + locale 토글 와이어링
+│   ├── state.js             # 전역 상태 + 세이브 (state.locale 포함)
+│   ├── i18n/
+│   │   ├── index.js         # t() / setLocale / formatGameDate
+│   │   ├── ko.js            # 한국어 문자열 테이블
+│   │   └── en.js            # 영어 문자열 테이블
 │   ├── data/
-│   │   ├── names.js         # 한국 성/이름 풀
-│   │   └── teams.js         # 리그/팀 템플릿
+│   │   ├── names.js         # 한국 이름 풀 + randomName(locale) 디스패처
+│   │   ├── names.en.js      # 영어 이름 풀
+│   │   ├── teams.js         # 한국 팀 풀 + getStageInfo / getTeamPool
+│   │   └── teams.en.js      # 영어 팀 풀 (고교/대학/프로/일본/MLB)
 │   ├── systems/
-│   │   ├── player.js        # 능력치·훈련·성장·부상
-│   │   ├── npc.js           # NPC 풀 생성
-│   │   ├── league.js        # 리그/일정/순위
-│   │   ├── simulator.js     # 경기 자동 시뮬레이션
+│   │   ├── player.js        # 능력치·훈련·성장·부상 (라벨 0, 키만)
+│   │   ├── npc.js           # NPC 풀 생성 (현재 locale 이름 풀 사용)
+│   │   ├── league.js        # 리그/일정/순위 (현재 locale 팀 풀 사용)
+│   │   ├── simulator.js     # 경기 자동 시뮬레이션 (이벤트는 type 키만 반환)
 │   │   ├── week.js          # 주 단위 진행
 │   │   ├── career.js        # 학년/단계 분기
 │   │   ├── autoTrain.js     # 자동훈련 프리셋
-│   │   └── tick.js          # 실시간 1일 진행
+│   │   └── tick.js          # 실시간 1일 진행 (formatGameDate 재수출)
 │   ├── views/
-│   │   ├── menu.js          # 캐릭터 생성 + 메뉴
-│   │   └── weekly.js        # 메인 게임 화면
+│   │   ├── menu.js          # 캐릭터 생성 + 메뉴 (t() 적용)
+│   │   └── weekly.js        # 메인 게임 화면 (t() 적용)
 │   └── render/
 │       ├── svg.js           # SVG 헬퍼
 │       ├── avatars.js       # 얼굴 6종
@@ -127,6 +204,33 @@ baseballalone/
 │       └── radar.js         # 레이더 차트
 └── assets/                  # 추후 이미지 교체 슬롯
 ```
+
+## i18n 아키텍처
+
+핵심 규칙은 **"시스템 레이어는 키만, UI 레이어가 t()로 라벨 해결"**.
+
+- **`src/i18n/{ko,en}.js`** — 도메인별로 네임스페이스가 나뉜 플랫한 문자열 테이블. 키는 dot-notation (`stat.contact`, `weekly.btnPlay`, `preset.slugger.label`). 템플릿 변수는 `{name}` 형태.
+- **`src/i18n/index.js`** — `t(key, params)`, `setLocale`, `toggleLocale`, `formatGameDate`. `state.locale` 을 SoT로 삼고 별도 localStorage 키(`baseballalone.locale.v1`)에 영속화.
+- **시스템 레이어 (`src/systems/*`)** — 라벨/문자열 보유 금지. 데이터 객체는 키만 가지며, 로그 메시지는 t() 호출로 생성. 예외: 로그 엔트리는 작성 시점에 즉시 t()로 렌더되어 텍스트로 동결됨.
+- **데이터 레이어 (`src/data/*`)** — 이름/팀 풀은 locale별 파일로 분리. `getTeamPool(stage, locale)`, `randomName(locale)` 헬퍼로 디스패치.
+- **UI 레이어 (`src/views/*`)** — 모든 사용자 표시 문자열은 `t()` 호출. 토글 시 `route(state.view)` 재호출로 즉시 재렌더.
+
+### 데이터의 "동결" vs "동적" 분류
+
+| 범주 | 정책 | 이유 |
+|---|---|---|
+| UI 라벨, 버튼, 패널 제목 | **동적** (매 렌더 t()) | 토글 즉시 반영되어야 자연스러움 |
+| 캐릭터 이름, 팀 이름, 지역명 | **동결** (생성 시점 locale의 풀에서 결정) | 식별자 성격 — 토글로 바뀌면 혼란 |
+| 로그 메시지 (state.log[]) | **동결** (작성 시점 t() 결과를 문자열로 저장) | 시간순 기록의 정합성 |
+| 부상 종류, 재능 타입, 훈련 종류 등 enum 표시 | **동적** (severity/key 저장 → 표시 시 t()) | 시스템 상태이므로 현재 언어로 보여야 함 |
+| 날짜 포맷 | **동적** (`formatGameDate(d)`가 현재 locale로 렌더) | `3월 15일 (수)` ↔ `Mar 15 (Wed)` |
+
+### 새 언어 추가 방법
+
+1. `src/i18n/<locale>.js` 작성 — `ko.js` 구조 그대로 모든 키를 채운다. 누락 시 `DEFAULT_LOCALE` (한국어) 로 폴백.
+2. `src/i18n/index.js` 의 `SUPPORTED_LOCALES`, `MONTH_ABBR`, `TABLES` 에 추가.
+3. (선택) 이름/팀 풀이 별도로 필요하면 `src/data/names.<locale>.js`, `src/data/teams.<locale>.js` 작성 후 `data/{names,teams}.js` 의 디스패처에 분기 추가.
+4. 토글 UX는 현재 KO ↔ EN 2언어 가정 — 3개 이상 지원하려면 `toggleLocale()` 을 셀렉터로 교체.
 
 ## 앞으로 할 일 (로드맵)
 

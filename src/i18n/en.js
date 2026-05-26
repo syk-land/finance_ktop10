@@ -1,0 +1,485 @@
+// English string table
+export const en = {
+  app: {
+    title: "Auto Baseball Alone",
+    logo: "Auto Baseball Alone",
+    version: "v0.1 · Phase 1",
+  },
+
+  nav: {
+    topbarFormat: "{name} · {team} · Year {grade} · Age {age}",
+    teamPlaceholder: "-",
+    localeToggle: "KO",
+  },
+
+  dateFormat: "{monthAbbr} {dayOfMonth} ({weekday})",
+  weekday: { mon: "Mon", tue: "Tue", wed: "Wed", thu: "Thu", fri: "Fri", sat: "Sat", sun: "Sun" },
+
+  common: {
+    dash: "-",
+    age: "Age {age}",
+    grade: "Year {grade}",
+    yearSlash: "Year {year} · Season Week {week}",
+    weeks: "{weeks}w",
+    weeksLeft: "({weeks}w)",
+    percent: "{value}%",
+    actionFail: "Action failed: {reason}",
+    returnToMenu: "Back to Menu",
+    cancel: "Cancel",
+    confirm: "OK",
+  },
+
+  stage: {
+    high: "High School",
+    univ: "College",
+    pro2: "Minor League",
+    pro1: "Major (Pro)",
+    japan: "Japan Pro Baseball",
+    mlb: "Major League",
+  },
+
+  stat: {
+    contact: "Contact", power: "Power", eye: "Eye", speed: "Speed", defense: "Defense",
+    velocity: "Velocity", control: "Control", breaking: "Breaking", stamina: "Stamina", mental: "Mental",
+  },
+
+  talent: {
+    contact: "Contact",
+    power: "Power",
+    speedster: "Speedster",
+    defender: "Defender",
+    all_round: "All-Round",
+    fireball: "Fireballer",
+    finesse: "Finesse",
+    breakerz: "Breaking-ball",
+  },
+
+  training: {
+    batting: "Batting Practice",
+    eye_drill: "Eye Drill",
+    running: "Base Running",
+    fielding: "Fielding",
+    pitching: "Pitching",
+    breaking_drill: "Breaking Ball",
+    weight: "Weights",
+    mental: "Mental",
+  },
+
+  trainingShort: {
+    batting: "Batting",
+    eye_drill: "Eye",
+    running: "Running",
+    fielding: "Fielding",
+    pitching: "Pitching",
+    breaking_drill: "Breaking",
+    weight: "Weights",
+    mental: "Mental",
+  },
+
+  action: { train: "Train", work: "Part-time Work", rest: "Rest" },
+
+  // Offseason — pick a category → event proposal yes/no → result
+  offseason: {
+    title: "Offseason — Year {grade} Ended",
+    pickHint: "How will you spend the break?",
+    proposalTitle: "Something special came up!",
+    btnYes: "Take it on",
+    btnNo: "Decline",
+    btnContinue: "Proceed to next year",
+    summary: "Offseason results",
+    sectionBase: "Base effect",
+    sectionEvent: "Event result",
+    noChange: "No change",
+    fame: "Fame",
+    skipped: "Declined the special event.",
+
+    intense:        { label: "Intense training", desc: "Harsh drills. High reward, high risk." },
+    camp:           { label: "Training camp",    desc: "Broad boost at a focused camp." },
+    regular:        { label: "Regular training", desc: "Steady team practice. Reliable growth." },
+    rest:           { label: "Rest",             desc: "Recover stamina and mental." },
+    youth_worldcup: { label: "U-18 national team", desc: "Chance to play in the U-18 World Cup. The big stage tests you." },
+
+    outcome: {
+      great: "Huge success!",
+      ok:    "It still helped a bit.",
+      bad:   "Maybe a bad call…",
+    },
+
+    event: {
+      // ── Intense ──
+      mad_scientist_pitch: {
+        label: "Mad scientist's pitching reform",
+        desc:  "A strange doctor offers to rework your pitching form.",
+        great: "The new pitching form clicked!",
+        ok:    "Reform failed, but training paid off.",
+        bad:   "Your form is wrecked…",
+      },
+      mad_scientist_bat: {
+        label: "Mad scientist's batting reform",
+        desc:  "The doctor wants to rebuild your swing.",
+        great: "Found the perfect swing!",
+        ok:    "Awkward but trained nonetheless.",
+        bad:   "Your swing is broken…",
+      },
+      secret_pitch: {
+        label: "Secret pitch tutelage",
+        desc:  "A senior offers to teach you their secret pitch.",
+        great: "New secret pitch mastered!",
+        ok:    "Got a feel for it.",
+        bad:   "Strained your arm…",
+      },
+      extreme_drill: {
+        label: "Extreme drill challenge",
+        desc:  "A killer drill that pushes you to your limit.",
+        great: "Broke past your limit!",
+        ok:    "Survived and grew a bit.",
+        bad:   "Body is wrecked…",
+      },
+      new_form: {
+        label: "Try a new form",
+        desc:  "The coach suggests a brand new form.",
+        great: "The new form fit perfectly!",
+        ok:    "Took time to adjust.",
+        bad:   "Worse than the old form…",
+      },
+
+      // ── Camp ──
+      foreign_coach: {
+        label: "Special clinic with a foreign coach",
+        desc:  "A renowned foreign coach offers a short clinic.",
+        great: "Clicked with the coach — batting evolved!",
+        ok:    "Took the lessons.",
+        bad:   "Styles didn't match…",
+      },
+      mentor_pitcher: {
+        label: "Meet a legendary mentor",
+        desc:  "A retired legend offers to watch you for a few days.",
+        great: "Inherited a secret skill!",
+        ok:    "Short but useful.",
+        bad:   "Lessons rattled your mind…",
+      },
+      team_chemistry: {
+        label: "Team training camp",
+        desc:  "Stay and train with the whole team.",
+        great: "Perfect chemistry with the team!",
+        ok:    "Got along.",
+        bad:   "Friction with teammates…",
+      },
+      tough_camp: {
+        label: "Rough-terrain camp",
+        desc:  "Camp in a punishing environment.",
+        great: "Endured the intense camp!",
+        ok:    "Finished without issue.",
+        bad:   "Injured during the camp…",
+      },
+      unfamiliar_env: {
+        label: "Training in a strange place",
+        desc:  "Adapt to a totally different environment.",
+        great: "Adapted to the new place fast!",
+        ok:    "Got through it.",
+        bad:   "Hit by homesickness…",
+      },
+
+      // ── Regular ──
+      new_technique: {
+        label: "New technique drill",
+        desc:  "Focus on a technique you're unfamiliar with.",
+        great: "Mastered the new technique!",
+        ok:    "Brushed up fundamentals.",
+        bad:   "Hard to learn…",
+      },
+      rival: {
+        label: "1-on-1 with a rival",
+        desc:  "A rival challenges you to a 1-on-1.",
+        great: "Crushed the rival!",
+        ok:    "Got some motivation.",
+        bad:   "Lost some confidence…",
+      },
+      coach_advice: {
+        label: "In-depth coaching",
+        desc:  "The team coach gives you serious 1-on-1 time.",
+        great: "A key breakthrough!",
+        ok:    "It helped.",
+        bad:   "Just got more confused…",
+      },
+      routine_drill: {
+        label: "Repetitive fundamentals",
+        desc:  "Monotonous but back-to-basics drills.",
+        great: "Found stability in repetition!",
+        ok:    "Standard practice.",
+        bad:   "Fell into boredom…",
+      },
+      night_training: {
+        label: "Extra night training",
+        desc:  "Add evening sessions on top of day practice?",
+        great: "Night training paid off!",
+        ok:    "Got through it.",
+        bad:   "Pace broke down…",
+      },
+
+      // ── Rest ──
+      confession: {
+        label: "A confession",
+        desc:  "A supporter asks you out.",
+        great: "Got a supporter — confidence way up!",
+        ok:    "A nice memory.",
+        bad:   "Played too hard, condition fell…",
+      },
+      family_time: {
+        label: "Time with family",
+        desc:  "Spend time with family after a long while.",
+        great: "Got warm comfort!",
+        ok:    "A relaxed time.",
+        bad:   "Just got nagged…",
+      },
+      hobby: {
+        label: "New hobby",
+        desc:  "Try something you've been curious about.",
+        great: "Found fresh inspiration!",
+        ok:    "Had fun.",
+        bad:   "Wasted time…",
+      },
+      short_trip: {
+        label: "Short trip",
+        desc:  "A quick getaway nearby.",
+        great: "Felt fully refreshed!",
+        ok:    "Reasonable rest.",
+        bad:   "Condition dropped…",
+      },
+      quiet_rest: {
+        label: "Quiet rest",
+        desc:  "Do nothing, just rest deeply.",
+        great: "Fully recharged!",
+        ok:    "Ordinary break.",
+        bad:   "Got lazy…",
+      },
+
+      // ── Youth World Cup ──
+      worldcup_run: {
+        label: "U-18 Baseball World Cup",
+        desc:  "Called up to the youth national team for the world stage.",
+        great: "Won the championship!",
+        ok:    "Made it to the main round — a great experience.",
+        bad:   "Knocked out in the prelims. A bitter taste…",
+      },
+    },
+  },
+
+  // Korean high school baseball tournaments (tournaments.js)
+  tournament: {
+    weekly_first:  "Spring Weekend League",
+    emart_cup:     "Emart Cup",
+    gold_lion:     "Golden Lion",
+    weekly_second: "Summer Weekend League",
+    blue_dragon:   "Blue Dragon",
+    president_cup: "President's Cup",
+    phoenix_cup:   "Phoenix Cup",
+  },
+
+  // Tournament outcomes
+  result: {
+    champion:   "Champion",
+    runner:     "Runner-up",
+    eliminated: "Eliminated",
+  },
+
+  // At-bat outcomes (simulator → events.type)
+  event: {
+    K:   "K",
+    BB:  "BB",
+    "1B": "Single",
+    "2B": "Double",
+    "3B": "Triple",
+    HR:  "HR",
+    OUT: "Out",
+  },
+
+  hand: {
+    right: "R / R",
+    left:  "L / L",
+    mixed: "R / L",
+    lefty_rb: "L / R",
+  },
+
+  face: {
+    f1: "Buzz cut",
+    f2: "Helmet",
+    f3: "Curly",
+    f4: "Cap",
+    f5: "Glasses",
+    f6: "Long hair",
+  },
+
+  preset: {
+    slugger:    { label: "Slugger",     desc: "Max power. Focus on batting & weights." },
+    contact:    { label: "Contact Hitter", desc: "Precision bat. Batting & eye." },
+    speedster:  { label: "Five-tool",   desc: "Speed + bat. Fast all-rounder." },
+    defender:   { label: "Defender",    desc: "Defense & running. Sturdy fielder." },
+    fireballer: { label: "Fireballer",  desc: "Velocity & power pitcher." },
+    finesse:    { label: "Finesse",     desc: "Control & breakers. Brainy pitcher." },
+    two_way:    { label: "Two-way (Balanced)", desc: "Hit + pitch. Even spread." },
+    recovery:   { label: "Recovery",    desc: "Rest & injury recovery. Light drills only." },
+  },
+
+  injury: {
+    minor: "Muscle pain",
+    moderate: "Sprain",
+    severe: "Ligament damage",
+    detected: "{type} injury! (est. {weeks}w)",
+    recovered: "Recovered from {type}.",
+    returned:  "Back from {type} injury.",
+    inProgress: "Injured ({type}, {weeks}w)",
+    restOnly: "Only rest is available while injured.",
+  },
+
+  reason: {
+    injured: "injured",
+    lowStamina: "low stamina",
+    noTraining: "unknown training",
+    noSeason: "no season",
+    weekendPending: "weekend game pending",
+    midweek: "still midweek",
+    invalidAction: "invalid action",
+  },
+
+  log: {
+    careerStart: "Joined {school} baseball team — Year 1 begins.",
+    graduation: "Graduated — career branching coming in Phase 3.",
+    seasonStart: "{team} Year {grade} season begins.",
+    seasonEnd: "{stage} Year {grade} season ended.",
+    trainingCritical: "{label} — critical! 2x effect",
+  },
+
+  menu: {
+    continueTitle: "Continue",
+    continueHint: "A saved game was found.",
+    continueBtn: "Continue",
+    deleteSave: "Delete save",
+    confirmDelete: "Really delete the save?",
+    newGameTitle: "New Game — Create Character",
+    fieldName: "Name",
+    fieldFace: "Choose face",
+    fieldHand: "Bat / Throw hand",
+    fieldTalent: "Talent type (affects training)",
+    fieldTalentDist: "Talent distribution (training multiplier)",
+    namePlaceholder: "e.g. Mike Johnson",
+    defaultName: "Rookie",
+    previewMeta: "{talent} · Age 16 · Year 1",
+    startBtn: "Start Game",
+  },
+
+  weekly: {
+    scheduleTitle: "Week {week}",
+    yearLabel: "{year}",
+    todayChoice: "Today's Choice — Day {day}",
+    trainingDirection: "Training Direction — Day {day}",
+    trainingDirectionTitle: "Training Direction",
+    seasonBatter: "Batter Stats",
+    seasonPitcher: "Pitcher Stats",
+    statsTitle: "Attributes",
+    lastWeekTitle: "Last Week's Games",
+    standingsTitle: "Standings",
+    seasonStatsTitle: "Season Stats",
+    seasonEndTitle: "Year {grade} Season Ended",
+    careerHigh: "Career High",
+    autoModeIndicator: "Training: {label}",
+    noGamesYet: "No games yet",
+    activeTournament: "In progress: {labels}",
+
+    finalAdvance: "Made the {tournament} Final!",
+    finalAdvanceDesc: "Opponent: {opponent}. Start the game?",
+    btnStartFinal: "Start the game",
+    btnAcceptReward: "Claim reward",
+    finalLiveTitle: "{tournament} Final",
+    finalChampion: "{tournament} — Champion!",
+    finalRunner:   "{tournament} — Runner-up",
+    finalScore: "{my} : {opp}",
+    rewardChampion: "All stats +3 / Fame +25",
+    rewardRunner:   "Mental +5 / Fame +10",
+    finalLoss: "Eliminated from {tournament}",
+    tournamentRecords: "Tournaments",
+    mvpBadge: "MVP",
+    mvpAwarded: "{tournament} MVP awarded!",
+    noTournamentsYet: "No records yet",
+
+    valGame: "Game",
+    valTraining: "Train ({short})",
+    valWork: "Work",
+    valRest: "Rest",
+    valPicking: "Pick",
+
+    btnPlay: "▶  Play",
+    btnPause: "⏸  Pause",
+
+    btnAutoOpen: "Auto-train — Pick preset",
+    btnAutoClose: "Close auto-train",
+    autoBannerLead: "Auto",
+    autoBannerBody: "{label} running",
+    btnChangePreset: "Change preset",
+    btnAutoOff: "Turn off auto",
+    autoPanelHint: "Picking a preset will auto-run the remaining {days} day(s).",
+    autoToggleOn: "{label} auto-mode ON",
+    autoDays: "{days} day(s) advanced",
+    autoCrits: "{count} critical hit(s)",
+    autoInjury: "Injury occurred",
+
+    weekendTitle: "Weekend — Game",
+    weekendDescPlain: "All weekdays done. Simulating weekend games.",
+    weekendDescAuto: "Auto-mode (<strong style=\"color:var(--accent-2)\">{label}</strong>) active. Next week's weekdays will also auto-run.<br>Change/turn off via the buttons below.",
+    weekendBtn: "Play weekend",
+    weekendBtnAuto: "Play weekend + auto next week",
+    weekendAutoSummary: "Auto-advanced {days} day(s)",
+
+    catBatter: "Batting drills",
+    catPitcher: "Pitching drills",
+    catBatterShort: "Batter",
+    catPitcherShort: "Pitcher",
+    pickSub: "{cat} — pick a drill.",
+    btnRest: "Rest",
+    btnRestSub: "Stamina +30~40",
+    staminaCost: "Stamina {value}",
+
+    infoAge: "Age",
+    infoTalent: "Talent",
+    infoOverall: "OVR",
+    infoStamina: "Stamina",
+    infoCondition: "Condition",
+    infoWeek: "Week",
+    infoInjury: "Injury",
+    staminaVal: "{cur} / {max}",
+    injuryVal: "{type} ({weeks}w)",
+    weekVal: "{cur} / {max}",
+
+    batterHeader: "Batter <span style=\"color:var(--accent); font-size:12px\">Start rate {pct}%</span>",
+    pitcherHeader: "Pitcher <span style=\"color:var(--accent-2); font-size:12px\">Start rate {pct}%{rest}</span>",
+    pitcherRestNote: " · resting next game",
+
+    statPa: "PA",
+    statH: "H",
+    statHr: "HR",
+    statK: "K",
+    statG: "G",
+    statBa: "AVG",
+    statOps: "OPS",
+    statPitchG: "App.",
+    statIp: "IP",
+    statEra: "ERA",
+    statKK: "K",
+    teamRecord: "Team record",
+    teamRecordVal: "{w}-{l}",
+
+    batLabel: "[B]",
+    pitLabel: "[P]",
+    batterRecap: "{pa} PA, {h} H, {hr} HR, {k} K",
+    pitcherRecap: "9 IP, {er} ER, {k} K, {bb} BB, {h} H",
+
+    standingsHead: { rank: "#", team: "Team", w: "W", l: "L", t: "T", pct: "PCT" },
+
+    seasonEndGraduation: "Graduated! (Phase 1 ends here) Phase 3 will add draft/college/pro branching.",
+    seasonEndFinalNote: "Senior season complete. Moving on to graduation.",
+    btnGraduate: "Graduate",
+    btnNextSeason: "Start Year {grade} season",
+
+    titleWithTeamGrade: "{name} — {team} Year {grade}",
+  },
+};

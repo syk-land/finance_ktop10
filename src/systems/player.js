@@ -1,44 +1,44 @@
 // 주인공 캐릭터 시스템
 // 능력치 스케일: 0~100
 // 양방향(투타)이므로 batter + pitcher 능력치 모두 유지
+//
+// i18n: 라벨/메시지는 모두 i18n 키로만 보유. 사람이 읽는 텍스트는 t() 호출로 UI에서 조회.
 
 import { pushLog } from "../state.js";
+import { t } from "../i18n/index.js";
 
 export const BATTER_STATS = ["contact", "power", "eye", "speed", "defense"];
 export const PITCHER_STATS = ["velocity", "control", "breaking", "stamina", "mental"];
 
-export const STAT_LABELS = {
-  contact: "컨택", power: "파워", eye: "선구안", speed: "주력", defense: "수비",
-  velocity: "구속", control: "제구", breaking: "변화구", stamina: "스태미나", mental: "멘탈",
-};
+// stat key → 현재 locale 의 라벨 맵 (radar / 표시용). 매 호출마다 새로 만든다.
+export function getStatLabels() {
+  const out = {};
+  for (const k of [...BATTER_STATS, ...PITCHER_STATS]) out[k] = t("stat." + k);
+  return out;
+}
 
-// 재능 타입 — 훈련 효율에 영향
+// 재능 타입 — 훈련 효율에 영향. 라벨은 i18n 의 talent.<key>.
 export const TALENTS = {
-  contact:   { label: "컨택형",    boost: { contact: 1.4, eye: 1.2 } },
-  power:     { label: "파워형",    boost: { power: 1.4, contact: 0.9 } },
-  speedster: { label: "주루형",    boost: { speed: 1.5, defense: 1.2 } },
-  defender:  { label: "수비형",    boost: { defense: 1.5, contact: 1.1 } },
-  all_round: { label: "만능형",    boost: { contact: 1.15, power: 1.15, eye: 1.15, speed: 1.15, defense: 1.15, velocity: 1.15, control: 1.15, breaking: 1.15, stamina: 1.15, mental: 1.15 } },
-  fireball:  { label: "강속구형",  boost: { velocity: 1.5, stamina: 1.2 } },
-  finesse:   { label: "제구형",    boost: { control: 1.5, mental: 1.2 } },
-  breakerz:  { label: "변화구형",  boost: { breaking: 1.5, control: 1.2 } },
+  contact:   { boost: { contact: 1.4, eye: 1.2 } },
+  power:     { boost: { power: 1.4, contact: 0.9 } },
+  speedster: { boost: { speed: 1.5, defense: 1.2 } },
+  defender:  { boost: { defense: 1.5, contact: 1.1 } },
+  all_round: { boost: { contact: 1.15, power: 1.15, eye: 1.15, speed: 1.15, defense: 1.15, velocity: 1.15, control: 1.15, breaking: 1.15, stamina: 1.15, mental: 1.15 } },
+  fireball:  { boost: { velocity: 1.5, stamina: 1.2 } },
+  finesse:   { boost: { control: 1.5, mental: 1.2 } },
+  breakerz:  { boost: { breaking: 1.5, control: 1.2 } },
 };
 
+// 훈련 카탈로그. 라벨은 i18n 의 training.<key>.
 export const TRAININGS = {
-  batting:   { label: "타격 훈련",  stats: ["contact", "power"],     stamina: -18, injuryRisk: 0.008 },
-  eye_drill: { label: "선구안 훈련", stats: ["eye", "contact"],       stamina: -12, injuryRisk: 0.004 },
-  running:   { label: "주루 훈련",  stats: ["speed"],                stamina: -16, injuryRisk: 0.010 },
-  fielding:  { label: "수비 훈련",  stats: ["defense"],              stamina: -14, injuryRisk: 0.006 },
-  pitching:  { label: "투구 훈련",  stats: ["velocity", "control"],  stamina: -20, injuryRisk: 0.012 },
-  breaking_drill: { label: "변화구 훈련", stats: ["breaking", "control"], stamina: -16, injuryRisk: 0.008 },
-  weight:    { label: "웨이트",     stats: ["power", "stamina"],     stamina: -22, injuryRisk: 0.010 },
-  mental:    { label: "멘탈 훈련",  stats: ["mental", "control"],    stamina: -8,  injuryRisk: 0.002 },
-};
-
-export const ACTIONS = {
-  train: { label: "훈련" },
-  work:  { label: "일/아르바이트" },
-  rest:  { label: "휴식" },
+  batting:        { stats: ["contact", "power"],     stamina: -18, injuryRisk: 0.008 },
+  eye_drill:      { stats: ["eye", "contact"],       stamina: -12, injuryRisk: 0.004 },
+  running:        { stats: ["speed"],                stamina: -16, injuryRisk: 0.010 },
+  fielding:       { stats: ["defense"],              stamina: -14, injuryRisk: 0.006 },
+  pitching:       { stats: ["velocity", "control"],  stamina: -20, injuryRisk: 0.012 },
+  breaking_drill: { stats: ["breaking", "control"],  stamina: -16, injuryRisk: 0.008 },
+  weight:         { stats: ["power", "stamina"],     stamina: -22, injuryRisk: 0.010 },
+  mental:         { stats: ["mental", "control"],    stamina: -8,  injuryRisk: 0.002 },
 };
 
 export function createPlayer({ name, talent, hand = "right", faceId = "f1" }) {
@@ -103,16 +103,16 @@ export const STAT_CAP = 150;
 
 // 단일 훈련 적용 (하루치)
 export function applyTraining(player, trainingKey) {
-  if (player.injury) return { ok: false, reason: "부상중" };
-  if (player.stamina < 15) return { ok: false, reason: "체력부족" };
-  const t = TRAININGS[trainingKey];
-  if (!t) return { ok: false, reason: "없는 훈련" };
+  if (player.injury) return { ok: false, reason: "injured" };
+  if (player.stamina < 15) return { ok: false, reason: "lowStamina" };
+  const tr = TRAININGS[trainingKey];
+  if (!tr) return { ok: false, reason: "noTraining" };
   const mult = ageMultiplier(player.age);
   const talentBoost = TALENTS[player.talent].boost;
   const critical = Math.random() < 0.10;
   const critMult = critical ? 2.0 : 1.0;
   const gained = {};
-  for (const stat of t.stats) {
+  for (const stat of tr.stats) {
     const base = (0.5 + Math.random() * 0.9) * 2.0;
     const boost = talentBoost[stat] ?? 1.0;
     const cap = STAT_CAP;
@@ -124,21 +124,24 @@ export function applyTraining(player, trainingKey) {
     target[stat] = Math.min(cap, +(curr + delta).toFixed(1));
     gained[stat] = delta;
   }
-  player.stamina = Math.max(0, player.stamina + t.stamina);
+  player.stamina = Math.max(0, player.stamina + tr.stamina);
   // 부상 체크
   const lowStamina = player.stamina < 25 ? 0.02 : 0;
-  if (Math.random() < t.injuryRisk + lowStamina) {
+  if (Math.random() < tr.injuryRisk + lowStamina) {
     applyInjury(player);
   }
   if (critical) {
-    pushLog({ msg: `${t.label} 대성공! 효과 2배`, kind: "good" });
+    pushLog({
+      msg: t("log.trainingCritical", { label: t("training." + trainingKey) }),
+      kind: "good",
+    });
   }
-  return { ok: true, gained, label: t.label, critical };
+  return { ok: true, gained, trainingKey, critical };
 }
 
 export function applyWork(player) {
-  if (player.injury) return { ok: false, reason: "부상중" };
-  if (player.stamina < 10) return { ok: false, reason: "체력부족" };
+  if (player.injury) return { ok: false, reason: "injured" };
+  if (player.stamina < 10) return { ok: false, reason: "lowStamina" };
   const fameBonus = 1 + player.fame / 100;
   const earned = Math.round((player.stage === "high" || player.stage === "univ" ? 8 : 50) * fameBonus * (0.8 + Math.random() * 0.5));
   player.money += earned;
@@ -152,21 +155,32 @@ export function applyRest(player) {
   if (player.injury) {
     player.injury.weeksLeft = Math.max(0, player.injury.weeksLeft - 0.2);
     if (player.injury.weeksLeft <= 0) {
-      pushLog({ msg: `${player.injury.type} 부상이 회복됐다.`, kind: "good" });
+      pushLog({
+        msg: t("injury.recovered", { type: t("injury." + player.injury.severity) }),
+        kind: "good",
+      });
       player.injury = null;
     }
   }
   return { ok: true, recover };
 }
 
+// 부상 객체는 severity 키만 보유. 표시용 라벨은 t("injury." + severity).
+// _isNew 플래그: UI 가 한 번 토스트 띄운 후 false 로 끔.
 export function applyInjury(player, forceSeverity = null) {
   const roll = forceSeverity ?? Math.random();
   let injury;
-  if (roll < 0.65) injury = { type: "근육통", weeksLeft: 1, severity: "minor" };
-  else if (roll < 0.92) injury = { type: "염좌", weeksLeft: 3, severity: "moderate" };
-  else injury = { type: "인대 손상", weeksLeft: 8, severity: "severe" };
+  if (roll < 0.65) injury = { weeksLeft: 1, severity: "minor", _isNew: true };
+  else if (roll < 0.92) injury = { weeksLeft: 3, severity: "moderate", _isNew: true };
+  else injury = { weeksLeft: 8, severity: "severe", _isNew: true };
   player.injury = injury;
-  pushLog({ msg: `${injury.type} 부상! (${injury.weeksLeft}주 예상)`, kind: "bad" });
+  pushLog({
+    msg: t("injury.detected", {
+      type: t("injury." + injury.severity),
+      weeks: injury.weeksLeft,
+    }),
+    kind: "bad",
+  });
 }
 
 // 주간 컨디션 변화 — 호조/슬럼프 사이클
@@ -190,7 +204,10 @@ export function tickConditionWeekly(player) {
   if (player.injury) {
     player.injury.weeksLeft = Math.max(0, player.injury.weeksLeft - 1);
     if (player.injury.weeksLeft <= 0) {
-      pushLog({ msg: `${player.injury.type} 부상에서 복귀했다.`, kind: "good" });
+      pushLog({
+        msg: t("injury.returned", { type: t("injury." + player.injury.severity) }),
+        kind: "good",
+      });
       player.injury = null;
     }
   }

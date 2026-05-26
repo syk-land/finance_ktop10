@@ -25,3 +25,11 @@ export function randomKoreanName(rng = Math.random) {
   const g = GIVEN[Math.floor(rng() * GIVEN.length)];
   return s + g;
 }
+
+// locale 분기. 영어 풀은 names.en.js 에 정의.
+// 캐릭터/NPC 생성 시점의 locale로 결정되며, 이후 locale 토글해도 이미 생성된 이름은 유지된다.
+import { randomEnglishName } from "./names.en.js";
+export function randomName(locale = "ko", rng = Math.random) {
+  if (locale === "en") return randomEnglishName(rng);
+  return randomKoreanName(rng);
+}

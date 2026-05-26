@@ -1,87 +1,199 @@
 // 메인 메뉴 + 캐릭터 생성 (이미지/레이더/캐릭터 자세 포함)
+//
+// i18n: 사용자 표시 문자열은 모두 t() 호출.
+// 캐릭터 이름은 사용자 입력 그대로 저장 (locale 토글해도 변경되지 않음).
+
 import { state, hasSave, loadGame, deleteSave, saveGame, resetState } from "../state.js";
-import { createPlayer, TALENTS, STAT_LABELS, BATTER_STATS, PITCHER_STATS } from "../systems/player.js";
+import { createPlayer, TALENTS } from "../systems/player.js";
 import { startHighSchoolCareer } from "../systems/career.js";
 import { FACES, createFaceSVG } from "../render/avatars.js";
 import { createCharacterSVG } from "../render/character.js";
-import { createRadarSVG } from "../render/radar.js";
 import { createGameDate } from "../systems/tick.js";
+import { t, getLocale } from "../i18n/index.js";
+import { resetWeeklyCarousel } from "./weekly.js";
 
 // 신규 게임 입력 상태 (라이브 갱신용)
 const draft = {
-  name: "심용기",
+  name: "",
   talent: "all_round",
   hand: "right",
   faceId: "f1",
 };
 
+// 이어하기 모달 — 한 번 닫으면 다시 안 뜸 (페이지 새로고침으로 리셋)
+let loadModalDismissed = false;
+
 export function renderMenu(root, route) {
   root.innerHTML = "";
   const wrap = document.createElement("div");
   wrap.className = "stack";
-
-  if (hasSave()) {
-    wrap.appendChild(renderLoadPanel(route));
-  }
-
   wrap.appendChild(renderCreatePanel(route));
-
   root.appendChild(wrap);
+
+  // 세이브가 있으면 모달 오버레이로 이어하기 노출
+  if (hasSave() && !loadModalDismissed) {
+    root.appendChild(renderLoadModal(route));
+  }
 }
 
-function renderLoadPanel(route) {
-  const panel = panelEl("이어하기");
-  const t = document.createElement("p");
-  t.className = "muted small";
-  t.style.margin = "0";
-  t.textContent = "이전에 저장된 게임이 있습니다.";
-  panel.appendChild(t);
+function renderLoadModal(route) {
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
 
-  const row = document.createElement("div");
-  row.style.display = "flex";
-  row.style.gap = "8px";
-  row.style.marginTop = "10px";
+  const dialog = document.createElement("div");
+  dialog.className = "modal-dialog";
+  dialog.style.position = "relative";
 
-  const loadBtn = button("이어하기", "primary", () => {
-    if (loadGame()) route("weekly");
+  // 닫기 버튼 (X)
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "modal-close";
+  closeBtn.type = "button";
+  closeBtn.setAttribute("aria-label", "Close");
+  closeBtn.textContent = "×";
+  closeBtn.addEventListener("click", () => {
+    loadModalDismissed = true;
+    backdrop.remove();
   });
-  const delBtn = button("세이브 삭제", "danger", () => {
-    if (confirm("정말 세이브를 삭제할까요?")) {
-      deleteSave();
-      route("menu");
+  dialog.appendChild(closeBtn);
+
+  const h = document.createElement("h2");
+  h.textContent = t("menu.continueTitle");
+  dialog.appendChild(h);
+
+  const hint = document.createElement("p");
+  hint.className = "muted small";
+  hint.style.margin = "0 0 14px";
+  hint.textContent = t("menu.continueHint");
+  dialog.appendChild(hint);
+
+  const loadBtn = button(t("menu.continueBtn"), "primary", () => {
+    if (loadGame()) {
+      loadModalDismissed = true;
+      resetWeeklyCarousel();
+      route("weekly");
     }
   });
-  row.appendChild(loadBtn);
-  row.appendChild(delBtn);
-  panel.appendChild(row);
-  return panel;
+  loadBtn.style.width = "100%";
+  loadBtn.style.padding = "12px";
+  loadBtn.style.fontSize = "15px";
+  loadBtn.style.marginBottom = "8px";
+  dialog.appendChild(loadBtn);
+
+  const delBtn = button(t("menu.deleteSave"), "danger", () => {
+    showConfirmModal({
+      title: t("menu.deleteSave"),
+      message: t("menu.confirmDelete"),
+      confirmLabel: t("menu.deleteSave"),
+      cancelLabel: t("common.cancel"),
+      danger: true,
+      onConfirm: () => {
+        deleteSave();
+        loadModalDismissed = true;
+        route("menu");
+      },
+    });
+  });
+  delBtn.style.width = "100%";
+  delBtn.style.padding = "10px";
+  delBtn.style.fontSize = "13px";
+  dialog.appendChild(delBtn);
+
+  backdrop.appendChild(dialog);
+
+  // backdrop 클릭 시 닫기 (다이얼로그 내부 클릭은 통과)
+  backdrop.addEventListener("click", e => {
+    if (e.target === backdrop) {
+      loadModalDismissed = true;
+      backdrop.remove();
+    }
+  });
+
+  return backdrop;
+}
+
+// 재사용 가능한 confirm 모달 — body 에 직접 append (다른 모달 위에 겹쳐 노출).
+// 확인 클릭 시 onConfirm 실행 후 자기 자신만 제거 (배경 모달은 유지).
+function showConfirmModal({ title, message, confirmLabel, cancelLabel, danger, onConfirm }) {
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+
+  const dialog = document.createElement("div");
+  dialog.className = "modal-dialog";
+  dialog.style.position = "relative";
+
+  const h = document.createElement("h2");
+  h.textContent = title;
+  dialog.appendChild(h);
+
+  if (message) {
+    const p = document.createElement("p");
+    p.className = "muted small";
+    p.style.margin = "0 0 14px";
+    p.style.lineHeight = "1.4";
+    p.textContent = message;
+    dialog.appendChild(p);
+  }
+
+  const btnRow = document.createElement("div");
+  btnRow.style.display = "grid";
+  btnRow.style.gridTemplateColumns = "1fr 1fr";
+  btnRow.style.gap = "8px";
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.type = "button";
+  cancelBtn.textContent = cancelLabel ?? t("common.cancel");
+  cancelBtn.style.padding = "12px";
+  cancelBtn.style.fontSize = "14px";
+  cancelBtn.addEventListener("click", () => backdrop.remove());
+
+  const confirmBtn = document.createElement("button");
+  confirmBtn.type = "button";
+  confirmBtn.className = danger ? "danger" : "primary";
+  confirmBtn.textContent = confirmLabel ?? t("common.confirm");
+  confirmBtn.style.padding = "12px";
+  confirmBtn.style.fontSize = "14px";
+  confirmBtn.style.fontWeight = "700";
+  confirmBtn.addEventListener("click", () => {
+    backdrop.remove();
+    onConfirm?.();
+  });
+
+  btnRow.appendChild(cancelBtn);
+  btnRow.appendChild(confirmBtn);
+  dialog.appendChild(btnRow);
+  backdrop.appendChild(dialog);
+
+  // backdrop 클릭 시 취소
+  backdrop.addEventListener("click", e => {
+    if (e.target === backdrop) backdrop.remove();
+  });
+
+  document.body.appendChild(backdrop);
 }
 
 function renderCreatePanel(route) {
-  const panel = panelEl("새 게임 — 캐릭터 생성");
+  const panel = panelEl(t("menu.newGameTitle"));
 
-  const grid = document.createElement("div");
-  grid.style.display = "grid";
-  grid.style.gridTemplateColumns = "minmax(0, 1fr) minmax(0, 1.2fr)";
-  grid.style.gap = "20px";
-  grid.style.alignItems = "start";
+  // 안드로이드 portrait(~412px) 기준 — 세로 stack
+  // 순서: 이름 → 얼굴 → 자세 → 재능 → 캐릭터 미리보기 → 시작
+  const col = document.createElement("div");
+  col.className = "stack";
+  col.style.gap = "8px"; // 한 화면 안에 들어오도록 간격 축소
 
-  // 왼쪽: 캐릭터 미리보기
-  const previewCol = document.createElement("div");
-  previewCol.id = "preview-col";
-  previewCol.appendChild(renderPreview());
+  col.appendChild(renderNameField());
+  col.appendChild(renderFaceGallery());
+  col.appendChild(renderHandField());
+  col.appendChild(renderTalentField());
 
-  // 오른쪽: 입력 폼
-  const formCol = document.createElement("div");
-  formCol.className = "stack";
-  formCol.appendChild(renderNameField());
-  formCol.appendChild(renderFaceGallery());
-  formCol.appendChild(renderHandField());
-  formCol.appendChild(renderTalentField());
-  formCol.appendChild(renderRadar());
+  // 캐릭터 미리보기 (선택 결과를 한 눈에 — refreshPreview 가 갱신)
+  const previewWrap = document.createElement("div");
+  previewWrap.id = "preview-col";
+  previewWrap.appendChild(renderPreview());
+  col.appendChild(previewWrap);
 
-  const startBtn = button("게임 시작", "primary", () => {
-    const name = draft.name.trim() || "주인공";
+  // 시작 버튼 (가로 100%)
+  const startBtn = button(t("menu.startBtn"), "primary", () => {
+    const name = draft.name.trim() || t("menu.defaultName");
     resetState();
     state.player = createPlayer({
       name,
@@ -91,16 +203,19 @@ function renderCreatePanel(route) {
     });
     startHighSchoolCareer(name, draft.talent, null);
     state.gameDate = createGameDate();
-    state.paused = true; // 사용자가 재생 누를 때까지 대기
+    state.autoMode = "two_way";   // 기본 훈련 방향: 양방향 밸런스
+    state.paused = true;          // 사용자가 재생 누를 때까지 대기
+    resetWeeklyCarousel();
     saveGame();
     route("weekly");
   });
   startBtn.style.marginTop = "8px";
-  formCol.appendChild(startBtn);
+  startBtn.style.width = "100%";
+  startBtn.style.padding = "12px";
+  startBtn.style.fontSize = "15px";
+  col.appendChild(startBtn);
 
-  grid.appendChild(previewCol);
-  grid.appendChild(formCol);
-  panel.appendChild(grid);
+  panel.appendChild(col);
   return panel;
 }
 
@@ -111,35 +226,30 @@ function refreshPreview() {
   col.appendChild(renderPreview());
 }
 
-function refreshRadar() {
-  const slot = document.getElementById("talent-radar");
-  if (!slot) return;
-  slot.innerHTML = "";
-  slot.appendChild(buildRadar());
-}
-
 function renderPreview() {
   const card = document.createElement("div");
   card.style.background = "var(--panel-2)";
   card.style.border = "1px solid var(--border)";
   card.style.borderRadius = "8px";
-  card.style.padding = "12px";
+  card.style.padding = "8px";
   card.style.textAlign = "center";
 
-  const charSVG = createCharacterSVG(draft.faceId, draft.hand, { w: 220, h: 280 });
+  // 안드로이드 폭에 맞게 캐릭터 SVG 작게
+  const charSVG = createCharacterSVG(draft.faceId, draft.hand, { w: 160, h: 200 });
   card.appendChild(charSVG);
 
   const name = document.createElement("div");
-  name.style.marginTop = "8px";
-  name.style.fontSize = "16px";
+  name.style.marginTop = "4px";
+  name.style.fontSize = "14px";
   name.style.fontWeight = "600";
-  name.textContent = draft.name || "주인공";
+  name.textContent = draft.name || t("menu.defaultName");
   card.appendChild(name);
 
   const meta = document.createElement("div");
   meta.className = "muted small";
-  meta.style.marginTop = "4px";
-  meta.textContent = `${TALENTS[draft.talent].label} · 16세 · 고교 1학년`;
+  meta.style.marginTop = "2px";
+  meta.style.fontSize = "11px";
+  meta.textContent = t("menu.previewMeta", { talent: t("talent." + draft.talent) });
   card.appendChild(meta);
 
   return card;
@@ -147,10 +257,10 @@ function renderPreview() {
 
 function renderNameField() {
   const wrap = document.createElement("div");
-  wrap.appendChild(label("이름"));
+  wrap.appendChild(label(t("menu.fieldName")));
   const input = document.createElement("input");
   input.type = "text";
-  input.placeholder = "예: 심용기";
+  input.placeholder = t("menu.namePlaceholder");
   input.value = draft.name;
   input.style.width = "100%";
   input.addEventListener("input", e => {
@@ -163,37 +273,46 @@ function renderNameField() {
 
 function renderFaceGallery() {
   const wrap = document.createElement("div");
-  wrap.appendChild(label("얼굴 선택"));
+  wrap.appendChild(label(t("menu.fieldFace")));
 
+  // 6개 한 줄 (모바일 폭 ~360px 기준 카드당 ~55px)
   const row = document.createElement("div");
   row.style.display = "grid";
-  row.style.gridTemplateColumns = "repeat(6, 1fr)";
-  row.style.gap = "6px";
+  row.style.gridTemplateColumns = "repeat(6, minmax(0, 1fr))";
+  row.style.gap = "4px";
 
   for (const face of FACES) {
     const cell = document.createElement("div");
     cell.style.background = "var(--panel-2)";
     cell.style.border = "1.5px solid var(--border)";
-    cell.style.borderRadius = "8px";
-    cell.style.padding = "4px";
+    cell.style.borderRadius = "6px";
+    cell.style.padding = "3px 2px";
     cell.style.cursor = "pointer";
     cell.style.transition = "border-color 120ms";
     cell.style.textAlign = "center";
+    cell.style.minWidth = "0";
     if (draft.faceId === face.id) cell.style.borderColor = "var(--accent)";
 
-    cell.appendChild(createFaceSVG(face.id, 56));
+    const svgWrap = document.createElement("div");
+    svgWrap.style.display = "flex";
+    svgWrap.style.justifyContent = "center";
+    svgWrap.appendChild(createFaceSVG(face.id, 44));
+    cell.appendChild(svgWrap);
 
     const lbl = document.createElement("div");
     lbl.className = "small muted";
     lbl.style.marginTop = "2px";
-    lbl.textContent = face.label;
+    lbl.style.fontSize = "10px";
+    lbl.style.lineHeight = "1.1";
+    lbl.style.overflow = "hidden";
+    lbl.style.textOverflow = "ellipsis";
+    lbl.style.whiteSpace = "nowrap";
+    lbl.textContent = t("face." + face.id);
     cell.appendChild(lbl);
 
     cell.addEventListener("click", () => {
       draft.faceId = face.id;
       refreshPreview();
-      // 갤러리 테두리 갱신
-      const all = row.querySelectorAll("div");
       for (const el of row.children) {
         el.style.borderColor = "var(--border)";
       }
@@ -207,24 +326,23 @@ function renderFaceGallery() {
 
 function renderHandField() {
   const wrap = document.createElement("div");
-  wrap.appendChild(label("타격/투구 손 (자세 변경)"));
+  wrap.appendChild(label(t("menu.fieldHand")));
+  // 4개 한 줄 — 안드로이드 폭 (~360px) 에서도 4 cols 가능하도록 폰트/패딩 축소
   const row = document.createElement("div");
-  row.style.display = "flex";
-  row.style.gap = "6px";
-  const options = [
-    ["right", "우투우타"],
-    ["left", "좌투좌타"],
-    ["mixed", "우투좌타"],
-    ["lefty_rb", "좌투우타"],
-  ];
-  for (const [val, lbl] of options) {
+  row.style.display = "grid";
+  row.style.gridTemplateColumns = "repeat(4, minmax(0, 1fr))";
+  row.style.gap = "4px";
+  const handKeys = ["right", "left", "mixed", "lefty_rb"];
+  for (const val of handKeys) {
     const btn = document.createElement("button");
-    btn.textContent = lbl;
-    btn.style.flex = "1";
+    btn.textContent = t("hand." + val);
+    btn.style.fontSize = "12px";
+    btn.style.padding = "8px 2px";
+    btn.style.minWidth = "0";
+    btn.style.whiteSpace = "nowrap";
     if (draft.hand === val) btn.classList.add("primary");
     btn.addEventListener("click", () => {
       draft.hand = val;
-      // 모든 버튼 갱신
       for (const b of row.children) b.classList.remove("primary");
       btn.classList.add("primary");
       refreshPreview();
@@ -237,61 +355,29 @@ function renderHandField() {
 
 function renderTalentField() {
   const wrap = document.createElement("div");
-  wrap.appendChild(label("재능 타입 (훈련 효율에 영향)"));
+  wrap.appendChild(label(t("menu.fieldTalent")));
   const select = document.createElement("select");
   select.style.width = "100%";
-  for (const [key, t] of Object.entries(TALENTS)) {
+  for (const [key, talent] of Object.entries(TALENTS)) {
     const opt = document.createElement("option");
     opt.value = key;
-    opt.textContent = `${t.label} — ${describeBoost(t.boost)}`;
+    opt.textContent = `${t("talent." + key)} — ${describeBoost(talent.boost)}`;
     select.appendChild(opt);
   }
   select.value = draft.talent;
   select.addEventListener("change", e => {
     draft.talent = e.target.value;
     refreshPreview();
-    refreshRadar();
   });
   wrap.appendChild(select);
   return wrap;
 }
 
 function describeBoost(boost) {
-  const ups = Object.entries(boost)
+  return Object.entries(boost)
     .filter(([, v]) => v > 1.0)
-    .map(([k, v]) => `${STAT_LABELS[k] ?? k} ×${v}`)
+    .map(([k, v]) => `${t("stat." + k)} ×${v}`)
     .join(", ");
-  return ups;
-}
-
-function renderRadar() {
-  const wrap = document.createElement("div");
-  wrap.style.marginTop = "8px";
-  const lbl = label("재능 분포 (훈련 효율 배수)");
-  wrap.appendChild(lbl);
-
-  const slot = document.createElement("div");
-  slot.id = "talent-radar";
-  slot.style.display = "flex";
-  slot.style.justifyContent = "center";
-  slot.style.background = "var(--panel-2)";
-  slot.style.border = "1px solid var(--border)";
-  slot.style.borderRadius = "8px";
-  slot.style.padding = "8px";
-  slot.appendChild(buildRadar());
-  wrap.appendChild(slot);
-  return wrap;
-}
-
-function buildRadar() {
-  // 10개 능력치 합쳐서 표시 (타자 5 + 투수 5)
-  const labels = [...BATTER_STATS, ...PITCHER_STATS];
-  const boost = TALENTS[draft.talent].boost;
-  const values = {};
-  for (const k of labels) {
-    values[k] = boost[k] ?? 1.0;
-  }
-  return createRadarSVG(values, labels, { size: 260, labelMap: STAT_LABELS });
 }
 
 // ─────── 헬퍼 ───────
@@ -308,10 +394,10 @@ function label(s) {
   l.textContent = s;
   return l;
 }
-function button(t, cls = "", onClick) {
+function button(text, cls = "", onClick) {
   const b = document.createElement("button");
   b.className = cls;
-  b.textContent = t;
+  b.textContent = text;
   b.addEventListener("click", onClick);
   return b;
 }

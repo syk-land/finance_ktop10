@@ -11,21 +11,33 @@ import { doDailyAction, endWeek } from "./week.js";
 const DAYS_PER_MONTH = 30;
 const DAYS_PER_WEEK = 7;
 
+// 실제 연도 매핑: 1학년 = 2027년 → 고3 = 2029년 (WBSC U-18 야구 월드컵 격년 홀수년 개최 가정)
+// 시즌은 3월 시작 — 한국 고교야구 정규 일정에 맞춤.
+export const START_YEAR = 2027;
+export const SEASON_START_MONTH = 3;
+
 export function createGameDate() {
   return {
-    year: 1,
-    day: 1,        // 누적 일자 (시즌 내)
-    month: 1,
+    year: START_YEAR,
+    day: 1,
+    month: SEASON_START_MONTH,
     dayOfMonth: 1,
     dayOfWeek: 0,  // 0=월, ..., 6=일
   };
 }
 
-export function formatGameDate(d) {
-  if (!d) return "";
-  const wd = ["월", "화", "수", "목", "금", "토", "일"][d.dayOfWeek];
-  return `${d.month}월 ${d.dayOfMonth}일 (${wd})`;
+// 시즌 시작 시점으로 캘린더 리셋 — 다음 학년 진입 시 호출.
+export function resetGameDateForNewSeason(d) {
+  if (!d) return;
+  d.year += 1;
+  d.month = SEASON_START_MONTH;
+  d.dayOfMonth = 1;
+  d.day = 1;
+  d.dayOfWeek = 0;
 }
+
+// 날짜 포맷은 i18n/index.js 의 formatGameDate 로 이동. 호환을 위해 재수출.
+export { formatGameDate } from "../i18n/index.js";
 
 function advanceDate(d) {
   d.day += 1;

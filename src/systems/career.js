@@ -4,18 +4,21 @@
 import { state, pushLog } from "../state.js";
 import { createLeague } from "./league.js";
 import { createSeason } from "./week.js";
-import { HIGH_SCHOOL_TEAMS } from "../data/teams.js";
+import { getTeamPool } from "../data/teams.js";
+import { t, getLocale } from "../i18n/index.js";
+import { resetGameDateForNewSeason } from "./tick.js";
 
 export function startHighSchoolCareer(playerName, talent, schoolName) {
-  // 학교가 명시 안되면 적당히 약체 배정
+  // 학교가 명시 안되면 현재 locale의 고교 풀에서 무작위 배정
   if (!schoolName) {
-    schoolName = HIGH_SCHOOL_TEAMS[Math.floor(Math.random() * HIGH_SCHOOL_TEAMS.length)].name;
+    const pool = getTeamPool("high", getLocale());
+    schoolName = pool[Math.floor(Math.random() * pool.length)].name;
   }
   state.player.teamName = schoolName;
   state.player.stage = "high";
   state.league = createLeague("high", schoolName);
   state.season = createSeason("high");
-  pushLog({ msg: `${schoolName} 야구부 입단! 고교 1학년 시작.`, kind: "good" });
+  pushLog({ msg: t("log.careerStart", { school: schoolName }), kind: "good" });
 }
 
 // 시즌 종료 후 다음 시즌 시작 (Phase 1: 고교 내에서만)
@@ -25,15 +28,19 @@ export function transitionAfterSeason() {
 
   // 3학년 시즌까지 끝난 후엔 ageUp으로 grade=4가 됨 → 졸업
   if (player.stage === "high" && player.grade > 3) {
-    pushLog({ msg: `고교 졸업 — Phase 3에서 진로 분기 예정`, kind: "info" });
+    pushLog({ msg: t("log.graduation"), kind: "info" });
     state.season.finished = true;
     state.career = { ended: true, reason: "graduation_phase1" };
     return { ended: true };
   }
 
-  // 다음 학년 시작
+  // 다음 학년 시작 — 캘린더도 3월 1일로 리셋 (year +1)
+  resetGameDateForNewSeason(state.gameDate);
   state.league = createLeague(player.stage, player.teamName);
   state.season = createSeason(player.stage);
-  pushLog({ msg: `${player.teamName} ${player.grade}학년 시즌 시작.`, kind: "info" });
+  pushLog({
+    msg: t("log.seasonStart", { team: player.teamName, grade: player.grade }),
+    kind: "info",
+  });
   return { ended: false };
 }

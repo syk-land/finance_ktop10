@@ -1,8 +1,15 @@
 // 부트스트랩 + 뷰 라우터
+//
+// i18n: 초기 진입 시 loadLocaleFromStorage 로 사용자 언어 복원, 토글 버튼으로 즉시 전환.
+// 로케일 변경 시 모든 정적 chrome (logo/title/footer)와 현재 뷰를 재렌더한다.
+
 import { state, loadGame, hasSave, saveGame } from "./state.js";
 import { renderMenu } from "./views/menu.js";
 import { renderWeekly } from "./views/weekly.js";
 import { advanceOneDay } from "./systems/tick.js";
+import {
+  t, loadLocaleFromStorage, toggleLocale, localeToggleLabel,
+} from "./i18n/index.js";
 
 const VIEWS = {
   menu: renderMenu,
@@ -13,15 +20,43 @@ function getRoot() {
   return document.getElementById("view-root");
 }
 
+// 정적 chrome (topbar 로고, 토글 버튼 라벨, footer 버전, document.title) 동기화
+function updateChrome() {
+  const logo = document.getElementById("logo-text");
+  if (logo) logo.textContent = t("app.logo");
+  const version = document.getElementById("version-text");
+  if (version) version.textContent = t("app.version");
+  const toggle = document.getElementById("locale-toggle");
+  if (toggle) {
+    toggle.textContent = localeToggleLabel();
+    toggle.setAttribute("aria-label", localeToggleLabel());
+  }
+  document.title = t("app.title");
+}
+
 function updateTopbar() {
   const el = document.getElementById("topbar-info");
   if (!el) return;
   if (state.player) {
     const p = state.player;
-    el.innerHTML = `<strong>${p.name}</strong> · ${p.teamName ?? "-"} · ${p.grade}학년 · ${p.age}세`;
+    el.innerHTML = t("nav.topbarFormat", {
+      name: `<strong>${escapeHtml(p.name)}</strong>`,
+      team: escapeHtml(p.teamName ?? t("nav.teamPlaceholder")),
+      grade: p.grade,
+      age: p.age,
+    });
   } else {
     el.innerHTML = "";
   }
+}
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function updateFooter() {
@@ -35,14 +70,20 @@ function updateFooter() {
   }
 }
 
-export function route(name) {
+export function route(name, opts = {}) {
+  // 같은 뷰 재렌더(매 tick, 자동훈련 등)에서는 스크롤 위치 유지.
+  // 뷰가 실제로 바뀌었을 때만 상단으로 리셋.
+  const isViewChange = state.view !== name;
   state.view = name;
   const fn = VIEWS[name] ?? VIEWS.menu;
   const root = getRoot();
-  fn(root, route);
+  fn(root, route, opts);
+  updateChrome();
   updateTopbar();
   updateFooter();
-  window.scrollTo({ top: 0, behavior: "instant" });
+  if (isViewChange) {
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }
 }
 
 // 실시간 진행 루프
@@ -72,13 +113,11 @@ function runTick() {
     return;
   }
   advanceOneDay();
-  // 화면 갱신
-  route("weekly");
-  // 시즌 종료 직후 자동 일시정지
+  // tick 자동 진행 시엔 fromTick 옵션으로 호출 — 타임바(일시정지/속도) 보존
+  route("weekly", { fromTick: true });
   if (state.season.finished) {
     state.paused = true;
   }
-  // 주기적으로 저장 (10일마다)
   saveCounter++;
   if (saveCounter >= 10) {
     saveCounter = 0;
@@ -87,8 +126,51 @@ function runTick() {
   scheduleTick();
 }
 
+function wireLocaleToggle() {
+  const btn = document.getElementById("locale-toggle");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    toggleLocale();
+    // 현재 뷰 재렌더 + chrome 갱신
+    route(state.view ?? "menu");
+  });
+}
+
+// "맨 위로" floating 버튼 — 스크롤이 일정 임계 이상이면 표시.
+function setupScrollTopButton() {
+  const btn = document.createElement("button");
+  btn.className = "scroll-top";
+  btn.type = "button";
+  btn.textContent = "↑";
+  btn.setAttribute("aria-label", "Scroll to top");
+  btn.addEventListener("click", () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+  document.body.appendChild(btn);
+
+  const THRESHOLD = 200;
+  let ticking = false;
+  function update() {
+    if (window.scrollY > THRESHOLD) btn.classList.add("visible");
+    else btn.classList.remove("visible");
+    ticking = false;
+  }
+  window.addEventListener("scroll", () => {
+    if (!ticking) {
+      requestAnimationFrame(update);
+      ticking = true;
+    }
+  }, { passive: true });
+  // 초기 상태 갱신
+  update();
+}
+
 // 초기 진입
 function init() {
+  loadLocaleFromStorage();
+  updateChrome();
+  wireLocaleToggle();
+  setupScrollTopButton();
   route("menu");
   scheduleTick();
 }

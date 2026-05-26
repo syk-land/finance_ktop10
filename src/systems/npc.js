@@ -1,6 +1,8 @@
 // NPC 선수 생성 — 리그 풀
-import { randomKoreanName } from "../data/names.js";
+// 이름은 생성 시점의 locale 풀에서 뽑는다 (이후 locale 토글해도 NPC 이름은 유지).
+import { randomName } from "../data/names.js";
 import { BATTER_STATS, PITCHER_STATS, emptyStats } from "./player.js";
+import { getLocale } from "../i18n/index.js";
 
 const POSITIONS_BATTER = ["C", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "DH"];
 // 포지션별 능력치 가중치 (생성 시)
@@ -41,7 +43,7 @@ function createBatter(strength, ageRange = [19, 35]) {
   }
   return {
     id: _npcIdCounter++,
-    name: randomKoreanName(),
+    name: randomName(getLocale()),
     role: "batter",
     pos,
     age: rndInt(ageRange[0], ageRange[1]),
@@ -60,7 +62,7 @@ function createPitcher(strength, ageRange = [19, 35]) {
   }
   return {
     id: _npcIdCounter++,
-    name: randomKoreanName(),
+    name: randomName(getLocale()),
     role: "pitcher",
     pos: role, // "SP" | "RP"
     age: rndInt(ageRange[0], ageRange[1]),

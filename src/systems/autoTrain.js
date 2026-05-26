@@ -7,46 +7,33 @@ import { doDailyAction } from "./week.js";
 import { TRAININGS } from "./player.js";
 
 // focusStats: 가장 부족한 stat 타게팅 시 대상 stat 화이트리스트 (null=모든 stat)
+// 라벨/설명은 i18n 의 preset.<key>.{label,desc} 에서 조회. 여기엔 가중치 같은 데이터만.
 export const AUTO_PRESETS = {
   slugger: {
-    label: "슬러거",
-    desc: "장타 극대화. 타격·웨이트 중심.",
     weights: { batting: 4, weight: 3, eye_drill: 1, fielding: 0.5, running: 0.5 },
     focusStats: ["contact", "power", "eye"],
   },
   contact: {
-    label: "컨택 히터",
-    desc: "정교한 방망이. 타격·선구안 중심.",
     weights: { batting: 3, eye_drill: 3, running: 1, fielding: 1 },
     focusStats: ["contact", "eye", "power"],
   },
   speedster: {
-    label: "호타준족",
-    desc: "주력 + 타격. 발 빠른 호타준족형.",
     weights: { running: 3, batting: 2, fielding: 2, eye_drill: 1 },
     focusStats: ["speed", "contact", "defense"],
   },
   defender: {
-    label: "수비 명인",
-    desc: "수비·주루 위주. 견고한 야수.",
     weights: { fielding: 4, running: 2, batting: 1, eye_drill: 1 },
     focusStats: ["defense", "speed", "contact"],
   },
   fireballer: {
-    label: "파이어볼러",
-    desc: "구속·파워. 강속구 투수.",
     weights: { pitching: 4, weight: 2, mental: 1, breaking_drill: 0.5 },
     focusStats: ["velocity", "stamina", "control"],
   },
   finesse: {
-    label: "제구파 투수",
-    desc: "제구·변화구. 두뇌형 투수.",
     weights: { pitching: 2, breaking_drill: 3, mental: 3 },
     focusStats: ["control", "breaking", "mental"],
   },
   two_way: {
-    label: "양방향 (밸런스)",
-    desc: "투타 균형. 모든 종목을 골고루.",
     weights: {
       batting: 1.5, eye_drill: 1.5, fielding: 1.5, running: 1.5,
       pitching: 1.5, breaking_drill: 1.5, mental: 1.5, weight: 1.5,
@@ -54,8 +41,6 @@ export const AUTO_PRESETS = {
     focusStats: null, // 모든 stat 균등
   },
   recovery: {
-    label: "회복 우선",
-    desc: "체력/부상 회복 위주. 가벼운 훈련만.",
     weights: { eye_drill: 1, mental: 1 },
     restBias: 0.6,
     focusStats: null,

@@ -1,14 +1,17 @@
 // 리그/시즌/일정 생성
-import { STAGE_INFO } from "../data/teams.js";
+import { getStageInfo } from "../data/teams.js";
 import { createRoster } from "./npc.js";
+import { getLocale } from "../i18n/index.js";
 
 let _teamIdCounter = 1;
 
-// 주인공 stage에 맞는 리그 구성
+// 주인공 stage에 맞는 리그 구성. 현재 locale 의 팀 풀로 생성.
+// league.stage 만 보존 — 표시용 라벨은 UI 에서 t('stage.' + league.stage).
 export function createLeague(stage, playerTeamName) {
-  const info = STAGE_INFO[stage];
+  const info = getStageInfo(stage, getLocale());
   if (!info) throw new Error(`unknown stage ${stage}`);
-  const teamTemplates = info.teams.length > 0 ? info.teams : fallbackTeams(stage);
+  const teamTemplates = info.teams.length > 0 ? info.teams : [];
+  if (teamTemplates.length === 0) throw new Error(`no teams for stage ${stage}`);
   const ageRange = stage === "high" ? [16, 18] : stage === "univ" ? [19, 22] : [19, 38];
 
   const teams = teamTemplates.map(t => ({
@@ -22,7 +25,6 @@ export function createLeague(stage, playerTeamName) {
   }));
   return {
     stage,
-    label: info.label,
     teams,
     schedule: buildSchedule(teams, info.weeksPerSeason, info.gamesPerWeek),
     weeksPerSeason: info.weeksPerSeason,
@@ -30,44 +32,18 @@ export function createLeague(stage, playerTeamName) {
   };
 }
 
-function fallbackTeams(stage) {
-  // 일본/MLB 분기용 임시 풀
-  if (stage === "japan") return [
-    { name: "도쿄 자이언츠", region: "도쿄", strength: 80 },
-    { name: "한신 타이거스", region: "오사카", strength: 78 },
-    { name: "히로시마 카프", region: "히로시마", strength: 75 },
-    { name: "요코하마 베이스타스", region: "요코하마", strength: 73 },
-    { name: "주니치 드래곤스", region: "나고야", strength: 72 },
-    { name: "야쿠르트 스왈로즈", region: "도쿄", strength: 70 },
-  ];
-  if (stage === "mlb") return [
-    { name: "LA Dodgers", region: "LA", strength: 85 },
-    { name: "NY Yankees", region: "NY", strength: 84 },
-    { name: "Boston Red Sox", region: "Boston", strength: 80 },
-    { name: "Chicago Cubs", region: "Chicago", strength: 78 },
-    { name: "SF Giants", region: "SF", strength: 76 },
-    { name: "Atlanta Braves", region: "Atlanta", strength: 79 },
-  ];
-  return [];
-}
-
-// 매주 각 팀이 1~3경기 — 단순 로테이션
+// 매 주 모든 팀이 정확히 gamesPerWeek 경기를 갖도록 라운드별로 짝지음.
+// 라운드마다 팀을 셔플 + 짝 매칭 → 한 라운드에 모든 팀이 1경기씩 → gamesPerWeek 라운드 반복.
 function buildSchedule(teams, weeks, gamesPerWeek) {
   const schedule = [];
   for (let w = 0; w < weeks; w++) {
     const games = [];
-    const pool = [...teams];
-    shuffle(pool);
-    // 짝 만들기
-    for (let i = 0; i + 1 < pool.length; i += 2) {
-      games.push({ home: pool[i].id, away: pool[i + 1].id });
-    }
-    // gamesPerWeek가 더 많으면 추가 짝
-    while (games.length < (teams.length / 2) * gamesPerWeek) {
-      const a = pool[Math.floor(Math.random() * pool.length)];
-      let b = pool[Math.floor(Math.random() * pool.length)];
-      while (b.id === a.id) b = pool[Math.floor(Math.random() * pool.length)];
-      games.push({ home: a.id, away: b.id });
+    for (let round = 0; round < gamesPerWeek; round++) {
+      const pool = [...teams];
+      shuffle(pool);
+      for (let i = 0; i + 1 < pool.length; i += 2) {
+        games.push({ home: pool[i].id, away: pool[i + 1].id });
+      }
     }
     schedule.push(games);
   }

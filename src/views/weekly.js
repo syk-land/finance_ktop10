@@ -1,18 +1,25 @@
 // 주간 행동 선택 화면
-import { state, saveGame } from "../state.js";
+//
+// i18n: 사용자 표시 문자열은 모두 t() 호출. 데이터(team.name, player.name)는 생성 시점
+// locale 의 풀에서 뽑힌 식별자라 그대로 표시한다 (locale 토글해도 변경되지 않음).
+
+import { state, saveGame, pushToast } from "../state.js";
 import {
-  BATTER_STATS, PITCHER_STATS, STAT_LABELS, TALENTS, TRAININGS, overallScore,
+  BATTER_STATS, PITCHER_STATS, TALENTS, overallScore, getStatLabels,
 } from "../systems/player.js";
-import { doDailyAction, endWeek, advanceToNextSeason } from "../systems/week.js";
+import { advanceToNextSeason } from "../systems/week.js";
 import { transitionAfterSeason } from "../systems/career.js";
 import { getPlayerTeam, standings } from "../systems/league.js";
 import { createFaceSVG } from "../render/avatars.js";
 import { AUTO_PRESETS, autoFillWeek } from "../systems/autoTrain.js";
+import { CATEGORY_KEYS, applyCategoryAndPickEvent, applyEventChoice, getAvailableCategories } from "../systems/offseason.js";
 import { appearanceChance } from "../systems/simulator.js";
 import { createRadarSVG } from "../render/radar.js";
-import { formatGameDate } from "../systems/tick.js";
+import { formatGameDate, t } from "../i18n/index.js";
+import { getActiveTournaments } from "../data/tournaments.js";
+import { simulateFinal, applyFinalReward } from "../systems/finals.js";
 
-export function renderWeekly(root, route) {
+export function renderWeekly(root, route, opts = {}) {
   const { player, league, season } = state;
   if (!player || !league || !season) {
     route("menu"); return;
@@ -22,745 +29,956 @@ export function renderWeekly(root, route) {
     return;
   }
 
+  // tick 자동 호출 시 schedule panel 만 element 자체를 보존(이벤트 리스너 유지) — pause/속도 클릭 안정.
+  // 나머지 panel (헤더, 시즌 성적, 능력치, 경기 결과, 순위) 은 매 tick 새로 그려서 실시간 갱신.
+  let preservedSchedule = null;
+  if (opts.fromTick) {
+    const existing = root.querySelector("[data-keep='schedule']");
+    if (existing) {
+      preservedSchedule = existing;
+      existing.remove();              // root.innerHTML="" 전에 detach
+      updateSchedulePanel(preservedSchedule);
+    }
+  }
+
   root.innerHTML = "";
   const wrap = document.createElement("div");
   wrap.className = "stack";
 
-  // 상단 상태 패널
+  // 1) 헤더 카드 (단독, 전체 폭, 컴팩트)
   wrap.appendChild(renderHeaderInfo(player, league, season));
 
-  // 시간 진행 바 (일시정지 / 속도 조절)
-  wrap.appendChild(renderTimeBar(route));
+  // 2) 합쳐진 "주차 일정" 카드 — 보존된 element 가 있으면 그대로 재사용
+  wrap.appendChild(preservedSchedule ?? renderSchedulePanel(route));
 
-  // 주차/요일 표시
-  wrap.appendChild(renderWeekStrip(season));
+  // 3) 메인 carousel — 훈련방향 / 시즌성적 / 능력치 / 경기결과 / 리그순위
+  wrap.appendChild(renderWeeklyCarousel(route, player, league, season));
 
-  // 행동 영역 — 일시정지 상태에서만 활성
-  if (state.paused) {
-    if (season.dayIndex < 5) {
-      wrap.appendChild(renderActions(route));
+  root.appendChild(wrap);
+
+  // 새 부상 발생 시 토스트 (한 번만)
+  showInjuryToastIfNeeded();
+
+  // pendingToasts 큐 처리 (탈락 알림 등)
+  drainPendingToasts();
+
+  // 토너먼트 결승 진출 — 모달 발동 (한 번만)
+  showFinalModalIfNeeded(route);
+}
+
+// 토너먼트 결승 모달 — state.pendingFinal 이 있고 아직 모달 안 띄웠으면 발동
+// 시즌 중 발생 시 자동 일시정지(사용자가 ▶ 다시 누를 때까지 시즌 멈춤)
+let _finalModalShown = false;
+function showFinalModalIfNeeded(route) {
+  const f = state.pendingFinal;
+  if (!f || _finalModalShown) return;
+  _finalModalShown = true;
+
+  // 결승 진출 시 시즌 일시정지 — 시즌 중 발생해도 게임이 계속 흐르지 않게
+  state.paused = true;
+  saveGame();
+
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  const dialog = document.createElement("div");
+  dialog.className = "modal-dialog";
+  dialog.style.position = "relative";
+  dialog.style.maxWidth = "360px";
+
+  function rerender() {
+    dialog.innerHTML = "";
+    if (f.status === "announce") buildFinalAnnounce(dialog, f, rerender);
+    else if (f.status === "playing") buildFinalPlaying(dialog, f, rerender);
+    else buildFinalResult(dialog, f, () => {
+      // 보너스 수령 + 기록 누적 (tournamentKey 전달)
+      const reward = applyFinalReward(state.player, f.result, f.tournamentKey);
+      if (reward.mvp) {
+        pushToast(t("weekly.mvpAwarded", { tournament: t("tournament." + f.tournamentKey) }), "good");
+      }
+      state.pendingFinal = null;
+      _finalModalShown = false;
+      saveGame();
+      backdrop.remove();
+      route("weekly");
+    });
+  }
+  rerender();
+  backdrop.appendChild(dialog);
+  document.body.appendChild(backdrop);
+}
+
+// phase 1 — 결승 진출 알림
+function buildFinalAnnounce(dialog, final, rerender) {
+  const h = document.createElement("h2");
+  h.textContent = t("weekly.finalAdvance", { tournament: t("tournament." + final.tournamentKey) });
+  dialog.appendChild(h);
+
+  const desc = document.createElement("p");
+  desc.className = "muted small";
+  desc.style.margin = "0 0 14px";
+  desc.style.lineHeight = "1.5";
+  desc.textContent = t("weekly.finalAdvanceDesc", { opponent: final.opponent.name });
+  dialog.appendChild(desc);
+
+  const btn = document.createElement("button");
+  btn.className = "primary";
+  btn.textContent = t("weekly.btnStartFinal");
+  btn.style.width = "100%";
+  btn.style.padding = "12px";
+  btn.style.fontWeight = "700";
+  btn.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    // 시뮬레이션 실행 + status="playing" 으로 전환
+    final.result = simulateFinal(state.player, state.league, final.opponent);
+    final.status = "playing";
+    saveGame();
+    rerender();
+  });
+  dialog.appendChild(btn);
+}
+
+// phase 2 — 라이브 진행: 다이아몬드 SVG + 라인 스코어 + 이닝별 점수 라이브 + 메인 이벤트 로그
+function buildFinalPlaying(dialog, final, rerender) {
+  const result = final.result;
+  const home = result.home;
+  const away = result.away;
+  const my = home.team.isPlayerTeam ? home : away;
+  const opp = my === home ? away : home;
+  const isHome = my === home;
+
+  // 1) 제목
+  const h = document.createElement("h2");
+  h.style.margin = "0 0 8px";
+  h.style.fontSize = "15px";
+  h.textContent = t("weekly.finalLiveTitle", { tournament: t("tournament." + final.tournamentKey) });
+  dialog.appendChild(h);
+
+  // 2) 다이아몬드 SVG + 현재 이닝 표시 (가운데)
+  const fieldWrap = document.createElement("div");
+  fieldWrap.style.display = "flex";
+  fieldWrap.style.justifyContent = "center";
+  fieldWrap.style.alignItems = "center";
+  fieldWrap.style.marginBottom = "8px";
+  fieldWrap.appendChild(createDiamondSVG());
+  dialog.appendChild(fieldWrap);
+
+  // 3) 점수판 (양 팀 점수 라이브)
+  const scoreBox = document.createElement("div");
+  scoreBox.style.display = "flex";
+  scoreBox.style.justifyContent = "space-around";
+  scoreBox.style.alignItems = "center";
+  scoreBox.style.margin = "0 0 10px";
+  scoreBox.style.fontVariantNumeric = "tabular-nums";
+
+  const myCol = document.createElement("div");
+  myCol.style.textAlign = "center";
+  const myName = document.createElement("div");
+  myName.style.color = "var(--accent)";
+  myName.style.fontSize = "11px";
+  myName.style.fontWeight = "700";
+  myName.textContent = my.team.name;
+  const myScore = document.createElement("div");
+  myScore.dataset.live = "myScore";
+  myScore.style.fontSize = "28px";
+  myScore.style.fontWeight = "800";
+  myScore.style.color = "var(--accent)";
+  myScore.textContent = "0";
+  myCol.appendChild(myName);
+  myCol.appendChild(myScore);
+
+  const inningTag = document.createElement("div");
+  inningTag.dataset.live = "inning";
+  inningTag.style.fontSize = "13px";
+  inningTag.style.color = "var(--muted)";
+  inningTag.style.fontWeight = "700";
+  inningTag.textContent = "—";
+
+  const oppCol = document.createElement("div");
+  oppCol.style.textAlign = "center";
+  const oppName = document.createElement("div");
+  oppName.style.color = "var(--muted)";
+  oppName.style.fontSize = "11px";
+  oppName.style.fontWeight = "700";
+  oppName.textContent = opp.team.name;
+  const oppScore = document.createElement("div");
+  oppScore.dataset.live = "oppScore";
+  oppScore.style.fontSize = "28px";
+  oppScore.style.fontWeight = "800";
+  oppScore.style.color = "var(--muted)";
+  oppScore.textContent = "0";
+  oppCol.appendChild(oppName);
+  oppCol.appendChild(oppScore);
+
+  scoreBox.appendChild(myCol);
+  scoreBox.appendChild(inningTag);
+  scoreBox.appendChild(oppCol);
+  dialog.appendChild(scoreBox);
+
+  // 4) 라인 스코어 — 1~9이닝 + R
+  const lineScore = renderLineScoreTable(my, opp);
+  lineScore.dataset.live = "lineScore";
+  dialog.appendChild(lineScore);
+
+  // 5) 메인 캐릭터 이벤트 로그
+  const logBox = document.createElement("div");
+  logBox.style.background = "var(--panel-2)";
+  logBox.style.border = "1px solid var(--border)";
+  logBox.style.borderRadius = "6px";
+  logBox.style.padding = "8px 10px";
+  logBox.style.maxHeight = "120px";
+  logBox.style.overflowY = "auto";
+  logBox.style.fontSize = "11px";
+  logBox.style.lineHeight = "1.5";
+  logBox.style.margin = "8px 0";
+  dialog.appendChild(logBox);
+
+  // 라이브 진행: setInterval 기반 step 진행 (안정적).
+  //   매 step (800ms): 한 half-inning 진행
+  //     - 초공격 → 점수 / 라인 / inning 텍스트 갱신
+  //     - 다음 step: 말공격 + 그 이닝 메인 이벤트 로그
+  //     - 다음 이닝으로
+  // 옛 세이브 호환: 캐시된 옛 simulator 결과는 innings 가 없을 수 있음 — fallback 빈 배열
+  const myInns = (isHome ? home.innings : away.innings) ?? [];
+  const oppInns = (isHome ? away.innings : home.innings) ?? [];
+  const totalInnings = Math.max(myInns.length, oppInns.length, 9);
+  const events = result.mainPlayer?.events ?? [];
+
+  let myRun = 0, oppRun = 0;
+  let inIdx = 0;
+  let phase = 0;       // 0 = 초공격, 1 = 말공격
+  let timer = null;
+
+  function step() {
+    if (inIdx >= totalInnings) {
+      if (timer) { clearInterval(timer); timer = null; }
+      final.status = "result";
+      saveGame();
+      rerender();
+      return;
+    }
+    const i = inIdx;
+    if (phase === 0) {
+      // 초공격 — 상대 점수 (홈팀이면 opp 가 원정)
+      inningTag.textContent = `${i + 1}회초`;
+      const awayRuns = isHome ? (oppInns[i] ?? 0) : (myInns[i] ?? 0);
+      if (isHome) {
+        oppRun += awayRuns;
+        oppScore.textContent = String(oppRun);
+        highlight(oppScore);
+      } else {
+        myRun += awayRuns;
+        myScore.textContent = String(myRun);
+        highlight(myScore);
+      }
+      updateLineScoreCell(lineScore, isHome ? "opp" : "my", i, awayRuns);
+      phase = 1;
     } else {
-      wrap.appendChild(renderWeekendButton(route));
+      inningTag.textContent = `${i + 1}회말`;
+      const homeRuns = isHome ? myInns[i] : oppInns[i];
+      if (homeRuns != null) {
+        if (isHome) {
+          myRun += homeRuns;
+          myScore.textContent = String(myRun);
+          highlight(myScore);
+        } else {
+          oppRun += homeRuns;
+          oppScore.textContent = String(oppRun);
+          highlight(oppScore);
+        }
+        updateLineScoreCell(lineScore, isHome ? "my" : "opp", i, homeRuns);
+      }
+      // 그 이닝의 메인 캐릭터 이벤트 로그 (한 번에 다 추가)
+      const inningEvents = events.filter(ev => ev.inning === i + 1);
+      for (const ev of inningEvents) {
+        const row = document.createElement("div");
+        const roleColor = ev.role === "batter" ? "var(--accent)" : "var(--accent-2)";
+        const roleLbl = ev.role === "batter" ? t("weekly.batLabel") : t("weekly.pitLabel");
+        row.innerHTML = `<span style="color:${roleColor}; font-weight:700">[${i + 1}] ${roleLbl}</span> ${t("event." + ev.type)}`;
+        logBox.appendChild(row);
+      }
+      logBox.scrollTop = logBox.scrollHeight;
+      phase = 0;
+      inIdx++;
     }
   }
 
-  // 능력치 패널
-  wrap.appendChild(renderStatsPanel(player));
-
-  // 이번 주 결과 (있을 때만)
-  if (season.weekResults && season.weekResults.length > 0) {
-    wrap.appendChild(renderLastWeekResults(season.weekResults));
-  }
-
-  // 순위표
-  wrap.appendChild(renderStandings(league));
-
-  root.appendChild(wrap);
+  // 첫 step 즉시 실행 + setInterval 800ms 진행
+  step();
+  timer = setInterval(step, 800);
 }
 
-function renderTimeBar(route) {
+// 다이아몬드 SVG (정적)
+function createDiamondSVG() {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("width", "100");
+  svg.setAttribute("height", "100");
+  svg.setAttribute("viewBox", "0 0 100 100");
+  svg.innerHTML = `
+    <polygon points="50,12 88,50 50,88 12,50" fill="#1a2a3d" stroke="var(--accent)" stroke-width="1.5"/>
+    <polygon points="50,38 62,50 50,62 38,50" fill="none" stroke="#2c4565" stroke-width="1"/>
+    <circle cx="88" cy="50" r="4" fill="var(--accent-2)" /> <!-- 1루 -->
+    <circle cx="50" cy="12" r="4" fill="var(--accent-2)" /> <!-- 2루 -->
+    <circle cx="12" cy="50" r="4" fill="var(--accent-2)" /> <!-- 3루 -->
+    <circle cx="50" cy="88" r="4" fill="white" /> <!-- 홈 -->
+  `;
+  return svg;
+}
+
+// 라인 스코어 테이블 (1~9이닝 + R)
+function renderLineScoreTable(my, opp) {
+  const table = document.createElement("table");
+  table.style.width = "100%";
+  table.style.borderCollapse = "collapse";
+  table.style.fontSize = "10px";
+  table.style.fontVariantNumeric = "tabular-nums";
+  table.style.textAlign = "center";
+
+  const headRow = document.createElement("tr");
+  headRow.innerHTML = `<th style="text-align:left; padding:2px 4px;"></th>`
+    + Array.from({ length: 9 }, (_, i) => `<th style="padding:2px 3px; color:var(--muted)">${i + 1}</th>`).join("")
+    + `<th style="padding:2px 6px; color:var(--accent-2); border-left:1px solid var(--border)">R</th>`;
+  const thead = document.createElement("thead");
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  for (const side of ["opp", "my"]) {  // 원정 위, 홈 아래 — UI 단순화: opp 먼저
+    const tr = document.createElement("tr");
+    tr.dataset.side = side;
+    const teamName = side === "my" ? my.team.name : opp.team.name;
+    const teamColor = side === "my" ? "var(--accent)" : "var(--muted)";
+    let row = `<td style="text-align:left; padding:3px 4px; color:${teamColor}; font-weight:700">${truncate(teamName, 6)}</td>`;
+    for (let i = 0; i < 9; i++) {
+      row += `<td data-cell="${side}-${i}" style="padding:2px 3px; color:var(--muted)">-</td>`;
+    }
+    row += `<td data-cell="${side}-R" style="padding:2px 6px; color:${teamColor}; font-weight:700; border-left:1px solid var(--border)">0</td>`;
+    tr.innerHTML = row;
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  return table;
+}
+
+function updateLineScoreCell(table, side, inningIdx, runs) {
+  const cell = table.querySelector(`[data-cell='${side}-${inningIdx}']`);
+  if (cell) {
+    cell.textContent = String(runs);
+    if (runs > 0) cell.style.color = "var(--text)";
+  }
+  // R 누적
+  const rCell = table.querySelector(`[data-cell='${side}-R']`);
+  if (rCell) rCell.textContent = String((+rCell.textContent || 0) + runs);
+}
+
+function truncate(s, n) {
+  return s.length > n ? s.slice(0, n - 1) + "…" : s;
+}
+
+function highlight(el) {
+  el.style.transition = "transform 200ms";
+  el.style.transform = "scale(1.2)";
+  setTimeout(() => { el.style.transform = "scale(1)"; }, 200);
+}
+
+// phase 3 — 결과 + 보너스
+function buildFinalResult(dialog, final, onClose) {
+  const result = final.result;
+  const home = result.home;
+  const away = result.away;
+  const my = home.team.isPlayerTeam ? home : away;
+  const opp = my === home ? away : home;
+  const won = result.winner === my.team.name;
+  const color = won ? "var(--good)" : "var(--accent-2)";
+
+  const h = document.createElement("h2");
+  h.style.color = color;
+  h.textContent = t(won ? "weekly.finalChampion" : "weekly.finalRunner", {
+    tournament: t("tournament." + final.tournamentKey),
+  });
+  dialog.appendChild(h);
+
+  // 점수
+  const score = document.createElement("div");
+  score.style.fontSize = "20px";
+  score.style.fontWeight = "800";
+  score.style.textAlign = "center";
+  score.style.margin = "8px 0 12px";
+  score.style.fontVariantNumeric = "tabular-nums";
+  score.textContent = t("weekly.finalScore", { my: my.score, opp: opp.score });
+  dialog.appendChild(score);
+
+  // 메인 캐릭터 박스 스코어
+  const mp = result.mainPlayer;
+  if (mp?.batterBox?.pa > 0) {
+    const b = mp.batterBox;
+    const line = document.createElement("div");
+    line.className = "muted small";
+    line.style.marginBottom = "4px";
+    line.innerHTML = `<span style="color:var(--accent)">${t("weekly.batLabel")}</span> ${t("weekly.batterRecap", { pa: b.pa, h: b.h, hr: b.hr, k: b.k })}`;
+    dialog.appendChild(line);
+  }
+  if (mp?.pitcherBox) {
+    const p = mp.pitcherBox;
+    const line = document.createElement("div");
+    line.className = "muted small";
+    line.style.marginBottom = "10px";
+    line.innerHTML = `<span style="color:var(--accent-2)">${t("weekly.pitLabel")}</span> ${t("weekly.pitcherRecap", { er: p.er ?? 0, k: p.pK ?? 0, bb: p.pBB ?? 0, h: p.pH ?? 0 })}`;
+    dialog.appendChild(line);
+  }
+
+  // 보상 — applyFinalReward 가 changes 반환하므로 미리 적용 (단, onClose 안에서도 적용. 충돌 피하려 여기선 미적용)
+  // → onClose 클릭 시점에 한 번만 적용. 미리보기 없이 단순 표시.
+  const rewardHint = document.createElement("div");
+  rewardHint.className = "muted small";
+  rewardHint.style.fontSize = "11px";
+  rewardHint.style.marginBottom = "10px";
+  rewardHint.textContent = won ? t("weekly.rewardChampion") : t("weekly.rewardRunner");
+  dialog.appendChild(rewardHint);
+
+  const btn = document.createElement("button");
+  btn.className = "primary";
+  btn.textContent = t("weekly.btnAcceptReward");
+  btn.style.width = "100%";
+  btn.style.padding = "12px";
+  btn.style.fontWeight = "700";
+  btn.addEventListener("pointerdown", e => { e.preventDefault(); onClose(); });
+  dialog.appendChild(btn);
+}
+
+// 평일 carousel 슬라이드 인덱스 (module-level, 재렌더 사이 유지)
+let weeklyCarouselIdx = 0;
+
+// 게임 진입 시 carousel 을 항상 첫 슬라이드로 리셋
+export function resetWeeklyCarousel() {
+  weeklyCarouselIdx = 0;
+  seasonEndCarouselIdx = 0;
+}
+
+function renderWeeklyCarousel(route, player, league, season) {
+  const slides = [
+    {
+      title: t("weekly.trainingDirectionTitle"),
+      render: () => renderTrainingDirectionBody(route),
+    },
+    {
+      title: t("weekly.seasonStatsTitle"),
+      render: () => renderSeasonBody(player),
+    },
+    {
+      title: t("weekly.statsTitle"),
+      render: () => renderAttributesBody(player),
+    },
+    {
+      title: t("weekly.lastWeekTitle"),
+      render: () => renderLastWeekBody(season.weekResults ?? []),
+    },
+    {
+      title: t("weekly.standingsTitle"),
+      render: () => renderStandingsBody(league),
+    },
+  ];
+  if (weeklyCarouselIdx >= slides.length) weeklyCarouselIdx = 0;
+  return renderCarousel(slides, {
+    get: () => weeklyCarouselIdx,
+    set: i => { weeklyCarouselIdx = i; },
+  });
+}
+
+// ─── Carousel 헬퍼 ────────────────────────────────────────────────
+// slides: [{ title, render: () => Element }]
+// idxRef: { get, set } — 외부 보존 (module-level 또는 state)
+function renderCarousel(slides, idxRef) {
   const panel = document.createElement("section");
   panel.className = "panel";
-  panel.style.display = "flex";
-  panel.style.alignItems = "center";
-  panel.style.justifyContent = "space-between";
-  panel.style.gap = "12px";
+  panel.style.padding = "12px";
 
-  // 날짜 표시
-  const dateBox = document.createElement("div");
-  dateBox.style.display = "flex";
-  dateBox.style.flexDirection = "column";
-  const dateLine = document.createElement("div");
-  dateLine.style.fontSize = "18px";
-  dateLine.style.fontWeight = "600";
-  dateLine.style.color = "var(--accent)";
-  dateLine.textContent = state.gameDate ? formatGameDate(state.gameDate) : "-";
-  const yearLine = document.createElement("div");
-  yearLine.className = "muted small";
-  yearLine.textContent = state.gameDate ? `${state.gameDate.year}년차 / 시즌 ${state.season.weekIndex + 1}주차` : "";
-  dateBox.appendChild(dateLine);
-  dateBox.appendChild(yearLine);
+  // 헤더: [‹] 제목 (n/m) [›]
+  const head = document.createElement("div");
+  head.style.display = "flex";
+  head.style.alignItems = "center";
+  head.style.gap = "8px";
+  head.style.marginBottom = "10px";
 
-  // 컨트롤
-  const controls = document.createElement("div");
-  controls.style.display = "flex";
-  controls.style.alignItems = "center";
-  controls.style.gap = "8px";
+  const prev = document.createElement("button");
+  prev.textContent = "‹";
+  prev.style.padding = "4px 10px";
+  prev.style.fontSize = "16px";
+  prev.style.fontWeight = "700";
+  prev.style.minWidth = "0";
+  prev.style.lineHeight = "1";
 
-  // 일시정지/재생 버튼
+  const title = document.createElement("div");
+  title.style.flex = "1";
+  title.style.textAlign = "center";
+  title.style.fontSize = "14px";
+  title.style.fontWeight = "700";
+  title.style.color = "var(--accent-2)";
+
+  const dot = document.createElement("div");
+  dot.className = "muted small";
+  dot.style.fontSize = "11px";
+  dot.style.minWidth = "32px";
+  dot.style.textAlign = "right";
+
+  const next = document.createElement("button");
+  next.textContent = "›";
+  next.style.padding = "4px 10px";
+  next.style.fontSize = "16px";
+  next.style.fontWeight = "700";
+  next.style.minWidth = "0";
+  next.style.lineHeight = "1";
+
+  head.appendChild(prev);
+  head.appendChild(title);
+  head.appendChild(dot);
+  head.appendChild(next);
+  panel.appendChild(head);
+
+  const content = document.createElement("div");
+  panel.appendChild(content);
+
+  function update() {
+    const i = idxRef.get();
+    title.textContent = slides[i].title;
+    dot.textContent = `${i + 1} / ${slides.length}`;
+    content.innerHTML = "";
+    content.appendChild(slides[i].render());
+  }
+
+  prev.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    idxRef.set((idxRef.get() - 1 + slides.length) % slides.length);
+    update();
+  });
+  next.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    idxRef.set((idxRef.get() + 1) % slides.length);
+    update();
+  });
+
+  update();
+  return panel;
+}
+
+// 합쳐진 "주차 일정" 패널 — 제목 + 날짜 + 재생/일시정지 + 속도 토글 + 요일 스트립.
+// dataset.keep="schedule" 로 마킹해서 tick 자동 호출 시 element 자체를 보존(클릭 미스 방지).
+// 자식 element 들도 data-tb / data-tb-* 로 마킹 — updateSchedulePanel 에서 텍스트만 갱신.
+const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+const SPEEDS = [
+  { label: "0.5x", ms: 1000 },
+  { label: "1x",   ms: 500 },
+  { label: "2x",   ms: 250 },
+  { label: "4x",   ms: 125 },
+];
+
+function renderSchedulePanel(route) {
+  const panel = document.createElement("section");
+  panel.className = "panel";
+  panel.dataset.keep = "schedule";
+
+  // 상단 한 줄: [제목 N주차 일정] ───── [재생] [속도 토글 1:1 카드]
+  const topLine = document.createElement("div");
+  topLine.style.display = "flex";
+  topLine.style.alignItems = "center";
+  topLine.style.gap = "6px";
+  topLine.style.flexWrap = "wrap";
+  topLine.style.marginBottom = "8px";
+
+  // 제목 — 좌측 끝. marginRight: auto 로 나머지 컨트롤을 우측으로 밀어냄.
+  // 제목 + 옆에 작게 대회 이름 inline (예: "3주차 일정  (전반기 주말리그)")
+  const h = document.createElement("h2");
+  h.dataset.tb = "title";
+  h.textContent = t("weekly.scheduleTitle", { week: state.season.weekIndex + 1 });
+  h.style.margin = "0";
+  h.style.fontSize = "15px";
+  h.style.color = "var(--accent-2)";
+  h.style.flex = "0 0 auto";
+  h.style.whiteSpace = "nowrap";
+
+  const tourInline = document.createElement("span");
+  tourInline.dataset.tb = "tournament-inline";
+  tourInline.style.fontSize = "11px";
+  tourInline.style.marginLeft = "6px";
+  tourInline.style.marginRight = "auto";   // 나머지 컨트롤은 우측
+  tourInline.style.color = "var(--good)";
+  tourInline.style.fontWeight = "500";
+  tourInline.textContent = formatInlineTournaments();
+
+  // 재생/일시정지 (제목과 충분히 떨어져 우측)
   const pauseBtn = document.createElement("button");
+  pauseBtn.dataset.tb = "pause";
   pauseBtn.className = "primary";
-  pauseBtn.textContent = state.paused ? "▶  재생" : "⏸  일시정지";
-  pauseBtn.style.padding = "10px 18px";
-  pauseBtn.style.fontSize = "15px";
+  pauseBtn.textContent = state.paused ? t("weekly.btnPlay") : t("weekly.btnPause");
+  pauseBtn.style.padding = "6px 10px";
+  pauseBtn.style.fontSize = "12px";
   pauseBtn.style.fontWeight = "700";
-  pauseBtn.addEventListener("click", () => {
+  pauseBtn.style.flex = "0 0 auto";
+  pauseBtn.style.whiteSpace = "nowrap";
+  // pointerdown 으로 빠르게 잡음 (click 보다 일찍 발화하여 tick 재렌더 영향 최소화)
+  pauseBtn.addEventListener("pointerdown", e => {
+    e.preventDefault();
     state.paused = !state.paused;
     route("weekly");
   });
-  controls.appendChild(pauseBtn);
 
-  // 속도 조절
+  // 속도 토글 — 4개 정사각형(aspect-ratio 1) 카드, 우측 정렬
   const speedWrap = document.createElement("div");
   speedWrap.style.display = "flex";
-  speedWrap.style.gap = "4px";
-  const speeds = [
-    { label: "0.5x", ms: 1000 },
-    { label: "1x",   ms: 500 },
-    { label: "2x",   ms: 250 },
-    { label: "4x",   ms: 125 },
-  ];
-  for (const sp of speeds) {
+  speedWrap.style.gap = "3px";
+  speedWrap.style.flex = "0 0 auto";
+  for (const sp of SPEEDS) {
     const b = document.createElement("button");
+    b.dataset.tbSpeed = String(sp.ms);
     b.textContent = sp.label;
-    b.style.padding = "6px 10px";
-    b.style.fontSize = "12px";
+    b.style.width = "30px";
+    b.style.height = "30px";
+    b.style.aspectRatio = "1";
+    b.style.padding = "0";
+    b.style.fontSize = "10px";
+    b.style.fontWeight = "700";
+    b.style.minWidth = "0";
+    b.style.lineHeight = "1";
     if (state.tickSpeed === sp.ms) b.classList.add("primary");
-    b.addEventListener("click", () => {
+    b.addEventListener("pointerdown", e => {
+      e.preventDefault();
       state.tickSpeed = sp.ms;
       route("weekly");
     });
     speedWrap.appendChild(b);
   }
-  controls.appendChild(speedWrap);
 
-  panel.appendChild(dateBox);
-  panel.appendChild(controls);
-  return panel;
-}
+  topLine.appendChild(h);
+  topLine.appendChild(tourInline);
+  topLine.appendChild(pauseBtn);
+  topLine.appendChild(speedWrap);
+  panel.appendChild(topLine);
 
-function renderHeaderInfo(player, league, season) {
-  const panel = document.createElement("section");
-  panel.className = "panel";
+  // 현재 활성 자동 프리셋 표시 (한 줄, 작게)
+  const autoLine = document.createElement("div");
+  autoLine.dataset.tb = "auto-mode";
+  autoLine.className = "muted small";
+  autoLine.style.fontSize = "11px";
+  autoLine.style.marginBottom = "8px";
+  autoLine.style.color = "var(--accent-2)";
+  autoLine.textContent = state.autoMode
+    ? t("weekly.autoModeIndicator", { label: t("preset." + state.autoMode + ".label") })
+    : "";
+  panel.appendChild(autoLine);
 
-  const titleRow = document.createElement("div");
-  titleRow.style.display = "flex";
-  titleRow.style.alignItems = "center";
-  titleRow.style.gap = "12px";
-  titleRow.style.marginBottom = "12px";
-
-  // 아바타
-  const avatar = document.createElement("div");
-  avatar.style.width = "56px";
-  avatar.style.height = "56px";
-  avatar.style.borderRadius = "50%";
-  avatar.style.background = "var(--panel-2)";
-  avatar.style.border = "2px solid var(--accent)";
-  avatar.style.overflow = "hidden";
-  avatar.style.flexShrink = "0";
-  avatar.appendChild(createFaceSVG(player.faceId ?? "f1", 52));
-  titleRow.appendChild(avatar);
-
-  const h = document.createElement("h2");
-  h.style.margin = "0";
-  h.textContent = `${player.name} — ${player.teamName} ${player.grade}학년`;
-  titleRow.appendChild(h);
-
-  panel.appendChild(titleRow);
-
-  const row = document.createElement("div");
-  row.className = "row";
-
-  row.appendChild(infoBlock("나이", `${player.age}세`));
-  row.appendChild(infoBlock("재능", TALENTS[player.talent].label));
-  row.appendChild(infoBlock("종합", overallScore(player).toFixed(1)));
-  row.appendChild(infoBlock("체력", `${Math.round(player.stamina)} / ${player.maxStamina}`, player.stamina < 30 ? "warn" : null));
-  row.appendChild(infoBlock("컨디션", `${Math.round(player.condition)}`, player.condition > 70 ? "good" : player.condition < 30 ? "bad" : null));
-  row.appendChild(infoBlock("주차", `${season.weekIndex + 1} / ${league.weeksPerSeason}`));
-
-  if (player.injury) {
-    row.appendChild(infoBlock("부상", `${player.injury.type} (${player.injury.weeksLeft}주)`, "bad"));
-  }
-  panel.appendChild(row);
-  return panel;
-}
-
-function infoBlock(label, value, tone) {
-  const d = document.createElement("div");
-  d.style.minWidth = "100px";
-  const l = document.createElement("div");
-  l.className = "muted small";
-  l.textContent = label;
-  const v = document.createElement("div");
-  v.className = "big";
-  v.textContent = value;
-  if (tone === "warn") v.style.color = "var(--warn)";
-  if (tone === "bad") v.style.color = "var(--bad)";
-  if (tone === "good") v.style.color = "var(--good)";
-  d.appendChild(l);
-  d.appendChild(v);
-  return d;
-}
-
-function renderWeekStrip(season) {
-  const panel = document.createElement("section");
-  panel.className = "panel";
-  const h = document.createElement("h3");
-  h.textContent = "이번 주 일정";
-  panel.appendChild(h);
-
+  // 요일 스트립 (월~일 7칸) — 날짜 라인 제거하여 카드 높이 절약
   const strip = document.createElement("div");
   strip.className = "daystrip";
-  const labels = ["월", "화", "수", "목", "금", "토", "일"];
-  for (let i = 0; i < 5; i++) {
+  strip.dataset.tb = "strip";
+  for (let i = 0; i < 7; i++) {
     const cell = document.createElement("div");
     cell.className = "daycell";
-    if (i < season.dayIndex) cell.classList.add("done");
-    const labelDiv = document.createElement("div");
-    labelDiv.className = "label";
-    labelDiv.textContent = labels[i];
-    const valDiv = document.createElement("div");
-    valDiv.className = "val";
-    const a = season.weekActions[i];
-    if (a) {
-      valDiv.textContent = a.action === "train" ? `훈련(${TRAININGS[a.detail]?.label.replace(" 훈련", "") ?? a.detail})`
-        : a.action === "work" ? "일"
-        : "휴식";
-    } else {
-      valDiv.textContent = i === season.dayIndex ? "선택중" : "-";
-    }
-    cell.appendChild(labelDiv);
-    cell.appendChild(valDiv);
-    strip.appendChild(cell);
-  }
-  // 주말
-  for (let i = 5; i < 7; i++) {
-    const cell = document.createElement("div");
-    cell.className = "daycell weekend";
-    const labelDiv = document.createElement("div");
-    labelDiv.className = "label";
-    labelDiv.textContent = labels[i];
-    const valDiv = document.createElement("div");
-    valDiv.className = "val";
-    valDiv.textContent = "경기";
-    cell.appendChild(labelDiv);
-    cell.appendChild(valDiv);
+    cell.dataset.tbDay = String(i);
+    if (i >= 5) cell.classList.add("weekend");
+    if (i < 5 && i < state.season.dayIndex) cell.classList.add("done");
+
+    const lbl = document.createElement("div");
+    lbl.className = "label";
+    lbl.textContent = t("weekday." + DAY_KEYS[i]);
+    const val = document.createElement("div");
+    val.className = "val";
+    val.dataset.tbVal = String(i);
+    val.textContent = computeDayValText(i);
+
+    cell.appendChild(lbl);
+    cell.appendChild(val);
     strip.appendChild(cell);
   }
   panel.appendChild(strip);
   return panel;
 }
 
-// view-local UI 상태 (재렌더 사이에 유지)
-let selectedCategory = "batter"; // "batter" | "pitcher"
-let showAutoPanel = false;
+// 일정 카드 제목 옆에 표시할 대회 — 진행 중 대회를 "(이름)" 으로 inline 표시
+function formatInlineTournaments() {
+  if (!state.player || !state.gameDate) return "";
+  const list = getActiveTournaments(state.player.stage, state.gameDate);
+  if (list.length === 0) return "";
+  return list.map(tn => `(${t("tournament." + tn.key)})`).join(" ");
+}
 
-const BATTER_TRAININGS = ["batting", "eye_drill", "running", "fielding", "weight"];
-const PITCHER_TRAININGS = ["pitching", "breaking_drill", "weight", "mental"];
+function computeDayValText(i) {
+  const season = state.season;
+  if (i >= 5) return t("weekly.valGame");
+  const a = season.weekActions[i];
+  if (a) {
+    // 훈련은 "훈련(X)" 대신 종목 짧은 라벨만 (예: "웨이트", "타격")
+    if (a.action === "train") return t("trainingShort." + a.detail) || a.detail;
+    if (a.action === "work") return t("weekly.valWork");
+    return t("weekly.valRest");
+  }
+  return i === season.dayIndex ? t("weekly.valPicking") : t("common.dash");
+}
 
-function renderActions(route) {
+// 기존 element 의 텍스트/active 클래스만 갱신 — element 자체는 보존되어 클릭 미스 방지
+function updateSchedulePanel(el) {
+  if (!state.season) return;
+  const title = el.querySelector("[data-tb='title']");
+  if (title) title.textContent = t("weekly.scheduleTitle", { week: state.season.weekIndex + 1 });
+
+  const pauseBtn = el.querySelector("[data-tb='pause']");
+  if (pauseBtn) pauseBtn.textContent = state.paused ? t("weekly.btnPlay") : t("weekly.btnPause");
+
+  const autoLine = el.querySelector("[data-tb='auto-mode']");
+  if (autoLine) {
+    autoLine.textContent = state.autoMode
+      ? t("weekly.autoModeIndicator", { label: t("preset." + state.autoMode + ".label") })
+      : "";
+  }
+
+  const tourInline = el.querySelector("[data-tb='tournament-inline']");
+  if (tourInline) tourInline.textContent = formatInlineTournaments();
+
+  const speedBtns = el.querySelectorAll("[data-tb-speed]");
+  for (const b of speedBtns) {
+    if (+b.dataset.tbSpeed === state.tickSpeed) b.classList.add("primary");
+    else b.classList.remove("primary");
+  }
+
+  for (let i = 0; i < 7; i++) {
+    const cell = el.querySelector(`[data-tb-day='${i}']`);
+    const val = el.querySelector(`[data-tb-val='${i}']`);
+    if (cell && i < 5) {
+      if (i < state.season.dayIndex) cell.classList.add("done");
+      else cell.classList.remove("done");
+    }
+    if (val) val.textContent = computeDayValText(i);
+  }
+}
+
+function renderHeaderInfo(player, league, season) {
   const panel = document.createElement("section");
   panel.className = "panel";
-  const h = document.createElement("h3");
-  h.textContent = `오늘의 선택 — ${state.season.dayIndex + 1}일차`;
-  panel.appendChild(h);
+  panel.style.padding = "10px";
 
-  const injured = !!state.player.injury;
+  // 타이틀 줄: avatar 36px + 이름/팀/학년 한 줄
+  const titleRow = document.createElement("div");
+  titleRow.style.display = "flex";
+  titleRow.style.alignItems = "center";
+  titleRow.style.gap = "8px";
+  titleRow.style.marginBottom = "8px";
 
-  // 자동 모드 활성 시 배너
-  if (state.autoMode) {
-    const banner = document.createElement("div");
-    banner.style.display = "flex";
-    banner.style.alignItems = "center";
-    banner.style.justifyContent = "space-between";
-    banner.style.padding = "10px 12px";
-    banner.style.marginBottom = "10px";
-    banner.style.background = "rgba(255,184,78,0.08)";
-    banner.style.border = "1px solid var(--accent-2)";
-    banner.style.borderRadius = "8px";
+  const avatar = document.createElement("div");
+  avatar.style.width = "36px";
+  avatar.style.height = "36px";
+  avatar.style.borderRadius = "50%";
+  avatar.style.background = "var(--panel-2)";
+  avatar.style.border = "2px solid var(--accent)";
+  avatar.style.overflow = "hidden";
+  avatar.style.flexShrink = "0";
+  avatar.appendChild(createFaceSVG(player.faceId ?? "f1", 32));
+  titleRow.appendChild(avatar);
 
-    const label = document.createElement("div");
-    label.innerHTML = `<strong style="color:var(--accent-2)">자동 모드</strong> · ${AUTO_PRESETS[state.autoMode]?.label ?? state.autoMode} 진행 중`;
-    label.style.fontSize = "13px";
-    banner.appendChild(label);
-
-    const btnRow = document.createElement("div");
-    btnRow.style.display = "flex";
-    btnRow.style.gap = "6px";
-
-    const changeBtn = document.createElement("button");
-    changeBtn.textContent = "프리셋 변경";
-    changeBtn.style.padding = "6px 12px";
-    changeBtn.style.fontSize = "12px";
-    changeBtn.addEventListener("click", () => {
-      showAutoPanel = true;
-      route("weekly");
-    });
-    const offBtn = document.createElement("button");
-    offBtn.textContent = "자동 해제";
-    offBtn.className = "danger";
-    offBtn.style.padding = "6px 12px";
-    offBtn.style.fontSize = "12px";
-    offBtn.addEventListener("click", () => {
-      state.autoMode = null;
-      saveGame();
-      route("weekly");
-    });
-    btnRow.appendChild(changeBtn);
-    btnRow.appendChild(offBtn);
-    banner.appendChild(btnRow);
-    panel.appendChild(banner);
-  }
-
-  // 자동 훈련 토글 버튼 (자동 모드 비활성 시에만 표시)
-  if (!state.autoMode) {
-    const autoBtn = document.createElement("button");
-    autoBtn.textContent = showAutoPanel ? "자동 훈련 닫기" : "자동 훈련 — 프리셋 선택";
-    autoBtn.style.width = "100%";
-    autoBtn.style.marginBottom = "10px";
-    autoBtn.style.borderColor = "var(--accent-2)";
-    autoBtn.style.color = "var(--accent-2)";
-    autoBtn.addEventListener("click", () => {
-      showAutoPanel = !showAutoPanel;
-      route("weekly");
-    });
-    panel.appendChild(autoBtn);
-  }
-
-  if (showAutoPanel) {
-    panel.appendChild(renderAutoPanel(route));
-  }
-
-  // 카테고리 토글
-  const catRow = document.createElement("div");
-  catRow.style.display = "grid";
-  catRow.style.gridTemplateColumns = "1fr 1fr";
-  catRow.style.gap = "8px";
-  catRow.style.marginTop = "8px";
-
-  const batBtn = bigToggleButton("타자 훈련", selectedCategory === "batter", () => {
-    selectedCategory = "batter";
-    route("weekly");
+  const h = document.createElement("div");
+  h.style.fontSize = "13px";
+  h.style.fontWeight = "700";
+  h.style.lineHeight = "1.2";
+  h.style.minWidth = "0";
+  h.style.overflow = "hidden";
+  h.style.textOverflow = "ellipsis";
+  h.textContent = t("weekly.titleWithTeamGrade", {
+    name: player.name,
+    team: player.teamName,
+    grade: player.grade,
   });
-  const pitBtn = bigToggleButton("투수 훈련", selectedCategory === "pitcher", () => {
-    selectedCategory = "pitcher";
-    route("weekly");
-  });
-  if (injured) {
-    batBtn.disabled = true;
-    pitBtn.disabled = true;
-  }
-  catRow.appendChild(batBtn);
-  catRow.appendChild(pitBtn);
-  panel.appendChild(catRow);
+  titleRow.appendChild(h);
 
-  // 하위 훈련 버튼 그리드
-  const subWrap = document.createElement("div");
-  subWrap.style.marginTop = "12px";
-  subWrap.style.padding = "12px";
-  subWrap.style.background = "var(--panel-2)";
-  subWrap.style.border = "1px solid var(--border)";
-  subWrap.style.borderRadius = "8px";
+  panel.appendChild(titleRow);
 
-  const subTitle = document.createElement("div");
-  subTitle.className = "muted small";
-  subTitle.style.marginBottom = "8px";
-  subTitle.textContent = injured
-    ? "부상 중에는 휴식만 가능합니다."
-    : `${selectedCategory === "batter" ? "타자" : "투수"} — 종목을 선택하세요.`;
-  subWrap.appendChild(subTitle);
-
+  // 정보 grid — 3-col × 2줄 (부상 시 3줄)
   const grid = document.createElement("div");
   grid.style.display = "grid";
-  grid.style.gridTemplateColumns = "repeat(auto-fill, minmax(120px, 1fr))";
-  grid.style.gap = "8px";
+  grid.style.gridTemplateColumns = "repeat(3, minmax(0, 1fr))";
+  grid.style.gap = "6px 8px";
 
-  const items = selectedCategory === "batter" ? BATTER_TRAININGS : PITCHER_TRAININGS;
-  for (const key of items) {
-    const t = TRAININGS[key];
-    const b = trainingButton(t.label, `체력 ${t.stamina}`, injured, () => {
-      const res = doDailyAction("train", key);
-      handleActionResult(res, route);
-    });
-    grid.appendChild(b);
+  grid.appendChild(infoBlock(t("weekly.infoAge"), t("common.age", { age: player.age }), null, "sm"));
+  grid.appendChild(infoBlock(t("weekly.infoTalent"), t("talent." + player.talent), null, "sm"));
+  grid.appendChild(infoBlock(t("weekly.infoOverall"), overallScore(player).toFixed(1), null, "sm"));
+  grid.appendChild(infoBlock(
+    t("weekly.infoStamina"),
+    t("weekly.staminaVal", { cur: Math.round(player.stamina), max: player.maxStamina }),
+    player.stamina < 30 ? "warn" : null,
+    "sm",
+  ));
+  grid.appendChild(infoBlock(
+    t("weekly.infoCondition"),
+    `${Math.round(player.condition)}`,
+    player.condition > 70 ? "good" : player.condition < 30 ? "bad" : null,
+    "sm",
+  ));
+  grid.appendChild(infoBlock(
+    t("weekly.infoWeek"),
+    t("weekly.weekVal", { cur: season.weekIndex + 1, max: league.weeksPerSeason }),
+    null,
+    "sm",
+  ));
+  if (player.injury) {
+    grid.appendChild(infoBlock(
+      t("weekly.infoInjury"),
+      t("weekly.injuryVal", {
+        type: t("injury." + player.injury.severity),
+        weeks: player.injury.weeksLeft,
+      }),
+      "bad",
+      "sm",
+    ));
   }
-
-  // 휴식 — 항상 노출
-  const restBtn = trainingButton("휴식", "체력 +30~40", false, () => {
-    const res = doDailyAction("rest");
-    handleActionResult(res, route);
-  }, /*isRest=*/true);
-  grid.appendChild(restBtn);
-
-  subWrap.appendChild(grid);
-  panel.appendChild(subWrap);
-
-  // 부상 안내
-  if (injured) {
-    const n = document.createElement("div");
-    n.className = "notice bad";
-    n.textContent = `부상 중 (${state.player.injury.type}, ${state.player.injury.weeksLeft}주)`;
-    n.style.marginTop = "10px";
-    panel.appendChild(n);
-  }
-
+  panel.appendChild(grid);
   return panel;
 }
 
-function renderAutoPanel(route) {
+function infoBlock(label, value, tone, size = "md") {
+  const d = document.createElement("div");
+  d.style.minWidth = size === "sm" ? "0" : "100px";
+
+  const l = document.createElement("div");
+  l.textContent = label;
+  l.style.color = "var(--muted)";
+  l.style.lineHeight = "1.2";
+  l.style.fontSize = size === "sm" ? "10px" : "12px";
+
+  const v = document.createElement("div");
+  v.textContent = value;
+  v.style.lineHeight = "1.2";
+  v.style.fontWeight = "700";
+  v.style.fontVariantNumeric = "tabular-nums";
+  v.style.fontSize = size === "sm" ? "13px" : "18px";
+
+  if (tone === "warn") v.style.color = "var(--warn)";
+  if (tone === "bad") v.style.color = "var(--bad)";
+  if (tone === "good") v.style.color = "var(--good)";
+
+  d.appendChild(l);
+  d.appendChild(v);
+  return d;
+}
+
+// ─── Carousel slide body 함수들 (panel 없이 컨텐츠만) ──────────────
+function renderTrainingDirectionBody(route) {
   const wrap = document.createElement("div");
-  wrap.style.padding = "12px";
-  wrap.style.background = "var(--panel-2)";
-  wrap.style.border = "1px solid var(--accent-2)";
-  wrap.style.borderRadius = "8px";
-  wrap.style.marginBottom = "12px";
-
-  const title = document.createElement("div");
-  title.className = "muted small";
-  title.style.marginBottom = "10px";
-  const remaining = 5 - state.season.dayIndex;
-  title.textContent = `프리셋을 선택하면 남은 ${remaining}일을 자동 진행합니다.`;
-  wrap.appendChild(title);
-
-  const grid = document.createElement("div");
-  grid.style.display = "grid";
-  grid.style.gridTemplateColumns = "repeat(auto-fill, minmax(160px, 1fr))";
-  grid.style.gap = "8px";
-
-  for (const [key, preset] of Object.entries(AUTO_PRESETS)) {
-    const card = document.createElement("div");
-    card.style.background = "var(--panel)";
-    card.style.border = "1px solid var(--border)";
-    card.style.borderRadius = "6px";
-    card.style.padding = "10px";
-    card.style.cursor = "pointer";
-    card.style.transition = "border-color 120ms, transform 80ms";
-
-    const lbl = document.createElement("div");
-    lbl.style.fontWeight = "600";
-    lbl.style.fontSize = "14px";
-    lbl.textContent = preset.label;
-    const desc = document.createElement("div");
-    desc.className = "muted small";
-    desc.style.marginTop = "4px";
-    desc.style.lineHeight = "1.4";
-    desc.textContent = preset.desc;
-
-    card.appendChild(lbl);
-    card.appendChild(desc);
-
-    card.addEventListener("mouseenter", () => {
-      card.style.borderColor = "var(--accent-2)";
+  wrap.appendChild(renderAutoPanel(route));
+  if (state.player.injury) {
+    const n = document.createElement("div");
+    n.className = "notice bad";
+    n.style.marginTop = "10px";
+    n.textContent = t("injury.inProgress", {
+      type: t("injury." + state.player.injury.severity),
+      weeks: state.player.injury.weeksLeft,
     });
-    card.addEventListener("mouseleave", () => {
-      card.style.borderColor = "var(--border)";
-    });
-    card.addEventListener("click", () => {
-      state.autoMode = key;
-      const summary = autoFillWeek(key);
-      saveGame();
-      showAutoPanel = false;
-      route("weekly");
-      const msgs = [`${preset.label} 자동 모드 ON`];
-      if (summary.days.length > 0) msgs.push(`${summary.days.length}일 진행`);
-      if (summary.crits > 0) msgs.push(`대성공 ${summary.crits}회`);
-      if (summary.newInjury) msgs.push("부상 발생");
-      showCriticalToast(msgs.join(" · "));
-    });
-    grid.appendChild(card);
+    wrap.appendChild(n);
   }
-  wrap.appendChild(grid);
   return wrap;
 }
 
-function bigToggleButton(label, active, onClick) {
-  const b = document.createElement("button");
-  b.textContent = label;
-  if (active) b.classList.add("primary");
-  b.style.padding = "14px 12px";
-  b.style.fontSize = "15px";
-  b.addEventListener("click", onClick);
-  return b;
-}
-
-function trainingButton(label, sub, disabled, onClick, isRest = false) {
-  const b = document.createElement("button");
-  b.style.display = "flex";
-  b.style.flexDirection = "column";
-  b.style.alignItems = "center";
-  b.style.gap = "2px";
-  b.style.padding = "10px 6px";
-  if (isRest) {
-    b.style.borderColor = "var(--good)";
-    b.style.color = "var(--good)";
-  }
-  if (disabled) b.disabled = true;
-
-  const t = document.createElement("span");
-  t.textContent = label;
-  t.style.fontSize = "13px";
-  t.style.fontWeight = "600";
-  const s = document.createElement("span");
-  s.textContent = sub;
-  s.style.fontSize = "11px";
-  s.style.color = "var(--muted)";
-
-  b.appendChild(t);
-  b.appendChild(s);
-  b.addEventListener("click", onClick);
-  return b;
-}
-
-function handleActionResult(res, route) {
-  if (!res.ok) {
-    alert(`행동 실패: ${res.reason}`);
-    return;
-  }
-  saveGame();
-  route("weekly");
-  if (res.critical) {
-    showCriticalToast(`${res.label} 대성공! 효과 2배`);
-  }
-}
-
-function showCriticalToast(msg) {
-  const t = document.createElement("div");
-  t.textContent = msg;
-  Object.assign(t.style, {
-    position: "fixed",
-    top: "20px",
-    left: "50%",
-    transform: "translateX(-50%)",
-    background: "#3fb950",
-    color: "#08111c",
-    padding: "12px 24px",
-    borderRadius: "8px",
-    fontWeight: "700",
-    fontSize: "15px",
-    boxShadow: "0 6px 20px rgba(63,185,80,0.4), 0 0 30px rgba(63,185,80,0.3)",
-    zIndex: "1000",
-    transition: "opacity 400ms, transform 400ms",
-    pointerEvents: "none",
-  });
-  document.body.appendChild(t);
-  // 입장 애니메이션
-  requestAnimationFrame(() => {
-    t.style.transform = "translateX(-50%) translateY(6px)";
-  });
-  setTimeout(() => {
-    t.style.opacity = "0";
-    t.style.transform = "translateX(-50%) translateY(-10px)";
-  }, 1800);
-  setTimeout(() => t.remove(), 2300);
-}
-
-function renderWeekendButton(route) {
-  const panel = document.createElement("section");
-  panel.className = "panel";
-  const h = document.createElement("h3");
-  h.textContent = "주말 — 경기 진행";
-  panel.appendChild(h);
-  const desc = document.createElement("p");
-  desc.className = "muted small";
-  if (state.autoMode) {
-    desc.innerHTML = `자동 모드 (<strong style="color:var(--accent-2)">${AUTO_PRESETS[state.autoMode]?.label}</strong>) 활성. 경기 진행 후 다음 주 평일도 자동으로 채워집니다.<br>프리셋 변경/해제는 아래 버튼으로 가능합니다.`;
-  } else {
-    desc.textContent = "이번 주 평일이 모두 끝났습니다. 주말 경기를 자동 시뮬레이션합니다.";
-  }
-  panel.appendChild(desc);
-
-  const btn = document.createElement("button");
-  btn.className = "primary";
-  btn.textContent = state.autoMode ? "주말 경기 진행 + 다음 주 자동 진행" : "주말 경기 진행";
-  btn.style.marginTop = "10px";
-  btn.addEventListener("click", () => {
-    const r = endWeek();
-    if (!r.ok) { alert(r.reason); return; }
-
-    // 자동 모드면 다음 주 평일 자동 채움 (시즌 종료 안 된 경우)
-    let autoSummary = null;
-    if (state.autoMode && state.season && !state.season.finished) {
-      autoSummary = autoFillWeek(state.autoMode);
-    }
-
-    saveGame();
-    route("weekly");
-
-    if (autoSummary && (autoSummary.crits > 0 || autoSummary.newInjury)) {
-      const msgs = [`자동 진행 ${autoSummary.days.length}일`];
-      if (autoSummary.crits > 0) msgs.push(`대성공 ${autoSummary.crits}회`);
-      if (autoSummary.newInjury) msgs.push("부상 발생");
-      showCriticalToast(msgs.join(" · "));
-    }
-  });
-  panel.appendChild(btn);
-
-  // 자동 모드 활성 시 변경/해제 버튼
-  if (state.autoMode) {
-    const btnRow = document.createElement("div");
-    btnRow.style.display = "flex";
-    btnRow.style.gap = "8px";
-    btnRow.style.marginTop = "10px";
-
-    const changeBtn = document.createElement("button");
-    changeBtn.textContent = "프리셋 변경";
-    changeBtn.addEventListener("click", () => {
-      showAutoPanel = true;
-      route("weekly");
-    });
-    const offBtn = document.createElement("button");
-    offBtn.textContent = "자동 해제";
-    offBtn.className = "danger";
-    offBtn.addEventListener("click", () => {
-      state.autoMode = null;
-      saveGame();
-      route("weekly");
-    });
-    btnRow.appendChild(changeBtn);
-    btnRow.appendChild(offBtn);
-    panel.appendChild(btnRow);
-
-    // 자동 모드 + 주말 상태에서 프리셋 변경 패널도 표시 가능
-    if (showAutoPanel) {
-      panel.appendChild(renderAutoPanel(route));
-    }
-  }
-
-  return panel;
-}
-
-function renderStatsPanel(player) {
-  const panel = document.createElement("section");
-  panel.className = "panel";
-  const h = document.createElement("h2");
-  h.textContent = "능력치";
-  panel.appendChild(h);
-
-  const chances = appearanceChance(player);
-
-  // 10각 레이더 차트 (타자5 + 투수5)
-  const radarWrap = document.createElement("div");
-  radarWrap.style.display = "flex";
-  radarWrap.style.gap = "16px";
-  radarWrap.style.alignItems = "center";
-  radarWrap.style.flexWrap = "wrap";
-
-  const radarBox = document.createElement("div");
-  radarBox.style.flex = "0 0 auto";
-
-  const labels = [...BATTER_STATS, ...PITCHER_STATS];
-  const values = {};
-  for (const s of BATTER_STATS) values[s] = player.batter[s];
-  for (const s of PITCHER_STATS) values[s] = player.pitcher[s];
-
-  const radarSvg = createRadarSVG(values, labels, {
-    size: 300,
-    min: 0,
-    max: 150,
-    labelMap: STAT_LABELS,
-  });
-  radarBox.appendChild(radarSvg);
-  radarWrap.appendChild(radarBox);
-
-  // 우측: 수치 + 출장률
-  const numsCol = document.createElement("div");
-  numsCol.style.flex = "1 1 200px";
-  numsCol.style.minWidth = "200px";
-
-  const batH = document.createElement("h3");
-  batH.innerHTML = `타자 <span style="color:var(--accent); font-size:12px">출장률 ${Math.round(chances.bat * 100)}%</span>`;
-  numsCol.appendChild(batH);
-  for (const s of BATTER_STATS) {
-    numsCol.appendChild(miniStatRow(STAT_LABELS[s], player.batter[s], "var(--accent)"));
-  }
-
-  const pitH = document.createElement("h3");
-  const restNote = player.gamesSinceLastPitch === 0 ? " · 다음 경기 휴식" : "";
-  pitH.innerHTML = `투수 <span style="color:var(--accent-2); font-size:12px">등판률 ${Math.round(chances.pitch * 100)}%${restNote}</span>`;
-  pitH.style.marginTop = "12px";
-  numsCol.appendChild(pitH);
-  for (const s of PITCHER_STATS) {
-    numsCol.appendChild(miniStatRow(STAT_LABELS[s], player.pitcher[s], "var(--accent-2)"));
-  }
-
-  radarWrap.appendChild(numsCol);
-  panel.appendChild(radarWrap);
-
-  // 시즌 성적
-  panel.appendChild(renderSeasonLine(player));
-  return panel;
-}
-
-function miniStatRow(label, value, color = "var(--accent)") {
-  const row = document.createElement("div");
-  row.style.display = "flex";
-  row.style.justifyContent = "space-between";
-  row.style.alignItems = "center";
-  row.style.padding = "2px 0";
-  row.style.fontSize = "12px";
-  const n = document.createElement("span");
-  n.className = "muted";
-  n.textContent = label;
-  const v = document.createElement("span");
-  v.style.color = color;
-  v.style.fontWeight = "600";
-  v.style.fontVariantNumeric = "tabular-nums";
-  v.textContent = Math.round(value);
-  row.appendChild(n);
-  row.appendChild(v);
-  return row;
-}
-
-function statRow(label, value) {
-  const row = document.createElement("div");
-  row.className = "stat-row";
-  const n = document.createElement("div");
-  n.className = "stat-name"; n.textContent = label;
-  const bar = document.createElement("div");
-  bar.className = "stat-bar";
-  const fill = document.createElement("div");
-  fill.className = "stat-fill";
-  fill.style.width = `${Math.min(100, value)}%`;
-  bar.appendChild(fill);
-  const v = document.createElement("div");
-  v.className = "stat-val";
-  v.textContent = Math.round(value);
-  row.appendChild(n); row.appendChild(bar); row.appendChild(v);
-  return row;
-}
-
-function renderSeasonLine(player) {
+function renderSeasonBody(player) {
+  const wrap = document.createElement("div");
   const s = player.seasonStats;
   const ba = s.ab > 0 ? (s.h / s.ab).toFixed(3).replace(/^0/, "") : ".---";
   const obp = (s.ab + s.bb) > 0 ? ((s.h + s.bb) / (s.ab + s.bb)).toFixed(3).replace(/^0/, "") : ".---";
   const slg = s.ab > 0 ? (s.tb / s.ab).toFixed(3).replace(/^0/, "") : ".---";
   const era = s.ip > 0 ? ((s.er / s.ip) * 9).toFixed(2) : "-";
+  const ops = s.ab > 0 ? (parseFloat("0" + obp) + parseFloat("0" + slg)).toFixed(3) : "-";
 
-  const wrap = document.createElement("div");
-  wrap.style.marginTop = "12px";
-  const h = document.createElement("h3");
-  h.textContent = "시즌 성적";
-  wrap.appendChild(h);
+  const batCard = statBlock(t("weekly.seasonBatter"), "var(--accent)");
+  batCard.body.appendChild(infoBlock(t("weekly.statG"),  s.games, null, "sm"));
+  batCard.body.appendChild(infoBlock(t("weekly.statPa"), s.pa,    null, "sm"));
+  batCard.body.appendChild(infoBlock(t("weekly.statH"),  s.h,     null, "sm"));
+  batCard.body.appendChild(infoBlock(t("weekly.statHr"), s.hr,    null, "sm"));
+  batCard.body.appendChild(infoBlock(t("weekly.statBa"), ba,      null, "sm"));
+  batCard.body.appendChild(infoBlock(t("weekly.statOps"), ops,    null, "sm"));
+  batCard.root.style.marginBottom = "8px";
+  wrap.appendChild(batCard.root);
 
-  const row = document.createElement("div");
-  row.className = "row";
-  row.appendChild(infoBlock("경기", s.games));
-  row.appendChild(infoBlock("타석", s.pa));
-  row.appendChild(infoBlock("안타", s.h));
-  row.appendChild(infoBlock("홈런", s.hr));
-  row.appendChild(infoBlock("타율", ba));
-  row.appendChild(infoBlock("OPS", (s.ab > 0 ? (parseFloat("0" + obp) + parseFloat("0" + slg)).toFixed(3) : "-")));
-  if (s.pitchG > 0) {
-    row.appendChild(infoBlock("투수 등판", s.pitchG));
-    row.appendChild(infoBlock("이닝", s.ip));
-    row.appendChild(infoBlock("ERA", era));
-    row.appendChild(infoBlock("K", s.pK));
-  }
-  wrap.appendChild(row);
+  const pitCard = statBlock(t("weekly.seasonPitcher"), "var(--accent-2)");
+  pitCard.body.appendChild(infoBlock(t("weekly.statPitchG"), s.pitchG, null, "sm"));
+  pitCard.body.appendChild(infoBlock(t("weekly.statIp"),    s.ip,      null, "sm"));
+  pitCard.body.appendChild(infoBlock(t("weekly.statEra"),   era,       null, "sm"));
+  pitCard.body.appendChild(infoBlock(t("weekly.statKK"),    s.pK,      null, "sm"));
+  wrap.appendChild(pitCard.root);
+
+  // 이번 시즌의 대회 기록
+  wrap.appendChild(renderSeasonTournaments(player));
+
   return wrap;
 }
 
-function renderLastWeekResults(results) {
-  const panel = document.createElement("section");
-  panel.className = "panel";
-  const h = document.createElement("h2");
-  h.textContent = "지난 주 경기 결과";
-  panel.appendChild(h);
+// 이번 시즌(현재 year) 의 대회 기록을 카드 형태로 — 각 토너먼트별 결과 + MVP 뱃지
+function renderSeasonTournaments(player) {
+  const wrap = document.createElement("div");
+  wrap.style.background = "var(--panel-2)";
+  wrap.style.border = "1px solid var(--border)";
+  wrap.style.borderTop = "3px solid var(--good)";
+  wrap.style.borderRadius = "8px";
+  wrap.style.padding = "8px";
+  wrap.style.marginTop = "8px";
 
+  const h = document.createElement("h4");
+  h.textContent = t("weekly.tournamentRecords");
+  h.style.margin = "0 0 6px";
+  h.style.fontSize = "11px";
+  h.style.fontWeight = "700";
+  h.style.letterSpacing = "0.3px";
+  h.style.color = "var(--good)";
+  wrap.appendChild(h);
+
+  const year = state.gameDate?.year;
+  const records = (player.tournamentHistory ?? []).filter(r => r.year === year);
+  if (records.length === 0) {
+    const none = document.createElement("div");
+    none.className = "muted small";
+    none.style.fontSize = "11px";
+    none.textContent = t("weekly.noTournamentsYet");
+    wrap.appendChild(none);
+    return wrap;
+  }
+  for (const r of records) {
+    const row = document.createElement("div");
+    row.style.display = "flex";
+    row.style.justifyContent = "space-between";
+    row.style.alignItems = "center";
+    row.style.padding = "3px 0";
+    row.style.fontSize = "12px";
+
+    const name = document.createElement("span");
+    name.textContent = t("tournament." + r.tournamentKey);
+    row.appendChild(name);
+
+    const result = document.createElement("span");
+    const resultColor = r.result === "champion" ? "var(--good)"
+                      : r.result === "runner"   ? "var(--accent-2)"
+                      : "var(--muted)";
+    result.style.color = resultColor;
+    result.style.fontWeight = "700";
+    result.textContent = t("result." + r.result);
+    if (r.mvp) {
+      result.textContent += "  ★ " + t("weekly.mvpBadge");
+    }
+    row.appendChild(result);
+
+    wrap.appendChild(row);
+  }
+  return wrap;
+}
+
+function renderLastWeekBody(results) {
+  const wrap = document.createElement("div");
+  if (!results || results.length === 0) {
+    const none = document.createElement("div");
+    none.className = "muted small";
+    none.style.padding = "20px 0";
+    none.style.textAlign = "center";
+    none.textContent = t("weekly.noGamesYet");
+    wrap.appendChild(none);
+    return wrap;
+  }
   for (const r of results) {
     const line = document.createElement("div");
     line.style.padding = "6px 0";
     line.style.borderBottom = "1px solid var(--border)";
+    line.style.fontSize = "13px";
     const isMyGame = !!r.mainPlayer;
     const text = `${r.away.team.name} ${r.away.score} : ${r.home.score} ${r.home.team.name}`;
     line.innerHTML = `<span class="${isMyGame ? "big" : ""}">${text}</span>`;
@@ -773,134 +991,745 @@ function renderLastWeekResults(results) {
       detail.style.gap = "2px";
 
       if (mp.batterBox && mp.batterBox.pa > 0) {
-        const batEvents = (mp.events ?? []).filter(e => e.role === "batter").map(e => e.desc).join(" / ");
+        const batEvents = (mp.events ?? [])
+          .filter(e => e.role === "batter")
+          .map(e => t("event." + e.type))
+          .join(" / ");
         const b = mp.batterBox;
         const bLine = document.createElement("div");
         bLine.className = "muted small";
-        bLine.innerHTML = `<span style="color:var(--accent)">[타]</span> ${b.pa}타석 ${b.h}안타 ${b.hr}홈런 ${b.k}삼진${batEvents ? ` — ${batEvents}` : ""}`;
+        const recap = t("weekly.batterRecap", { pa: b.pa, h: b.h, hr: b.hr, k: b.k });
+        bLine.innerHTML = `<span style="color:var(--accent)">${t("weekly.batLabel")}</span> ${recap}${batEvents ? ` — ${batEvents}` : ""}`;
         detail.appendChild(bLine);
       }
       if (mp.pitcherBox) {
         const p = mp.pitcherBox;
         const pLine = document.createElement("div");
         pLine.className = "muted small";
-        pLine.innerHTML = `<span style="color:var(--accent-2)">[투]</span> 9이닝 ${p.er ?? 0}자책 ${p.pK ?? 0}K ${p.pBB ?? 0}BB ${p.pH ?? 0}피안타`;
+        const recap = t("weekly.pitcherRecap", {
+          er: p.er ?? 0, k: p.pK ?? 0, bb: p.pBB ?? 0, h: p.pH ?? 0,
+        });
+        pLine.innerHTML = `<span style="color:var(--accent-2)">${t("weekly.pitLabel")}</span> ${recap}`;
         detail.appendChild(pLine);
       }
       line.appendChild(detail);
     }
-    panel.appendChild(line);
+    wrap.appendChild(line);
   }
-  return panel;
+  return wrap;
 }
 
-function renderStandings(league) {
-  const panel = document.createElement("section");
-  panel.className = "panel";
-  const h = document.createElement("h2");
-  h.textContent = "리그 순위";
-  panel.appendChild(h);
-
+function renderStandingsBody(league) {
+  const wrap = document.createElement("div");
+  const head = t("weekly.standingsHead");
   const table = document.createElement("table");
+  table.style.fontSize = "12px";
   const thead = document.createElement("thead");
-  thead.innerHTML = "<tr><th>#</th><th>팀</th><th>W</th><th>L</th><th>T</th><th>승률</th></tr>";
+  thead.innerHTML = `<tr><th>${head.rank}</th><th>${head.team}</th><th>${head.w}</th><th>${head.l}</th><th>${head.t}</th><th>${head.pct}</th></tr>`;
   table.appendChild(thead);
   const tbody = document.createElement("tbody");
   const sorted = standings(league);
-  sorted.forEach((t, i) => {
+  sorted.forEach((tm, i) => {
     const tr = document.createElement("tr");
-    if (t.isPlayerTeam) tr.className = "me";
-    const total = t.record.w + t.record.l;
-    const pct = total > 0 ? (t.record.w / total).toFixed(3).replace(/^0/, "") : ".---";
-    tr.innerHTML = `<td>${i + 1}</td><td>${t.name}</td><td class="num">${t.record.w}</td><td class="num">${t.record.l}</td><td class="num">${t.record.t}</td><td class="num">${pct}</td>`;
+    if (tm.isPlayerTeam) tr.className = "me";
+    const total = tm.record.w + tm.record.l;
+    const pct = total > 0 ? (tm.record.w / total).toFixed(3).replace(/^0/, "") : ".---";
+    tr.innerHTML = `<td>${i + 1}</td><td>${tm.name}</td><td class="num">${tm.record.w}</td><td class="num">${tm.record.l}</td><td class="num">${tm.record.t}</td><td class="num">${pct}</td>`;
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
-  panel.appendChild(table);
-  return panel;
+  wrap.appendChild(table);
+  return wrap;
 }
 
-// ─────────────── 시즌 종료 ───────────────
+// 시즌 종료 화면용 — 능력치 (레이더 + 막대 그래프) body
+function renderAttributesBody(player) {
+  const wrap = document.createElement("div");
+  const chances = appearanceChance(player);
+  const statLabels = getStatLabels();
+
+  const row = document.createElement("div");
+  row.style.display = "flex";
+  row.style.gap = "8px";
+  row.style.alignItems = "flex-start";
+
+  const radarBox = document.createElement("div");
+  radarBox.style.flex = "0 0 auto";
+  const labels = [...BATTER_STATS, ...PITCHER_STATS];
+  const values = {};
+  for (const s of BATTER_STATS) values[s] = player.batter[s];
+  for (const s of PITCHER_STATS) values[s] = player.pitcher[s];
+  radarBox.appendChild(createRadarSVG(values, labels, {
+    size: 160, min: 0, max: 150, labelMap: statLabels,
+  }));
+  row.appendChild(radarBox);
+
+  const barsCol = document.createElement("div");
+  barsCol.style.flex = "1 1 0";
+  barsCol.style.minWidth = "0";
+  barsCol.style.display = "flex";
+  barsCol.style.flexDirection = "column";
+  barsCol.style.gap = "3px";
+  for (const s of BATTER_STATS) {
+    barsCol.appendChild(statBarRow(statLabels[s], player.batter[s], "var(--accent)"));
+  }
+  for (const s of PITCHER_STATS) {
+    barsCol.appendChild(statBarRow(statLabels[s], player.pitcher[s], "var(--accent-2)"));
+  }
+  row.appendChild(barsCol);
+  wrap.appendChild(row);
+  return wrap;
+}
+
+function renderAutoPanel(route) {
+  // 능력치 카드와 동일하게 — 외곽 컨테이너/안내 텍스트 없이 grid 자체만 panel에 추가됨
+  // 안드로이드 portrait (~360px) 에서는 auto-fit 으로 wrap 되어 4개씩 2줄로, 데스크탑(>~1000px) 에선 8개 한 줄로.
+  const grid = document.createElement("div");
+  grid.style.display = "grid";
+  grid.style.gridTemplateColumns = "repeat(auto-fit, minmax(78px, 1fr))";
+  grid.style.gap = "6px";
+
+  for (const key of Object.keys(AUTO_PRESETS)) {
+    const active = state.autoMode === key;
+    const card = document.createElement("div");
+    card.style.background = active ? "rgba(255,184,78,0.12)" : "var(--panel)";
+    card.style.border = active ? "1.5px solid var(--accent-2)" : "1px solid var(--border)";
+    card.style.borderRadius = "6px";
+    card.style.padding = "8px 6px";
+    card.style.cursor = "pointer";
+    card.style.transition = "border-color 120ms, background 120ms";
+    card.style.minWidth = "0";
+
+    const lbl = document.createElement("div");
+    lbl.style.fontWeight = "700";
+    lbl.style.fontSize = "12px";
+    lbl.style.lineHeight = "1.2";
+    lbl.style.color = active ? "var(--accent-2)" : "var(--text)";
+    lbl.textContent = t("preset." + key + ".label");
+    const desc = document.createElement("div");
+    desc.className = "muted small";
+    desc.style.marginTop = "4px";
+    desc.style.lineHeight = "1.3";
+    desc.style.fontSize = "10.5px";
+    desc.textContent = t("preset." + key + ".desc");
+
+    card.appendChild(lbl);
+    card.appendChild(desc);
+
+    card.addEventListener("mouseenter", () => {
+      if (!active) card.style.borderColor = "var(--accent-2)";
+    });
+    card.addEventListener("mouseleave", () => {
+      if (!active) card.style.borderColor = "var(--border)";
+    });
+    card.addEventListener("click", () => {
+      state.autoMode = key;
+      const summary = autoFillWeek(key);
+      saveGame();
+      route("weekly");
+      const msgs = [t("weekly.autoToggleOn", { label: t("preset." + key + ".label") })];
+      if (summary.days.length > 0) msgs.push(t("weekly.autoDays", { days: summary.days.length }));
+      if (summary.crits > 0) msgs.push(t("weekly.autoCrits", { count: summary.crits }));
+      if (summary.newInjury) msgs.push(t("weekly.autoInjury"));
+      showCriticalToast(msgs.join(" · "));
+    });
+    grid.appendChild(card);
+  }
+  return grid;
+}
+
+// 토스트 — kind = "good" (긍정) | "bad" (부정) | "info" (중립)
+function showToast(msg, kind = "good") {
+  const colors = {
+    good: { bg: "#3fb950", shadow: "rgba(63,185,80,0.4)" },
+    bad:  { bg: "#f85149", shadow: "rgba(248,81,73,0.4)" },
+    info: { bg: "#4ea4ff", shadow: "rgba(78,164,255,0.4)" },
+  };
+  const c = colors[kind] ?? colors.good;
+  const el = document.createElement("div");
+  el.textContent = msg;
+  Object.assign(el.style, {
+    position: "fixed",
+    top: "20px",
+    left: "50%",
+    transform: "translateX(-50%)",
+    background: c.bg,
+    color: "#08111c",
+    padding: "12px 20px",
+    borderRadius: "8px",
+    fontWeight: "700",
+    fontSize: "14px",
+    maxWidth: "92vw",
+    boxShadow: `0 6px 20px ${c.shadow}, 0 0 30px ${c.shadow}`,
+    zIndex: "1000",
+    transition: "opacity 400ms, transform 400ms",
+    pointerEvents: "none",
+  });
+  document.body.appendChild(el);
+  requestAnimationFrame(() => {
+    el.style.transform = "translateX(-50%) translateY(6px)";
+  });
+  setTimeout(() => {
+    el.style.opacity = "0";
+    el.style.transform = "translateX(-50%) translateY(-10px)";
+  }, 1800);
+  setTimeout(() => el.remove(), 2300);
+}
+
+// 부상 토스트 — applyInjury 에서 set 한 _isNew 플래그를 감지해 한 번만 띄움
+function showInjuryToastIfNeeded() {
+  const inj = state.player?.injury;
+  if (inj?._isNew) {
+    showToast(t("injury.detected", {
+      type: t("injury." + inj.severity),
+      weeks: inj.weeksLeft,
+    }), "bad");
+    inj._isNew = false;
+  }
+}
+
+// pendingToasts 큐를 소비 — 여러 개면 시간 차로 띄움.
+function drainPendingToasts() {
+  const queue = state.pendingToasts ?? [];
+  if (queue.length === 0) return;
+  queue.forEach((toast, idx) => {
+    setTimeout(() => showToast(toast.msg, toast.kind), idx * 300);
+  });
+  state.pendingToasts = [];
+}
+
+// 호환: 옛 이름 그대로 호출하는 곳을 위해 별칭
+function showCriticalToast(msg) { showToast(msg, "good"); }
+
+// 능력치 1개 행 — 라벨 + 막대 그래프 + 수치. STAT_CAP(150) 기준.
+function statBarRow(label, value, color) {
+  const row = document.createElement("div");
+  row.className = "stat-row";
+
+  const n = document.createElement("div");
+  n.className = "stat-name";
+  n.textContent = label;
+
+  const bar = document.createElement("div");
+  bar.className = "stat-bar";
+  const fill = document.createElement("div");
+  fill.className = "stat-fill";
+  fill.style.background = color;
+  fill.style.width = `${Math.min(100, (value / 150) * 100)}%`;
+  bar.appendChild(fill);
+
+  const v = document.createElement("div");
+  v.className = "stat-val";
+  v.style.color = color;
+  v.style.fontWeight = "600";
+  v.textContent = Math.round(value);
+
+  row.appendChild(n);
+  row.appendChild(bar);
+  row.appendChild(v);
+  return row;
+}
+
+// 시즌성적 좌/우 컬럼 — 컬러 상단 보더 + 패널2 배경으로 영역 시각 구분
+function statBlock(title, accent) {
+  const root = document.createElement("div");
+  root.style.flex = "1 1 180px";
+  root.style.minWidth = "160px";
+  root.style.background = "var(--panel-2)";
+  root.style.border = "1px solid var(--border)";
+  root.style.borderTop = `3px solid ${accent}`;
+  root.style.borderRadius = "8px";
+  root.style.padding = "8px";
+
+  const h = document.createElement("h4");
+  h.textContent = title;
+  h.style.margin = "0 0 6px";
+  h.style.color = accent;
+  h.style.fontSize = "11px";
+  h.style.fontWeight = "700";
+  h.style.letterSpacing = "0.3px";
+  root.appendChild(h);
+
+  // 컴팩트 grid — 안드로이드 폭 기준 3-col 로 강제 (6칸 → 2줄 / 4칸 → 1.x 줄)
+  const body = document.createElement("div");
+  body.style.display = "grid";
+  body.style.gridTemplateColumns = "repeat(3, minmax(0, 1fr))";
+  body.style.gap = "6px 8px";
+  root.appendChild(body);
+
+  return { root, body };
+}
+
+// (구) renderLastWeekResults / renderStandings — carousel slide body 로 대체됨.
+
+// ─────────────── 시즌 종료 + 휴식기 ───────────────
+// 시즌 종료 carousel 인덱스
+let seasonEndCarouselIdx = 0;
+
+// 커리어 하이 grid — careerHistory + 현재 시즌의 stat별 최고 기록
+function renderCareerHighGrid(player) {
+  const seasons = [
+    ...(player.careerHistory ?? []).map(h => h.stats),
+    player.seasonStats,
+  ];
+
+  function max(getter) {
+    let m = 0;
+    for (const s of seasons) {
+      const v = getter(s);
+      if (v != null && v > m) m = v;
+    }
+    return m;
+  }
+  function bestBA() {
+    let best = 0;
+    for (const s of seasons) {
+      if (s.ab > 0) {
+        const ba = s.h / s.ab;
+        if (ba > best) best = ba;
+      }
+    }
+    return best > 0 ? best.toFixed(3).replace(/^0/, "") : ".---";
+  }
+  function bestERA() {
+    let best = null;
+    for (const s of seasons) {
+      if (s.ip > 0) {
+        const era = (s.er / s.ip) * 9;
+        if (best == null || era < best) best = era;
+      }
+    }
+    return best == null ? "-" : best.toFixed(2);
+  }
+
+  const grid = document.createElement("div");
+  grid.style.display = "grid";
+  grid.style.gridTemplateColumns = "repeat(4, minmax(0, 1fr))";
+  grid.style.gap = "6px 8px";
+
+  grid.appendChild(infoBlock(t("weekly.statBa"), bestBA(), null, "sm"));
+  grid.appendChild(infoBlock(t("weekly.statHr"), max(s => s.hr), null, "sm"));
+  grid.appendChild(infoBlock(t("weekly.statH"),  max(s => s.h),  null, "sm"));
+  grid.appendChild(infoBlock(t("weekly.statEra"), bestERA(), null, "sm"));
+  grid.appendChild(infoBlock(t("weekly.statKK"),  max(s => s.pK), null, "sm"));
+  grid.appendChild(infoBlock(t("weekly.statIp"),  max(s => s.ip), null, "sm"));
+  grid.appendChild(infoBlock(t("weekly.statPa"),  max(s => s.pa), null, "sm"));
+  grid.appendChild(infoBlock(t("weekly.statG"),   max(s => s.games), null, "sm"));
+
+  return grid;
+}
+
 function renderSeasonEnd(root, route) {
   root.innerHTML = "";
-  const { player, league, season } = state;
+  const { player, league } = state;
   const wrap = document.createElement("div");
   wrap.className = "stack";
 
-  const panel = document.createElement("section");
-  panel.className = "panel";
+  // 1) 시즌 종료 헤더 카드 — 제목 + 해당 시즌 1줄 요약
+  const headerPanel = document.createElement("section");
+  headerPanel.className = "panel";
+  headerPanel.style.padding = "10px 12px";
+
   const h = document.createElement("h2");
-  h.textContent = `${player.grade}학년 시즌 종료`;
-  panel.appendChild(h);
+  h.style.margin = "0 0 4px";
+  h.style.fontSize = "15px";
+  h.textContent = t("weekly.seasonEndTitle", { grade: player.grade });
+  headerPanel.appendChild(h);
 
   const s = player.seasonStats;
   const ba = s.ab > 0 ? (s.h / s.ab).toFixed(3).replace(/^0/, "") : ".---";
   const era = s.ip > 0 ? ((s.er / s.ip) * 9).toFixed(2) : "-";
-
-  const summary = document.createElement("div");
-  summary.className = "row";
-  summary.appendChild(infoBlock("경기", s.games));
-  summary.appendChild(infoBlock("타율", ba));
-  summary.appendChild(infoBlock("홈런", s.hr));
-  summary.appendChild(infoBlock("ERA", era));
-  summary.appendChild(infoBlock("종합", overallScore(player).toFixed(1)));
-
   const team = getPlayerTeam(league);
-  if (team) summary.appendChild(infoBlock("팀 성적", `${team.record.w}승 ${team.record.l}패`));
+  const summary = document.createElement("div");
+  summary.className = "muted small";
+  summary.style.fontSize = "11px";
+  summary.textContent = `${s.games} ${t("weekly.statG")} · ${t("weekly.statBa")} ${ba} · ${s.hr} ${t("weekly.statHr")} · ${t("weekly.statEra")} ${era}`
+    + (team ? ` · ${t("weekly.teamRecordVal", { w: team.record.w, l: team.record.l })}` : "");
+  headerPanel.appendChild(summary);
+  wrap.appendChild(headerPanel);
 
-  panel.appendChild(summary);
+  // 2) 커리어 하이 카드 (별도 패널)
+  const careerPanel = document.createElement("section");
+  careerPanel.className = "panel";
+  careerPanel.style.padding = "10px 12px";
+  const careerTitle = document.createElement("h3");
+  careerTitle.style.margin = "0 0 8px";
+  careerTitle.style.fontSize = "12px";
+  careerTitle.style.color = "var(--accent-2)";
+  careerTitle.style.textTransform = "uppercase";
+  careerTitle.style.letterSpacing = "0.5px";
+  careerTitle.textContent = t("weekly.careerHigh");
+  careerPanel.appendChild(careerTitle);
+  careerPanel.appendChild(renderCareerHighGrid(player));
+  wrap.appendChild(careerPanel);
 
-  // 순위표
-  panel.appendChild(renderStandings(league));
+  // 2) Carousel — 시즌 성적 / 리그 순위 / 능력치
+  const slides = [
+    { title: t("weekly.seasonStatsTitle"), render: () => renderSeasonBody(player) },
+    { title: t("weekly.standingsTitle"),   render: () => renderStandingsBody(league) },
+    { title: t("weekly.statsTitle"),       render: () => renderAttributesBody(player) },
+  ];
+  if (seasonEndCarouselIdx >= slides.length) seasonEndCarouselIdx = 0;
+  wrap.appendChild(renderCarousel(slides, {
+    get: () => seasonEndCarouselIdx,
+    set: i => { seasonEndCarouselIdx = i; },
+  }));
 
-  // 진행 버튼
+  // 3) 진행 버튼 분기
   const isGraduation = player.stage === "high" && player.grade >= 3;
-
   if (state.career?.ended) {
-    const note = document.createElement("div");
-    note.className = "notice";
-    note.textContent = "고교 졸업! (Phase 1에서는 여기까지) Phase 3에서 드래프트/대학/프로 분기가 추가됩니다.";
-    panel.appendChild(note);
-    const btn = document.createElement("button");
-    btn.textContent = "메인 메뉴로";
-    btn.addEventListener("click", () => route("menu"));
-    panel.appendChild(btn);
+    wrap.appendChild(renderCareerEndedPanel(route));
   } else if (isGraduation) {
-    const note = document.createElement("div");
-    note.className = "notice";
-    note.textContent = "고교 3학년 시즌까지 마쳤습니다. 졸업으로 넘어갑니다.";
-    note.style.marginTop = "12px";
-    panel.appendChild(note);
-    const btn = document.createElement("button");
-    btn.className = "primary";
-    btn.textContent = "졸업";
-    btn.style.marginTop = "12px";
-    btn.addEventListener("click", () => {
-      advanceToNextSeason();
-      transitionAfterSeason(); // grade > 3 → career.ended 처리됨
-      state.autoMode = null;
-      showAutoPanel = false;
-      saveGame();
-      route("weekly");
-    });
-    panel.appendChild(btn);
+    wrap.appendChild(renderGraduationPanel(route));
   } else {
+    // "확인" 버튼 → 휴식기 모달
+    const btnPanel = document.createElement("section");
+    btnPanel.className = "panel";
+    btnPanel.style.padding = "10px";
     const btn = document.createElement("button");
     btn.className = "primary";
-    btn.textContent = `${player.grade + 1}학년 시즌 시작`;
-    btn.style.marginTop = "12px";
-    btn.addEventListener("click", () => {
-      advanceToNextSeason();
-      transitionAfterSeason();
-      // 학년 변경 시 자동 모드 해제 (사용자가 새 학년에서 다시 선택)
-      state.autoMode = null;
-      showAutoPanel = false;
-      saveGame();
-      route("weekly");
+    btn.textContent = t("common.confirm");
+    btn.style.width = "100%";
+    btn.style.padding = "12px";
+    btn.style.fontSize = "15px";
+    btn.style.fontWeight = "700";
+    btn.addEventListener("pointerdown", e => {
+      e.preventDefault();
+      showOffseasonModal(route);
     });
-    panel.appendChild(btn);
+    btnPanel.appendChild(btn);
+    wrap.appendChild(btnPanel);
   }
 
-  wrap.appendChild(panel);
   root.appendChild(wrap);
+}
+
+// ─── 휴식기 모달 ──────────────────────────────────────────────────
+// 시즌 종료 후 "확인" 클릭 시 띄움. 내부에서 카테고리 → 이벤트 → 결과 phase 진행.
+// "다음 연차 진행하기" 클릭 시 모달 닫고 다음 시즌으로.
+function showOffseasonModal(route) {
+  if (!state.offseason) {
+    state.offseason = {
+      selectedCategory: null,
+      baseChanges: null,
+      eventKey: null,
+      decided: false,
+      outcomeKind: null,
+      eventChanges: null,
+    };
+    saveGame();
+  }
+
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+
+  const dialog = document.createElement("div");
+  dialog.className = "modal-dialog";
+  dialog.style.position = "relative";
+  dialog.style.maxWidth = "360px";
+
+  function rerender() {
+    dialog.innerHTML = "";
+    const off = state.offseason;
+    if (off.selectedCategory == null) {
+      buildOffseasonPickPhase(dialog, rerender);
+    } else if (off.decided === false) {
+      buildOffseasonProposalPhase(dialog, rerender);
+    } else {
+      buildOffseasonResultPhase(dialog, rerender, () => {
+        // "다음 연차 진행하기" — autoMode 는 이전 시즌 설정 그대로 유지
+        advanceToNextSeason();
+        transitionAfterSeason();
+        state.offseason = null;
+        saveGame();
+        backdrop.remove();
+        route("weekly");
+      });
+    }
+  }
+
+  rerender();
+  backdrop.appendChild(dialog);
+  document.body.appendChild(backdrop);
+}
+
+function buildOffseasonPickPhase(dialog, rerender) {
+  const h = document.createElement("h2");
+  h.textContent = t("offseason.title", { grade: state.player.grade });
+  dialog.appendChild(h);
+
+  const hint = document.createElement("p");
+  hint.className = "muted small";
+  hint.style.margin = "0 0 12px";
+  hint.textContent = t("offseason.pickHint");
+  dialog.appendChild(hint);
+
+  const accents = {
+    intense:        "var(--bad)",
+    camp:           "var(--accent-2)",
+    regular:        "var(--accent)",
+    rest:           "var(--good)",
+    youth_worldcup: "var(--accent-2)",
+  };
+  for (const key of getAvailableCategories(state.player)) {
+    const accent = accents[key] ?? "var(--accent)";
+    const card = document.createElement("div");
+    card.style.background = "var(--panel-2)";
+    card.style.border = "1px solid var(--border)";
+    card.style.borderLeft = `3px solid ${accent}`;
+    card.style.borderRadius = "8px";
+    card.style.padding = "10px";
+    card.style.marginBottom = "6px";
+    card.style.cursor = "pointer";
+
+    const lbl = document.createElement("div");
+    lbl.style.fontWeight = "700";
+    lbl.style.fontSize = "13px";
+    lbl.style.color = accent;
+    lbl.textContent = t("offseason." + key + ".label");
+    const desc = document.createElement("div");
+    desc.className = "muted small";
+    desc.style.marginTop = "3px";
+    desc.style.fontSize = "11px";
+    desc.textContent = t("offseason." + key + ".desc");
+    card.appendChild(lbl);
+    card.appendChild(desc);
+
+    card.addEventListener("pointerdown", e => {
+      e.preventDefault();
+      const { baseChanges, eventKey } = applyCategoryAndPickEvent(state.player, key);
+      state.offseason.selectedCategory = key;
+      state.offseason.baseChanges = baseChanges;
+      state.offseason.eventKey = eventKey;
+      state.offseason.decided = false;
+      saveGame();
+      rerender();
+    });
+    dialog.appendChild(card);
+  }
+}
+
+function buildOffseasonProposalPhase(dialog, rerender) {
+  const off = state.offseason;
+  const evKey = off.eventKey;
+
+  const h = document.createElement("h2");
+  h.textContent = t("offseason.proposalTitle");
+  dialog.appendChild(h);
+
+  const evBox = document.createElement("div");
+  evBox.style.background = "var(--panel-2)";
+  evBox.style.border = "1px solid var(--accent-2)";
+  evBox.style.borderRadius = "8px";
+  evBox.style.padding = "10px";
+  evBox.style.marginBottom = "12px";
+  const evLbl = document.createElement("div");
+  evLbl.style.fontWeight = "700";
+  evLbl.style.fontSize = "14px";
+  evLbl.style.color = "var(--accent-2)";
+  evLbl.textContent = t("offseason.event." + evKey + ".label");
+  const evDesc = document.createElement("div");
+  evDesc.className = "muted small";
+  evDesc.style.marginTop = "5px";
+  evDesc.style.lineHeight = "1.4";
+  evDesc.textContent = t("offseason.event." + evKey + ".desc");
+  evBox.appendChild(evLbl);
+  evBox.appendChild(evDesc);
+  dialog.appendChild(evBox);
+
+  const btnRow = document.createElement("div");
+  btnRow.style.display = "grid";
+  btnRow.style.gridTemplateColumns = "1fr 1fr";
+  btnRow.style.gap = "6px";
+
+  const yesBtn = document.createElement("button");
+  yesBtn.className = "primary";
+  yesBtn.textContent = t("offseason.btnYes");
+  yesBtn.style.padding = "10px";
+  yesBtn.style.fontSize = "13px";
+  yesBtn.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    const { outcomeKind, changes } = applyEventChoice(state.player, evKey);
+    state.offseason.decided = true;
+    state.offseason.outcomeKind = outcomeKind;
+    state.offseason.eventChanges = changes;
+    saveGame();
+    rerender();
+  });
+
+  const noBtn = document.createElement("button");
+  noBtn.textContent = t("offseason.btnNo");
+  noBtn.style.padding = "10px";
+  noBtn.style.fontSize = "13px";
+  noBtn.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    state.offseason.decided = "skipped";
+    state.offseason.eventChanges = [];
+    saveGame();
+    rerender();
+  });
+
+  btnRow.appendChild(yesBtn);
+  btnRow.appendChild(noBtn);
+  dialog.appendChild(btnRow);
+}
+
+function buildOffseasonResultPhase(dialog, rerender, onContinue) {
+  const off = state.offseason;
+
+  const h = document.createElement("h2");
+  h.textContent = t("offseason.summary");
+  dialog.appendChild(h);
+
+  const choice = document.createElement("div");
+  choice.className = "muted small";
+  choice.style.margin = "0 0 8px";
+  choice.style.fontSize = "11px";
+  choice.textContent = t("offseason." + off.selectedCategory + ".label")
+    + (off.eventKey ? `  ·  ${t("offseason.event." + off.eventKey + ".label")}` : "");
+  dialog.appendChild(choice);
+
+  if (off.decided === true && off.eventKey) {
+    const out = off.outcomeKind;
+    const color = out === "great" ? "var(--good)" : out === "bad" ? "var(--bad)" : "var(--muted)";
+
+    const evBox = document.createElement("div");
+    evBox.style.background = "var(--panel-2)";
+    evBox.style.border = "1px solid var(--border)";
+    evBox.style.borderLeft = `3px solid ${color}`;
+    evBox.style.borderRadius = "6px";
+    evBox.style.padding = "8px 10px";
+    evBox.style.marginBottom = "10px";
+
+    const outLine = document.createElement("div");
+    outLine.style.fontWeight = "700";
+    outLine.style.fontSize = "13px";
+    outLine.style.color = color;
+    outLine.textContent = t("offseason.outcome." + out);
+    evBox.appendChild(outLine);
+
+    const flavorLine = document.createElement("div");
+    flavorLine.style.marginTop = "4px";
+    flavorLine.style.fontSize = "12px";
+    flavorLine.style.lineHeight = "1.4";
+    flavorLine.textContent = t("offseason.event." + off.eventKey + "." + out);
+    evBox.appendChild(flavorLine);
+
+    dialog.appendChild(evBox);
+  } else if (off.decided === "skipped") {
+    const skip = document.createElement("div");
+    skip.className = "muted small";
+    skip.style.marginBottom = "10px";
+    skip.style.fontSize = "12px";
+    skip.textContent = t("offseason.skipped");
+    dialog.appendChild(skip);
+  }
+
+  const allChanges = [...(off.baseChanges ?? []), ...(off.eventChanges ?? [])];
+  if (allChanges.length === 0) {
+    const none = document.createElement("div");
+    none.className = "muted small";
+    none.style.fontSize = "12px";
+    none.textContent = t("offseason.noChange");
+    dialog.appendChild(none);
+  } else {
+    const changesWrap = document.createElement("div");
+    changesWrap.style.maxHeight = "180px";
+    changesWrap.style.overflowY = "auto";
+    for (const c of allChanges) changesWrap.appendChild(renderChangeRow(c));
+    dialog.appendChild(changesWrap);
+  }
+
+  const btn = document.createElement("button");
+  btn.className = "primary";
+  btn.textContent = t("offseason.btnContinue");
+  btn.style.width = "100%";
+  btn.style.padding = "12px";
+  btn.style.marginTop = "12px";
+  btn.style.fontWeight = "700";
+  btn.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    onContinue();
+  });
+  dialog.appendChild(btn);
+}
+
+function renderCareerEndedPanel(route) {
+  const panel = document.createElement("section");
+  panel.className = "panel";
+  const note = document.createElement("div");
+  note.className = "notice";
+  note.textContent = t("weekly.seasonEndGraduation");
+  panel.appendChild(note);
+  const btn = document.createElement("button");
+  btn.textContent = t("common.returnToMenu");
+  btn.style.marginTop = "10px";
+  btn.addEventListener("click", () => route("menu"));
+  panel.appendChild(btn);
+  return panel;
+}
+
+function renderGraduationPanel(route) {
+  const panel = document.createElement("section");
+  panel.className = "panel";
+  const note = document.createElement("div");
+  note.className = "notice";
+  note.textContent = t("weekly.seasonEndFinalNote");
+  panel.appendChild(note);
+  const btn = document.createElement("button");
+  btn.className = "primary";
+  btn.textContent = t("weekly.btnGraduate");
+  btn.style.marginTop = "12px";
+  btn.addEventListener("click", () => {
+    advanceToNextSeason();
+    transitionAfterSeason();
+    state.offseason = null;
+    saveGame();
+    route("weekly");
+  });
+  panel.appendChild(btn);
+  return panel;
+}
+
+// (옛 renderOffseasonPick / Proposal / Result / offseasonCategoryCard 는 휴식기 모달로 대체됨 — 제거)
+
+// 능력치 변경 1행 렌더 (휴식기 결과 표시용)
+function renderChangeRow(c) {
+  const row = document.createElement("div");
+  row.style.display = "flex";
+  row.style.justifyContent = "space-between";
+  row.style.alignItems = "center";
+  row.style.padding = "3px 0";
+  row.style.fontSize = "13px";
+
+  let labelText;
+  let color;
+  if (c.group === "meta" && c.stat === "fame") {
+    labelText = t("offseason.fame");
+    color = "var(--accent-2)";
+  } else if (c.group === "batter") {
+    labelText = `${t("weekly.catBatterShort")} ${t("stat." + c.stat)}`;
+    color = "var(--accent)";
+  } else if (c.group === "pitcher") {
+    labelText = `${t("weekly.catPitcherShort")} ${t("stat." + c.stat)}`;
+    color = "var(--accent-2)";
+  } else {
+    labelText = c.stat;
+    color = "var(--muted)";
+  }
+
+  const name = document.createElement("span");
+  name.textContent = labelText;
+  name.style.color = color;
+
+  const delta = document.createElement("span");
+  const d = c.delta;
+  delta.textContent = d > 0 ? `+${d}` : `${d}`;
+  delta.style.color = d > 0 ? "var(--good)" : d < 0 ? "var(--bad)" : "var(--muted)";
+  delta.style.fontWeight = "700";
+  delta.style.fontVariantNumeric = "tabular-nums";
+
+  row.appendChild(name);
+  row.appendChild(delta);
+  return row;
 }

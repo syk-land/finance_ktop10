@@ -26,13 +26,14 @@ html, body {
   min-height: 100vh;
 }
 
+/* 타겟: 안드로이드 portrait (~412px). 데스크탑에서도 같은 폭으로 고정해서 모바일과 동일하게 보임. */
 #app {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  max-width: 1100px;
+  max-width: 412px;
   margin: 0 auto;
-  padding: 0 16px;
+  padding: 0 12px;
 }
 
 .topbar {
@@ -53,11 +54,114 @@ html, body {
 .topbar-info {
   font-size: 13px;
   color: var(--muted);
+  flex: 1;
+  margin-left: 16px;
 }
 
 .topbar-info strong {
   color: var(--text);
   margin: 0 4px;
+}
+
+.locale-toggle {
+  margin-left: 12px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--accent);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: color 120ms, border-color 120ms;
+}
+.locale-toggle:hover {
+  color: var(--accent-2);
+  border-color: var(--accent-2);
+}
+
+/* Modal — backdrop + dialog (메뉴의 "이어하기" 등) */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+  animation: fadeIn 160ms ease-out;
+}
+.modal-dialog {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  width: 100%;
+  max-width: 340px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+  animation: slideUp 200ms ease-out;
+}
+.modal-dialog h2 {
+  margin: 0 0 8px;
+  color: var(--accent-2);
+  font-size: 17px;
+}
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+}
+.modal-close:hover {
+  color: var(--text);
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Floating "맨 위로" 버튼 — 최상단이 아니면 하단 우측에 표시 */
+.scroll-top {
+  position: fixed;
+  bottom: 20px;
+  right: 16px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #08111c;
+  border: none;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.45), 0 0 0 1px rgba(78,164,255,0.3);
+  z-index: 999;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px);
+  transition: opacity 200ms, transform 200ms;
+}
+.scroll-top.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+.scroll-top:active {
+  transform: translateY(2px);
 }
 
 .bottombar {
@@ -157,8 +261,8 @@ label { display: block; margin-bottom: 4px; color: var(--muted); font-size: 12px
   margin-bottom: 6px;
 }
 .stat-name {
-  width: 72px;
-  font-size: 12px;
+  width: 56px;
+  font-size: 11px;
   color: var(--muted);
 }
 .stat-bar {
@@ -236,7 +340,14 @@ label { display: block; margin-bottom: 4px; color: var(--muted); font-size: 12px
 .daycell.done { opacity: 0.55; }
 .daycell.weekend { background: #1a2a3d; border-color: #2c4565; }
 .daycell .label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
-.daycell .val { font-weight: 600; }
+.daycell .val {
+  font-weight: 600;
+  font-size: 10px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* Tables */
 table { width: 100%; border-collapse: collapse; font-size: 13px; }

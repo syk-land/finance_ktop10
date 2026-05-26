@@ -8,6 +8,9 @@ import {
 } from "./player.js";
 import { simulateGame } from "./simulator.js";
 import { getPlayerTeam, standings } from "./league.js";
+import { t } from "../i18n/index.js";
+import { checkFinalAdvance } from "./finals.js";
+import { checkScheduledEvents } from "./seasonEvents.js";
 
 export function createSeason(stage) {
   return {
@@ -21,11 +24,11 @@ export function createSeason(stage) {
   };
 }
 
-// 평일 한 칸(하루) 행동 적용
+// 평일 한 칸(하루) 행동 적용. reason은 i18n 키 (reason.<key>).
 export function doDailyAction(action, detail) {
   const { player, season } = state;
-  if (!season || season.finished) return { ok: false, reason: "시즌없음" };
-  if (season.dayIndex >= 5) return { ok: false, reason: "주말경기대기" };
+  if (!season || season.finished) return { ok: false, reason: "noSeason" };
+  if (season.dayIndex >= 5) return { ok: false, reason: "weekendPending" };
 
   let res;
   if (action === "train") {
@@ -35,7 +38,7 @@ export function doDailyAction(action, detail) {
   } else if (action === "rest") {
     res = applyRest(player);
   } else {
-    return { ok: false, reason: "잘못된행동" };
+    return { ok: false, reason: "invalidAction" };
   }
   if (!res.ok) return res;
 
@@ -47,7 +50,7 @@ export function doDailyAction(action, detail) {
 // 한 주가 끝나면 주말 경기 진행
 export function endWeek() {
   const { player, league, season } = state;
-  if (season.dayIndex < 5) return { ok: false, reason: "아직주중" };
+  if (season.dayIndex < 5) return { ok: false, reason: "midweek" };
 
   // 주말 컨디션/부상 갱신 + 체력 회복
   tickConditionWeekly(player);
@@ -77,10 +80,22 @@ export function endWeek() {
   season.dayIndex = 0;
   season.weekActions = [];
 
+  // 토너먼트 결승 진출 체크 — 이미 pendingFinal 이 있으면 그대로
+  if (!state.pendingFinal) {
+    const adv = checkFinalAdvance(player, league, season, state.gameDate);
+    if (adv) state.pendingFinal = adv;
+  }
+
+  // 시즌 중 이벤트 (올스타/올림픽/WBC 등 — 현재는 카탈로그 비어있음, 인프라만)
+  checkScheduledEvents(player, state.gameDate);
+
   // 시즌 종료 체크
   if (season.weekIndex >= league.weeksPerSeason) {
     season.finished = true;
-    pushLog({ msg: `${league.label} ${player.grade}학년 시즌 종료`, kind: "info" });
+    pushLog({
+      msg: t("log.seasonEnd", { stage: t("stage." + league.stage), grade: player.grade }),
+      kind: "info",
+    });
   }
   return { ok: true, results };
 }

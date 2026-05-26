@@ -6,6 +6,7 @@ import { npcOverall } from "./npc.js";
 import { getEffectiveBatter, getEffectivePitcher, BATTER_STATS, PITCHER_STATS, emptyStats } from "./player.js";
 
 // 결과 종류: K(삼진), BB(볼넷), 1B(안타), 2B(2루타), 3B(3루타), HR(홈런), OUT(범타)
+// type 키만 반환. 표시용 라벨은 UI 에서 i18n 의 event.<type> 로 조회.
 // 매치업 공식 — 컨택의 영향력을 강하게 반영
 function simulateAtBat(batter, pitcher) {
   const b = batter;
@@ -29,8 +30,8 @@ function simulateAtBat(batter, pitcher) {
   // 볼넷 확률: 선구안 vs 제구
   const bbChance = clamp(9 + eyeDiff * 0.3, 3, 25);
 
-  if (r < kChance) return { type: "K", desc: "삼진" };
-  if (r < kChance + bbChance) return { type: "BB", desc: "볼넷" };
+  if (r < kChance) return { type: "K" };
+  if (r < kChance + bbChance) return { type: "BB" };
 
   // 인플레이 안타 확률 (BABIP 기반)
   const inPlayHitChance = clamp(30 + contactDiff * 0.35, 18, 62);
@@ -42,12 +43,12 @@ function simulateAtBat(batter, pitcher) {
     const hrChance = clamp(powerDiff * 0.5 + 5, 1, 25);
     const tripleChance = 1.5;
     const doubleChance = clamp(powerDiff * 0.3 + 10, 5, 22);
-    if (r3 < hrChance) return { type: "HR", desc: "홈런" };
-    if (r3 < hrChance + tripleChance) return { type: "3B", desc: "3루타" };
-    if (r3 < hrChance + tripleChance + doubleChance) return { type: "2B", desc: "2루타" };
-    return { type: "1B", desc: "단타" };
+    if (r3 < hrChance) return { type: "HR" };
+    if (r3 < hrChance + tripleChance) return { type: "3B" };
+    if (r3 < hrChance + tripleChance + doubleChance) return { type: "2B" };
+    return { type: "1B" };
   }
-  return { type: "OUT", desc: "범타" };
+  return { type: "OUT" };
 }
 
 // 한 경기 전체 시뮬레이션
@@ -72,21 +73,28 @@ export function simulateGame(league, gameDef, mainPlayer) {
   let awayScore = 0;
   let awayBatterIdx = 0;
   let homeBatterIdx = 0;
+  const homeInnings = [];
+  const awayInnings = [];
 
   for (let inning = 1; inning <= 9; inning++) {
     const awayRuns = playHalfInning(awayLineup, homePitcher, myBoxBatter, myBoxPitcher, events, () => {
       const b = awayLineup[awayBatterIdx % awayLineup.length];
       awayBatterIdx++;
       return b;
-    });
+    }, inning);
     awayScore += awayRuns;
-    if (inning === 9 && homeScore > awayScore) break;
+    awayInnings.push(awayRuns);
+    if (inning === 9 && homeScore > awayScore) {
+      homeInnings.push(null); // 끝내기 — 9말 안 함
+      break;
+    }
     const homeRuns = playHalfInning(homeLineup, awayPitcher, myBoxBatter, myBoxPitcher, events, () => {
       const b = homeLineup[homeBatterIdx % homeLineup.length];
       homeBatterIdx++;
       return b;
-    });
+    }, inning);
     homeScore += homeRuns;
+    homeInnings.push(homeRuns);
   }
 
   let winner;
@@ -101,8 +109,8 @@ export function simulateGame(league, gameDef, mainPlayer) {
   }
 
   return {
-    home: { team: home, score: homeScore, pitcher: homePitcher.name },
-    away: { team: away, score: awayScore, pitcher: awayPitcher.name },
+    home: { team: home, score: homeScore, pitcher: homePitcher.name, innings: homeInnings },
+    away: { team: away, score: awayScore, pitcher: awayPitcher.name, innings: awayInnings },
     winner: winner ? winner.name : null,
     mainPlayer: (roles.bat || roles.pitch) ? {
       roles,
@@ -113,18 +121,7 @@ export function simulateGame(league, gameDef, mainPlayer) {
   };
 }
 
-// 출장 확률 곡선: OVR이 lo 이하면 0%, hi 이상이면 100%, 사이는 선형
-function chanceFromOVR(ovr, lo, hi) {
-  if (ovr <= lo) return 0;
-  if (ovr >= hi) return 1;
-  return (ovr - lo) / (hi - lo);
-}
-
-const BAT_LO = 30;
-const BAT_HI = 80;
-const PIT_LO = 35;
-const PIT_HI = 80;
-
+// OVR (정렬·라인업 슬롯 결정용. 출장 결정에서는 더 이상 사용 안 함)
 export function batterOVR(player) {
   const b = player.batter;
   return (b.contact + b.power + b.eye + b.speed + b.defense) / 5;
@@ -134,31 +131,28 @@ export function pitcherOVR(player) {
   return (p.velocity + p.control + p.breaking + p.stamina + p.mental) / 5;
 }
 
+// 출장 룰 (Phase 1, 단순화):
+//   - 타자: 부상 아니면 매 경기 무조건 출장 (양방향 주전 가정)
+//   - 투수: 직전 경기 등판 → 등판 불가, 1경기 휴식 → 50%, 2경기+ 휴식 → 무조건 등판
+function pitcherChanceByRest(restGames) {
+  if (restGames === 0) return 0;
+  if (restGames === 1) return 0.5;
+  return 1;
+}
+
 // UI 표시용 — 현재 출장 확률 (0~1)
 export function appearanceChance(player) {
   if (player.injury) return { bat: 0, pitch: 0 };
-  const batChance = chanceFromOVR(batterOVR(player), BAT_LO, BAT_HI);
   const restGames = player.gamesSinceLastPitch ?? 99;
-  const restMult = restGames === 0 ? 0 : restGames === 1 ? 0.5 : 1.0;
-  const pitchChance = chanceFromOVR(pitcherOVR(player), PIT_LO, PIT_HI) * restMult;
-  return { bat: batChance, pitch: pitchChance };
+  return { bat: 1, pitch: pitcherChanceByRest(restGames) };
 }
 
 function decideRolesForGame(player) {
   if (player.injury) return { bat: false, pitch: false };
-
-  const batChance = chanceFromOVR(batterOVR(player), BAT_LO, BAT_HI);
-
-  // 투수 등판 휴식: 직전 게임 등판 시 등판 불가
   const restGames = player.gamesSinceLastPitch ?? 99;
-  let restMult;
-  if (restGames === 0) restMult = 0;
-  else if (restGames === 1) restMult = 0.5;
-  else restMult = 1.0;
-  const pitchChance = chanceFromOVR(pitcherOVR(player), PIT_LO, PIT_HI) * restMult;
-
+  const pitchChance = pitcherChanceByRest(restGames);
   return {
-    bat: Math.random() < batChance,
+    bat: true,
     pitch: Math.random() < pitchChance,
   };
 }
@@ -204,7 +198,7 @@ function asPitcherEntry(mainPlayer) {
   };
 }
 
-function playHalfInning(battingLineup, pitcher, myBox, myPbox, events, nextBatter) {
+function playHalfInning(battingLineup, pitcher, myBox, myPbox, events, nextBatter, inning = 0) {
   let outs = 0;
   let runs = 0;
   // 베이스: [1루, 2루, 3루] — 주자 있으면 true
@@ -231,7 +225,7 @@ function playHalfInning(battingLineup, pitcher, myBox, myPbox, events, nextBatte
         else if (result.type === "HR") { myBox.hr++; myBox.tb += 4; }
         else myBox.tb += 1;
       }
-      events.push({ inning: 0, type: result.type, desc: result.desc, role: "batter" });
+      events.push({ inning, type: result.type, role: "batter" });
     }
     if (isMainPit) {
       myPbox.pa = (myPbox.pa ?? 0) + 1;
@@ -239,7 +233,7 @@ function playHalfInning(battingLineup, pitcher, myBox, myPbox, events, nextBatte
       if (result.type === "BB") myPbox.pBB++;
       if (["1B","2B","3B","HR"].includes(result.type)) myPbox.pH++;
       if (result.type === "HR") myPbox.pHR++;
-      events.push({ inning: 0, type: result.type, desc: result.desc, role: "pitcher" });
+      events.push({ inning, type: result.type, role: "pitcher" });
     }
 
     // 베이스 상태 갱신
