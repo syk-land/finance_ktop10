@@ -3,7 +3,7 @@ export const ko = {
   app: {
     title: "나혼자만 자동야구",
     logo: "나혼자만 자동야구",
-    version: "v0.1 · Phase 1",
+    version: "v0.3 · Phase 1+α",
   },
 
   nav: {
@@ -306,11 +306,17 @@ export const ko = {
   event: {
     K:   "삼진",
     BB:  "볼넷",
+    HBP: "사구",
     "1B": "단타",
     "2B": "2루타",
     "3B": "3루타",
     HR:  "홈런",
     OUT: "범타",
+    E:   "실책 출루",
+    DP:  "병살타",
+    SF:  "희생플라이",
+    SB:  "도루",
+    CS:  "도루실패",
   },
 
   hand: {
@@ -510,6 +516,8 @@ export const ko = {
     statH: "안타",
     statHr: "홈런",
     statK: "삼진",
+    statSb: "도루",
+    statHbp: "사구",
     statG: "경기",
     statBa: "타율",
     statOps: "OPS",
@@ -523,6 +531,7 @@ export const ko = {
     batLabel: "[타]",
     pitLabel: "[투]",
     batterRecap: "{pa}타석 {h}안타 {hr}홈런 {k}삼진",
+    batterRecapExtra: "{hbp}사구 {sb}도루 {sf}희타 {dp}병살",
     pitcherRecap: "9이닝 {er}자책 {k}K {bb}BB {h}피안타",
 
     standingsHead: { rank: "#", team: "팀", w: "W", l: "L", t: "T", pct: "승률" },

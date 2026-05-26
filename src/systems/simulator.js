@@ -41,9 +41,11 @@ function getStageRule(stage) {
   return STAGE_RULES[stage] ?? STAGE_RULES.high;
 }
 
-// 결과 종류: K(삼진), BB(볼넷), 1B(안타), 2B(2루타), 3B(3루타), HR(홈런), OUT(범타)
+// 결과 종류:
+//   매치업 산출: K(삼진), BB(볼넷), HBP(사구), 1B/2B/3B/HR, OUT(범타)
+//   상황 분기:   E(실책 출루), DP(병살), SF(희생플라이) — OUT 의 변형
+//   이닝 페이즈: SB(도루 성공), CS(도루 실패) — 타석과 무관, 베이스 주자 액션
 // type 키만 반환. 표시용 라벨은 UI 에서 i18n 의 event.<type> 로 조회.
-// 매치업 공식 — 컨택의 영향력을 강하게 반영
 function simulateAtBat(batter, pitcher) {
   const b = batter;
   const p = pitcher;
@@ -54,26 +56,24 @@ function simulateAtBat(batter, pitcher) {
   const control  = p.control ?? 50;
   const breaking = p.breaking ?? 50;
 
-  // 차이값
   const stuffAvg = (velocity + breaking) / 2;
-  const contactDiff = contact - stuffAvg;     // +면 타자 우위
+  const contactDiff = contact - stuffAvg;
   const eyeDiff = eye - control;
 
   const r = Math.random() * 100;
 
-  // 삼진 확률: 컨택과 선구안이 좋으면 감소
   const kChance = clamp(22 - contactDiff * 0.4 - eyeDiff * 0.15, 3, 45);
-  // 볼넷 확률: 선구안 vs 제구
   const bbChance = clamp(9 + eyeDiff * 0.3, 3, 25);
+  // 사구 — 제구 낮을수록 증가. 베이스라인 ~1%.
+  const hbpChance = clamp(1.0 - (control - 50) * 0.03, 0.3, 3.0);
 
   if (r < kChance) return { type: "K" };
   if (r < kChance + bbChance) return { type: "BB" };
+  if (r < kChance + bbChance + hbpChance) return { type: "HBP" };
 
-  // 인플레이 안타 확률 (BABIP 기반)
   const inPlayHitChance = clamp(30 + contactDiff * 0.35, 18, 62);
   const r2 = Math.random() * 100;
   if (r2 < inPlayHitChance) {
-    // 장타 분류
     const r3 = Math.random() * 100;
     const powerDiff = power - velocity;
     const hrChance = clamp(powerDiff * 0.5 + 5, 1, 25);
@@ -85,6 +85,56 @@ function simulateAtBat(batter, pitcher) {
     return { type: "1B" };
   }
   return { type: "OUT" };
+}
+
+// OUT 을 상황별로 분기 — E(실책) / SF(희생플라이) / DP(병살) / OUT(범타) 중 하나로.
+// outs: 현재 이닝 아웃수, defenseRating: 수비팀 평균 defense
+function classifyOut(batter, bases, outs, defenseRating) {
+  const contact = batter.contact ?? 50;
+  const power   = batter.power ?? 50;
+  const speed   = batter.speed ?? 50;
+
+  // 실책 출루(E) — 수비 낮을수록 + 컨택 높을수록 (강한 타구). 베이스라인 ~1.5%.
+  const eChance = clamp((contact - defenseRating) * 0.08 + 1.5, 0.3, 7);
+  if (Math.random() * 100 < eChance) return "E";
+
+  // 희생플라이(SF) — 3루 주자 + <2아웃 + 파워(타구 깊이) 영향
+  if (bases[2] && outs < 2) {
+    const sfChance = clamp(16 + (power - 50) * 0.25, 6, 32);
+    if (Math.random() * 100 < sfChance) return "SF";
+  }
+
+  // 병살타(DP) — 1루 주자 + <2아웃. 느릴수록 잘 걸림.
+  if (bases[0] && outs < 2) {
+    const dpChance = clamp(14 - (speed - 50) * 0.20, 4, 28);
+    if (Math.random() * 100 < dpChance) return "DP";
+  }
+
+  return "OUT";
+}
+
+// 도루 시도 굴림. 1루 주자(2루 비어있을 때)만 처리 — 단순화.
+// 시도 여부는 주자 speed 기반, 성공률은 speed vs pitcher.control.
+// 결과: { attempted: bool, success: bool, runner } — runner는 시도한 주자 객체.
+function attemptSteal(bases, pitcher) {
+  const r1 = bases[0];
+  if (!r1 || bases[1]) return { attempted: false };
+  const speed = r1.speed ?? 50;
+  const attemptChance = clamp((speed - 50) * 0.7, 0, 30);
+  if (Math.random() * 100 >= attemptChance) return { attempted: false };
+  const control = pitcher.control ?? 50;
+  const successChance = clamp(62 + (speed - control) * 0.5, 25, 90);
+  const success = Math.random() * 100 < successChance;
+  return { attempted: true, success, runner: r1 };
+}
+
+// 베이스 슬롯에 들어갈 주자 객체. 도루 굴림과 메인 캐릭터 통계 추적용.
+function makeRunner(batter) {
+  const stats = batter.batter ?? batter;
+  return {
+    isMain: !!batter.isMain,
+    speed: stats.speed ?? 50,
+  };
 }
 
 // 한 경기 전체 시뮬레이션
@@ -114,16 +164,21 @@ export function simulateGame(league, gameDef, mainPlayer) {
 
   const rule = getStageRule(league.stage);
   const maxInning = rule.regulation + (rule.maxExtra === Infinity ? 999 : rule.maxExtra);
+  // 수비팀 평균 defense — 실책(E) 굴림에 사용
+  const homeDefense = teamDefenseRating(homeLineup);
+  const awayDefense = teamDefenseRating(awayLineup);
   // 정규 이닝 완료 후엔 매 이닝 끝마다 결판 체크. tieAllowed=false 이고 max 도달했는데도 동점이면 추가로 이어감.
   for (let inning = 1; inning <= maxInning; inning++) {
     const useTiebreaker = rule.tiebreaker && inning >= rule.tiebreaker.fromInning;
-    const initialBases = useTiebreaker ? [...rule.tiebreaker.runners] : [false, false, false];
+    const initialBases = useTiebreaker
+      ? rule.tiebreaker.runners.map(b => b ? ghostRunner() : null)
+      : [null, null, null];
 
     const awayRuns = playHalfInning(awayLineup, homePitcher, myBoxBatter, myBoxPitcher, events, () => {
       const b = awayLineup[awayBatterIdx % awayLineup.length];
       awayBatterIdx++;
       return b;
-    }, inning, initialBases);
+    }, inning, [...initialBases], homeDefense);
     awayScore += awayRuns;
     awayInnings.push(awayRuns);
 
@@ -137,7 +192,7 @@ export function simulateGame(league, gameDef, mainPlayer) {
       const b = homeLineup[homeBatterIdx % homeLineup.length];
       homeBatterIdx++;
       return b;
-    }, inning, initialBases);
+    }, inning, [...initialBases], awayDefense);
     homeScore += homeRuns;
     homeInnings.push(homeRuns);
 
@@ -249,52 +304,81 @@ function asPitcherEntry(mainPlayer) {
   };
 }
 
-function playHalfInning(battingLineup, pitcher, myBox, myPbox, events, nextBatter, inning = 0, initialBases = null) {
+function playHalfInning(battingLineup, pitcher, myBox, myPbox, events, nextBatter, inning = 0, initialBases = null, defenseRating = 50) {
   let outs = 0;
   let runs = 0;
-  // 베이스: [1루, 2루, 3루] — 주자 있으면 true. 승부치기/ghost runner 시 시작 베이스 지정.
-  let bases = initialBases ? [...initialBases] : [false, false, false];
+  // 베이스: [1루, 2루, 3루] — 주자가 있으면 {isMain, speed} 객체, 비어있으면 null.
+  let bases = initialBases ? [...initialBases] : [null, null, null];
+  const pStats = pitcher.pitcher ?? pitcher;
+  const isMainPit = pitcher.isMain;
 
   while (outs < 3) {
+    // ─ 도루 phase (타석 전) ─ 1루 주자 → 2루 도루만 처리.
+    const steal = attemptSteal(bases, pStats);
+    if (steal.attempted) {
+      const r1 = steal.runner;
+      if (steal.success) {
+        bases[1] = r1;
+        bases[0] = null;
+        if (r1.isMain) { myBox.sb = (myBox.sb ?? 0) + 1; events.push({ inning, type: "SB", role: "batter" }); }
+      } else {
+        bases[0] = null;
+        outs++;
+        if (r1.isMain) { myBox.cs = (myBox.cs ?? 0) + 1; events.push({ inning, type: "CS", role: "batter" }); }
+        if (outs >= 3) break;
+      }
+    }
+
+    // ─ 타석 ─
     const batter = nextBatter();
     const isMainBat = batter.isMain;
-    const isMainPit = pitcher.isMain;
-    const bStats = batter.batter ?? batter; // already effective if main
-    const pStats = pitcher.pitcher ?? pitcher;
+    const bStats = batter.batter ?? batter;
 
-    const result = simulateAtBat(bStats, pStats);
+    const raw = simulateAtBat(bStats, pStats);
+    const resolvedType = raw.type === "OUT"
+      ? classifyOut(bStats, bases, outs, defenseRating)
+      : raw.type;
 
-    // 주인공이 타석/투구 중이면 통계 누적
+    // 통계 누적 — 주인공이 타석에 있을 때
     if (isMainBat) {
-      myBox.pa++; if (result.type !== "BB") myBox.ab++;
-      if (result.type === "K") myBox.k++;
-      if (result.type === "BB") myBox.bb++;
-      if (["1B","2B","3B","HR"].includes(result.type)) {
+      myBox.pa++;
+      // AB 산입: BB/HBP/SF 는 제외. DP/E/OUT/안타류는 산입.
+      if (!["BB", "HBP", "SF"].includes(resolvedType)) myBox.ab++;
+      if (resolvedType === "K") myBox.k++;
+      if (resolvedType === "BB") myBox.bb++;
+      if (resolvedType === "HBP") myBox.hbp = (myBox.hbp ?? 0) + 1;
+      if (resolvedType === "SF")  myBox.sf  = (myBox.sf  ?? 0) + 1;
+      if (resolvedType === "DP")  myBox.dp  = (myBox.dp  ?? 0) + 1;
+      if (resolvedType === "E")   myBox.e   = (myBox.e   ?? 0) + 1;
+      if (["1B","2B","3B","HR"].includes(resolvedType)) {
         myBox.h++;
-        if (result.type === "2B") myBox.tb += 2;
-        else if (result.type === "3B") myBox.tb += 3;
-        else if (result.type === "HR") { myBox.hr++; myBox.tb += 4; }
+        if (resolvedType === "2B") myBox.tb += 2;
+        else if (resolvedType === "3B") myBox.tb += 3;
+        else if (resolvedType === "HR") { myBox.hr++; myBox.tb += 4; }
         else myBox.tb += 1;
       }
-      events.push({ inning, type: result.type, role: "batter" });
+      events.push({ inning, type: resolvedType, role: "batter" });
     }
     if (isMainPit) {
       myPbox.pa = (myPbox.pa ?? 0) + 1;
-      if (result.type === "K") myPbox.pK++;
-      if (result.type === "BB") myPbox.pBB++;
-      if (["1B","2B","3B","HR"].includes(result.type)) myPbox.pH++;
-      if (result.type === "HR") myPbox.pHR++;
-      events.push({ inning, type: result.type, role: "pitcher" });
+      if (resolvedType === "K") myPbox.pK++;
+      if (resolvedType === "BB") myPbox.pBB++;
+      if (resolvedType === "HBP") myPbox.pHbp = (myPbox.pHbp ?? 0) + 1;
+      if (["1B","2B","3B","HR"].includes(resolvedType)) myPbox.pH++;
+      if (resolvedType === "HR") myPbox.pHR++;
+      events.push({ inning, type: resolvedType, role: "pitcher" });
     }
 
-    // 베이스 상태 갱신
-    const ab = applyResult(result.type, bases, batter);
+    const ab = applyResult(resolvedType, bases, batter);
     runs += ab.runs;
     bases = ab.bases;
-    if (ab.out) outs++;
+    outs += ab.outsAdded;
 
     if (isMainPit) {
-      myPbox.er = (myPbox.er ?? 0) + ab.runs;
+      // 자책점: 실책으로 인한 출루는 비자책. 그 외 실점은 자책 처리.
+      // 단순화 — 실책 출루 발생 후 같은 이닝 추가 실점도 일단 자책 처리 (정확한 ER 룰은 복잡).
+      const earned = resolvedType === "E" ? 0 : ab.runs;
+      myPbox.er = (myPbox.er ?? 0) + earned;
     }
   }
   return runs;
@@ -302,52 +386,84 @@ function playHalfInning(battingLineup, pitcher, myBox, myPbox, events, nextBatte
 
 function applyResult(type, bases, batter) {
   let runs = 0;
-  let out = false;
+  let outsAdded = 0;
   let newBases = [...bases];
+  const newRunner = makeRunner(batter);
+
   switch (type) {
     case "K":
     case "OUT":
-      out = true;
+      outsAdded = 1;
       break;
-    case "BB": {
-      // 1루로 보내고 강제진루
+    case "BB":
+    case "HBP": {
+      // 1루 출루 + 강제진루
       if (newBases[0]) {
         if (newBases[1]) {
           if (newBases[2]) runs++;
-          newBases[2] = true;
+          newBases[2] = newBases[1];
         }
-        newBases[1] = true;
+        newBases[1] = newBases[0];
       }
-      newBases[0] = true;
+      newBases[0] = newRunner;
       break;
     }
+    case "E":
     case "1B": {
       // 모든 주자 1루씩 진루 (단순화)
-      if (newBases[2]) { runs++; newBases[2] = false; }
-      if (newBases[1]) { newBases[2] = true; newBases[1] = false; }
-      if (newBases[0]) { newBases[1] = true; newBases[0] = false; }
-      newBases[0] = true;
+      if (newBases[2]) { runs++; newBases[2] = null; }
+      if (newBases[1]) { newBases[2] = newBases[1]; newBases[1] = null; }
+      if (newBases[0]) { newBases[1] = newBases[0]; newBases[0] = null; }
+      newBases[0] = newRunner;
       break;
     }
     case "2B": {
-      if (newBases[2]) { runs++; newBases[2] = false; }
-      if (newBases[1]) { runs++; newBases[1] = false; }
-      if (newBases[0]) { newBases[2] = true; newBases[0] = false; }
-      newBases[1] = true;
+      if (newBases[2]) { runs++; newBases[2] = null; }
+      if (newBases[1]) { runs++; newBases[1] = null; }
+      if (newBases[0]) { newBases[2] = newBases[0]; newBases[0] = null; }
+      newBases[1] = newRunner;
       break;
     }
     case "3B": {
-      runs += bases.filter(Boolean).length;
-      newBases = [false, false, true];
+      runs += newBases.filter(Boolean).length;
+      newBases = [null, null, newRunner];
       break;
     }
     case "HR": {
-      runs += bases.filter(Boolean).length + 1;
-      newBases = [false, false, false];
+      runs += newBases.filter(Boolean).length + 1;
+      newBases = [null, null, null];
+      break;
+    }
+    case "SF": {
+      // 희생플라이: 아웃 + 3루 주자 득점
+      outsAdded = 1;
+      if (newBases[2]) { runs++; newBases[2] = null; }
+      break;
+    }
+    case "DP": {
+      // 병살: 타자 + 1루 주자 동시 아웃. 단순화 — 3루 주자 진루 없음.
+      outsAdded = 2;
+      newBases[0] = null;
       break;
     }
   }
-  return { runs, out, bases: newBases };
+  return { runs, outsAdded, bases: newBases };
+}
+
+// 수비팀 평균 defense — 실책 굴림에 사용. lineup 의 야수 9명 평균.
+function teamDefenseRating(lineup) {
+  if (!lineup || lineup.length === 0) return 50;
+  let sum = 0, n = 0;
+  for (const e of lineup) {
+    const d = (e.batter?.defense ?? e.defense);
+    if (d != null) { sum += d; n++; }
+  }
+  return n > 0 ? sum / n : 50;
+}
+
+// 승부치기/ghost runner — speed 정보 필요해서 합리적인 중간값 runner 객체로.
+function ghostRunner() {
+  return { isMain: false, speed: 55 };
 }
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }

@@ -85,8 +85,17 @@ export function createPlayer({ name, talent, hand = "right", faceId = "f1" }) {
 export function emptyStats() {
   return {
     games: 0, pa: 0, ab: 0, h: 0, hr: 0, bb: 0, k: 0,
-    r: 0, rbi: 0, sb: 0, tb: 0,
+    r: 0, rbi: 0, tb: 0,
+    // 신규: 타자 부가 통계
+    hbp: 0,     // 사구로 출루
+    sf: 0,      // 희생플라이 (타점 산입, AB 제외)
+    sb: 0,      // 도루 성공
+    cs: 0,      // 도루 실패
+    dp: 0,      // 병살타 (타자가 친 게 병살로 처리)
+    e: 0,       // 상대 실책 출루 (AB 산입, H 제외)
     pitchG: 0, ip: 0, er: 0, pK: 0, pBB: 0, pH: 0, pHR: 0, w: 0, l: 0, sv: 0,
+    // 신규: 투수 부가 통계
+    pHbp: 0,    // 피사구
   };
 }
 
@@ -265,6 +274,12 @@ export function applyGameExperience(player, mainPlayerResult) {
     bump("batter", "eye", bbox.bb * 0.08);
     // 삼진 페널티 (작게)
     bump("batter", "eye", -bbox.k * 0.02);
+    // 신규: 부가 통계 보너스/페널티
+    bump("batter", "eye",   (bbox.hbp ?? 0) * 0.04); // 사구도 출루 — 선구 약간
+    bump("batter", "power", (bbox.sf  ?? 0) * 0.10); // 희생플라이 = 깊은 외야 타구
+    bump("batter", "speed", (bbox.sb  ?? 0) * 0.12); // 도루 성공
+    bump("batter", "speed", -(bbox.cs ?? 0) * 0.06); // 도루 실패
+    bump("batter", "speed", -(bbox.dp ?? 0) * 0.03); // 병살 — 발 느리다는 신호
   }
 
   // 투수 경험치
@@ -281,6 +296,7 @@ export function applyGameExperience(player, mainPlayerResult) {
     bump("pitcher", "breaking", (pbox.pK ?? 0) * 0.03);
     bump("pitcher", "control", -((pbox.pBB ?? 0) * 0.02));
     bump("pitcher", "control", -((pbox.pHR ?? 0) * 0.05));
+    bump("pitcher", "control", -((pbox.pHbp ?? 0) * 0.04)); // 피사구 — 제구 페널티
     // 호투 보너스
     const er = pbox.er ?? 0;
     if (er === 0) {

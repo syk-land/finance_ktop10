@@ -110,6 +110,13 @@ function mergeSeasonStats(player, mainPlayer) {
     const box = mainPlayer.batterBox;
     ss.pa += box.pa; ss.ab += box.ab; ss.h += box.h; ss.hr += box.hr;
     ss.bb += box.bb; ss.k += box.k; ss.tb += box.tb;
+    // 신규 부가 통계
+    ss.hbp = (ss.hbp ?? 0) + (box.hbp ?? 0);
+    ss.sf  = (ss.sf  ?? 0) + (box.sf  ?? 0);
+    ss.sb  = (ss.sb  ?? 0) + (box.sb  ?? 0);
+    ss.cs  = (ss.cs  ?? 0) + (box.cs  ?? 0);
+    ss.dp  = (ss.dp  ?? 0) + (box.dp  ?? 0);
+    ss.e   = (ss.e   ?? 0) + (box.e   ?? 0);
   }
   if (mainPlayer.pitcherBox) {
     const box = mainPlayer.pitcherBox;
@@ -120,6 +127,7 @@ function mergeSeasonStats(player, mainPlayer) {
     ss.pBB += box.pBB ?? 0;
     ss.pH += box.pH ?? 0;
     ss.pHR += box.pHR ?? 0;
+    ss.pHbp = (ss.pHbp ?? 0) + (box.pHbp ?? 0);
   }
 }
 

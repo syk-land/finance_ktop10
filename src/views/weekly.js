@@ -456,6 +456,17 @@ function buildFinalResult(dialog, final, onClose) {
     line.style.marginBottom = "4px";
     line.innerHTML = `<span style="color:var(--accent)">${t("weekly.batLabel")}</span> ${t("weekly.batterRecap", { pa: b.pa, h: b.h, hr: b.hr, k: b.k })}`;
     dialog.appendChild(line);
+    if ((b.hbp ?? 0) + (b.sb ?? 0) + (b.sf ?? 0) + (b.dp ?? 0) > 0) {
+      const extra = document.createElement("div");
+      extra.className = "muted small";
+      extra.style.marginBottom = "4px";
+      extra.style.fontSize = "11px";
+      extra.style.opacity = "0.75";
+      extra.textContent = t("weekly.batterRecapExtra", {
+        hbp: b.hbp ?? 0, sb: b.sb ?? 0, sf: b.sf ?? 0, dp: b.dp ?? 0,
+      });
+      dialog.appendChild(extra);
+    }
   }
   if (mp?.pitcherBox) {
     const p = mp.pitcherBox;
@@ -940,12 +951,14 @@ function renderSeasonBody(player) {
   const ops = s.ab > 0 ? (parseFloat("0" + obp) + parseFloat("0" + slg)).toFixed(3) : "-";
 
   const batCard = statBlock(t("weekly.seasonBatter"), "var(--accent)");
-  batCard.body.appendChild(infoBlock(t("weekly.statG"),  s.games, null, "sm"));
-  batCard.body.appendChild(infoBlock(t("weekly.statPa"), s.pa,    null, "sm"));
-  batCard.body.appendChild(infoBlock(t("weekly.statH"),  s.h,     null, "sm"));
-  batCard.body.appendChild(infoBlock(t("weekly.statHr"), s.hr,    null, "sm"));
-  batCard.body.appendChild(infoBlock(t("weekly.statBa"), ba,      null, "sm"));
-  batCard.body.appendChild(infoBlock(t("weekly.statOps"), ops,    null, "sm"));
+  batCard.body.appendChild(infoBlock(t("weekly.statG"),   s.games,    null, "sm"));
+  batCard.body.appendChild(infoBlock(t("weekly.statPa"),  s.pa,       null, "sm"));
+  batCard.body.appendChild(infoBlock(t("weekly.statH"),   s.h,        null, "sm"));
+  batCard.body.appendChild(infoBlock(t("weekly.statHr"),  s.hr,       null, "sm"));
+  batCard.body.appendChild(infoBlock(t("weekly.statBa"),  ba,         null, "sm"));
+  batCard.body.appendChild(infoBlock(t("weekly.statOps"), ops,        null, "sm"));
+  batCard.body.appendChild(infoBlock(t("weekly.statSb"),  s.sb  ?? 0, null, "sm"));
+  batCard.body.appendChild(infoBlock(t("weekly.statHbp"), s.hbp ?? 0, null, "sm"));
   batCard.root.style.marginBottom = "8px";
   wrap.appendChild(batCard.root);
 
@@ -1058,6 +1071,17 @@ function renderLastWeekBody(results) {
         const recap = t("weekly.batterRecap", { pa: b.pa, h: b.h, hr: b.hr, k: b.k });
         bLine.innerHTML = `<span style="color:var(--accent)">${t("weekly.batLabel")}</span> ${recap}${batEvents ? ` — ${batEvents}` : ""}`;
         detail.appendChild(bLine);
+        if ((b.hbp ?? 0) + (b.sb ?? 0) + (b.sf ?? 0) + (b.dp ?? 0) > 0) {
+          const bLineExtra = document.createElement("div");
+          bLineExtra.className = "muted small";
+          bLineExtra.style.fontSize = "10.5px";
+          bLineExtra.style.opacity = "0.7";
+          bLineExtra.style.paddingLeft = "26px";
+          bLineExtra.textContent = t("weekly.batterRecapExtra", {
+            hbp: b.hbp ?? 0, sb: b.sb ?? 0, sf: b.sf ?? 0, dp: b.dp ?? 0,
+          });
+          detail.appendChild(bLineExtra);
+        }
       }
       if (mp.pitcherBox) {
         const p = mp.pitcherBox;

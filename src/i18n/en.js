@@ -3,7 +3,7 @@ export const en = {
   app: {
     title: "Auto Baseball Alone",
     logo: "Auto Baseball Alone",
-    version: "v0.1 · Phase 1",
+    version: "v0.3 · Phase 1+α",
   },
 
   nav: {
@@ -302,11 +302,17 @@ export const en = {
   event: {
     K:   "K",
     BB:  "BB",
+    HBP: "HBP",
     "1B": "Single",
     "2B": "Double",
     "3B": "Triple",
     HR:  "HR",
     OUT: "Out",
+    E:   "Reached on E",
+    DP:  "Double Play",
+    SF:  "Sac Fly",
+    SB:  "Stolen Base",
+    CS:  "Caught Stealing",
   },
 
   hand: {
@@ -506,6 +512,8 @@ export const en = {
     statH: "H",
     statHr: "HR",
     statK: "K",
+    statSb: "SB",
+    statHbp: "HBP",
     statG: "G",
     statBa: "AVG",
     statOps: "OPS",
@@ -519,6 +527,7 @@ export const en = {
     batLabel: "[B]",
     pitLabel: "[P]",
     batterRecap: "{pa} PA, {h} H, {hr} HR, {k} K",
+    batterRecapExtra: "{hbp} HBP, {sb} SB, {sf} SF, {dp} DP",
     pitcherRecap: "9 IP, {er} ER, {k} K, {bb} BB, {h} H",
 
     standingsHead: { rank: "#", team: "Team", w: "W", l: "L", t: "T", pct: "PCT" },
