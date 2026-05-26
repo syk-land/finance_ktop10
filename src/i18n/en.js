@@ -30,12 +30,15 @@ export const en = {
   },
 
   stage: {
-    high: "High School",
-    univ: "College",
-    pro2: "Minor League",
-    pro1: "Major (Pro)",
-    japan: "Japan Pro Baseball",
-    mlb: "Major League",
+    high:    "High School",
+    univ:    "College",
+    pro2:    "KBO Futures",
+    pro1:    "KBO",
+    japan:   "NPB",
+    mlb:     "MLB",
+    mlb_aaa: "AAA",
+    mlb_aa:  "AA",
+    mlb_a:   "Single-A",
   },
 
   stat: {
@@ -268,12 +271,12 @@ export const en = {
   // Korean high school baseball tournaments (tournaments.js)
   tournament: {
     weekly_first:  "Spring Weekend League",
-    emart_cup:     "Emart Cup",
-    gold_lion:     "Golden Lion",
+    emart_cup:     "Black Tortoise Cup",
+    gold_lion:     "White Tiger Cup",
     weekly_second: "Summer Weekend League",
-    blue_dragon:   "Blue Dragon",
+    blue_dragon:   "Azure Dragon Cup",
     president_cup: "President's Cup",
-    phoenix_cup:   "Phoenix Cup",
+    phoenix_cup:   "Vermilion Bird Cup",
   },
 
   // Tournament outcomes
@@ -281,6 +284,18 @@ export const en = {
     champion:   "Champion",
     runner:     "Runner-up",
     eliminated: "Eliminated",
+  },
+
+  // Season awards (awards.js)
+  award: {
+    battingTitle: "Batting Title",
+    hrKing:       "Home Run King",
+    rbiKing:      "RBI Leader",
+    kKing:        "Strikeout King",
+    eraTitle:     "ERA Title",
+    rookie:       "Rookie of the Year",
+    mvp:          "MVP",
+    twoWayMvp:    "Two-Way MVP",
   },
 
   // At-bat outcomes (simulator → events.type)
@@ -344,10 +359,38 @@ export const en = {
 
   log: {
     careerStart: "Joined {school} baseball team — Year 1 begins.",
-    graduation: "Graduated — career branching coming in Phase 3.",
+    graduation: "Graduated — choose your career path.",
     seasonStart: "{team} Year {grade} season begins.",
     seasonEnd: "{stage} Year {grade} season ended.",
     trainingCritical: "{label} — critical! 2x effect",
+    stageTransition: "Signed with {team} ({stage})!",
+    retired: "Retired from baseball.",
+    promoted: "Called up to {team} ({stage})!",
+  },
+
+  // Career path selection (career.js)
+  careerPath: {
+    title: "Choose Your Path",
+    desc: "Graduation is here. Pick your next stage.",
+    univLabel:   "College",
+    univDesc:    "Four years of college ball.",
+    kboLabel:    "KBO Draft",
+    kboDesc:     "Drafted to top or farm league based on stats. May go undrafted.",
+    mlbLabel:    "MLB",
+    mlbDesc:     "Requires an offer.",
+    mlbOffer:    "Offers: {teams}",
+    retireLabel: "Retire",
+    retireDesc:  "End your baseball career.",
+    locked:      "No offers",
+    yourScore:   "Composite score: {score}",
+
+    mlbOfferTitle: "MLB Offers",
+    mlbOfferDesc:  "These teams are interested. Pick one or decline.",
+    mlbReject:     "Decline (KBO Draft)",
+    teamStrength:  "Team strength: {strength}",
+
+    draftPicked:    "Drafted to {stage}!",
+    draftUndrafted: "Undrafted — career ends.",
   },
 
   menu: {
@@ -401,6 +444,10 @@ export const en = {
     mvpBadge: "MVP",
     mvpAwarded: "{tournament} MVP awarded!",
     noTournamentsYet: "No records yet",
+    awardsTitle: "Season Awards",
+    noAwards: "No awards",
+    careerTotalsTitle: "Career Totals",
+    careerAwardsTitle: "Career Awards",
 
     valGame: "Game",
     valTraining: "Train ({short})",
@@ -410,6 +457,7 @@ export const en = {
 
     btnPlay: "▶  Play",
     btnPause: "⏸  Pause",
+    btnReplay: "▶ Watch POV",
 
     btnAutoOpen: "Auto-train — Pick preset",
     btnAutoClose: "Close auto-train",

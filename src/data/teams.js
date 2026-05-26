@@ -71,29 +71,34 @@ export const MLB_TEAMS = [
 // 고교: 실제 한국 고교야구 일정 (3월 ~ 8월 말, 약 25주, 권역 풀리그라 주 1경기)
 // 토너먼트 결승전은 별도 모달로 추가 시뮬되므로 정규 리그 + 결승 합치면 시즌당 ~28-32경기.
 const STAGE_META = {
-  high:  { weeksPerSeason: 25, gamesPerWeek: 1 },
-  univ:  { weeksPerSeason: 22, gamesPerWeek: 2 },
-  pro2:  { weeksPerSeason: 26, gamesPerWeek: 3 },
-  pro1:  { weeksPerSeason: 26, gamesPerWeek: 3 },
-  japan: { weeksPerSeason: 26, gamesPerWeek: 3 },
-  mlb:   { weeksPerSeason: 26, gamesPerWeek: 3 },
+  high:    { weeksPerSeason: 25, gamesPerWeek: 1 },
+  univ:    { weeksPerSeason: 22, gamesPerWeek: 2 },
+  pro2:    { weeksPerSeason: 26, gamesPerWeek: 3 },
+  pro1:    { weeksPerSeason: 26, gamesPerWeek: 3 },
+  japan:   { weeksPerSeason: 26, gamesPerWeek: 3 },
+  mlb:     { weeksPerSeason: 26, gamesPerWeek: 3 },
+  mlb_aaa: { weeksPerSeason: 26, gamesPerWeek: 3 },
+  mlb_aa:  { weeksPerSeason: 26, gamesPerWeek: 3 },
+  mlb_a:   { weeksPerSeason: 26, gamesPerWeek: 3 },
 };
 
 // stage + locale → 팀 풀
+// 마이너리그(mlb_aaa/aa/a) 는 MLB 30팀의 산하 팜으로 같은 팀 풀을 사용. NPC 는 dummy 이름 처리.
 export function getTeamPool(stage, locale = "ko") {
+  const isMlbBranch = stage === "mlb" || stage === "mlb_aaa" || stage === "mlb_aa" || stage === "mlb_a";
   if (locale === "en") {
     if (stage === "high")  return HIGH_SCHOOL_TEAMS_EN;
     if (stage === "univ")  return UNIV_TEAMS_EN;
     if (stage === "pro1" || stage === "pro2") return PRO_TEAMS_EN;
     if (stage === "japan") return JAPAN_TEAMS_EN;
-    if (stage === "mlb")   return MLB_TEAMS_EN;
+    if (isMlbBranch)       return MLB_TEAMS_EN;
     return [];
   }
   if (stage === "high")  return HIGH_SCHOOL_TEAMS;
   if (stage === "univ")  return UNIV_TEAMS;
   if (stage === "pro1" || stage === "pro2") return PRO_TEAMS;
   if (stage === "japan") return JAPAN_TEAMS;
-  if (stage === "mlb")   return MLB_TEAMS;
+  if (isMlbBranch)       return MLB_TEAMS;
   return [];
 }
 

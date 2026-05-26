@@ -10,10 +10,11 @@
 // 토너먼트별로 시즌당 한 번만 굴림 (state.pendingFinal.processedWeek 로 중복 방지).
 
 import { HIGH_SCHOOL_TOURNAMENTS } from "../data/tournaments.js";
+import { getTeamPool } from "../data/teams.js";
 import { getPlayerTeam } from "./league.js";
 import { createRoster } from "./npc.js";
 import { simulateGame } from "./simulator.js";
-import { overallScore, BATTER_STATS, PITCHER_STATS } from "./player.js";
+import { overallScore, BATTER_STATS, PITCHER_STATS, getPlayerStatCap } from "./player.js";
 import { state, pushToast } from "../state.js";
 import { t } from "../i18n/index.js";
 
@@ -45,15 +46,24 @@ function advanceProbability(player, league) {
   return Math.max(0.05, Math.min(0.55, score));
 }
 
-// 가상의 결승전 상대 팀 생성 — 결승까지 올라온 강팀
-function makeOpponentTeam(myTeamStrength, opponentSeed) {
-  const baseStr = Math.max(60, myTeamStrength + (opponentSeed === "strong" ? 10 : 5));
+// 가상의 결승전 상대 팀 생성 — 팀 풀에서 리그에 없는 강팀 하나 선택
+function makeOpponentTeam(myTeamStrength, league) {
+  const locale = state?.locale ?? "ko";
+  const pool = getTeamPool("high", locale);
+  const existingNames = new Set((league?.teams ?? []).map(t => t.name));
+  const candidates = pool.filter(t => !existingNames.has(t.name));
+  const usable = candidates.length > 0 ? candidates : pool;
+  // 결승까지 올라온 팀이므로 strength 상위 절반 중 랜덤 선택
+  const sorted = [...usable].sort((a, b) => b.strength - a.strength);
+  const topN = Math.max(3, Math.ceil(sorted.length / 2));
+  const pick = sorted[Math.floor(Math.random() * Math.min(topN, sorted.length))];
+  const finalStrength = Math.max(60, myTeamStrength + 5, pick.strength);
   return {
     id: -100,
-    name: opponentSeed === "strong" ? "라이벌 고등학교" : "지역 강호고",
-    region: "기타",
-    strength: baseStr,
-    roster: createRoster(baseStr, [16, 18]),
+    name: pick.name,
+    region: pick.region,
+    strength: finalStrength,
+    roster: createRoster(finalStrength, [16, 18]),
     record: { w: 0, l: 0, t: 0 },
     isPlayerTeam: false,
   };
@@ -74,7 +84,7 @@ export function checkFinalAdvance(player, league, season, gameDate) {
     if (Math.random() < advanceProbability(player, league)) {
       // 결승 진출!
       const myStrength = getPlayerTeam(league)?.strength ?? 60;
-      const opponent = makeOpponentTeam(myStrength, "strong");
+      const opponent = makeOpponentTeam(myStrength, league);
       return {
         tournamentKey: tn.key,
         opponent,
@@ -145,10 +155,11 @@ export function applyFinalReward(player, result, tournamentKey = null) {
   const mvp = won && checkMVP(result);
 
   const changes = [];
+  const cap = getPlayerStatCap(player);
   function bump(group, stat, delta) {
     if (player[group]?.[stat] === undefined) return;
     const before = player[group][stat];
-    const after = Math.max(STAT_MIN, Math.min(STAT_CAP, before + delta));
+    const after = Math.max(STAT_MIN, Math.min(cap, before + delta));
     player[group][stat] = +after.toFixed(1);
     changes.push({ group, stat, delta: +(after - before).toFixed(1) });
   }

@@ -1,6 +1,6 @@
 // 리그/시즌/일정 생성
 import { getStageInfo } from "../data/teams.js";
-import { createRoster } from "./npc.js";
+import { createRoster, ageUpRoster, stageAgeRange } from "./npc.js";
 import { getLocale } from "../i18n/index.js";
 
 let _teamIdCounter = 1;
@@ -12,14 +12,14 @@ export function createLeague(stage, playerTeamName) {
   if (!info) throw new Error(`unknown stage ${stage}`);
   const teamTemplates = info.teams.length > 0 ? info.teams : [];
   if (teamTemplates.length === 0) throw new Error(`no teams for stage ${stage}`);
-  const ageRange = stage === "high" ? [16, 18] : stage === "univ" ? [19, 22] : [19, 38];
+  const ageRange = stageAgeRange(stage);
 
   const teams = teamTemplates.map(t => ({
     id: _teamIdCounter++,
     name: t.name,
     region: t.region,
     strength: t.strength,
-    roster: createRoster(t.strength, ageRange),
+    roster: createRoster(t.strength, ageRange, { stage, teamName: t.name }),
     record: { w: 0, l: 0, t: 0 },
     isPlayerTeam: t.name === playerTeamName,
   }));
@@ -48,6 +48,17 @@ function buildSchedule(teams, weeks, gamesPerWeek) {
     schedule.push(games);
   }
   return schedule;
+}
+
+// 학년/시즌 진급 시 league 갱신 — NPC 풀 carry-over + 일정 새로 생성
+// (createLeague 통째로 재생성 대신 이걸 사용하면 NPC 가 시즌 단위로 성장/은퇴/신인 합류함)
+export function ageUpLeague(league) {
+  for (const team of league.teams) {
+    team.roster = ageUpRoster(team.roster, league.stage, team.strength, team.name);
+    team.record = { w: 0, l: 0, t: 0 };
+  }
+  league.schedule = buildSchedule(league.teams, league.weeksPerSeason, league.gamesPerWeek);
+  return league;
 }
 
 export function getTeamById(league, id) {

@@ -8,7 +8,7 @@ import {
   BATTER_STATS, PITCHER_STATS, TALENTS, overallScore, getStatLabels,
 } from "../systems/player.js";
 import { advanceToNextSeason } from "../systems/week.js";
-import { transitionAfterSeason } from "../systems/career.js";
+import { transitionAfterSeason, transitionToStage, eligibleCareerPaths, kboDraft, determineMLBStartStage, compositeScore } from "../systems/career.js";
 import { getPlayerTeam, standings } from "../systems/league.js";
 import { createFaceSVG } from "../render/avatars.js";
 import { AUTO_PRESETS, autoFillWeek } from "../systems/autoTrain.js";
@@ -18,6 +18,7 @@ import { createRadarSVG } from "../render/radar.js";
 import { formatGameDate, t } from "../i18n/index.js";
 import { getActiveTournaments } from "../data/tournaments.js";
 import { simulateFinal, applyFinalReward } from "../systems/finals.js";
+import { createPOVScene, pulseDiamondHome } from "../render/finalAnim.js";
 
 export function renderWeekly(root, route, opts = {}) {
   const { player, league, season } = state;
@@ -26,6 +27,8 @@ export function renderWeekly(root, route, opts = {}) {
   }
   if (season.finished) {
     renderSeasonEnd(root, route);
+    // 시즌 종료와 같은 주에 발동된 결승(예: 주작기)은 시즌종료 화면 위에 모달로 띄움
+    showFinalModalIfNeeded(route);
     return;
   }
 
@@ -74,7 +77,8 @@ function showFinalModalIfNeeded(route) {
   if (!f || _finalModalShown) return;
   _finalModalShown = true;
 
-  // 결승 진출 시 시즌 일시정지 — 시즌 중 발생해도 게임이 계속 흐르지 않게
+  // 결승 진출 시 시즌 일시정지 — 직전 상태를 보존했다가 결승 종료 후 복원해서 자동 진행 이어감
+  if (f._wasPaused == null) f._wasPaused = state.paused;
   state.paused = true;
   saveGame();
 
@@ -95,8 +99,10 @@ function showFinalModalIfNeeded(route) {
       if (reward.mvp) {
         pushToast(t("weekly.mvpAwarded", { tournament: t("tournament." + f.tournamentKey) }), "good");
       }
+      const restorePaused = f._wasPaused ?? false;
       state.pendingFinal = null;
       _finalModalShown = false;
+      state.paused = restorePaused;
       saveGame();
       backdrop.remove();
       route("weekly");
@@ -153,13 +159,15 @@ function buildFinalPlaying(dialog, final, rerender) {
   h.textContent = t("weekly.finalLiveTitle", { tournament: t("tournament." + final.tournamentKey) });
   dialog.appendChild(h);
 
-  // 2) 다이아몬드 SVG + 현재 이닝 표시 (가운데)
+  // 2) 시각화 영역 — 평소 다이아몬드, 메인 캐릭터 타석/등판 시 POV 씬으로 swap
   const fieldWrap = document.createElement("div");
   fieldWrap.style.display = "flex";
   fieldWrap.style.justifyContent = "center";
   fieldWrap.style.alignItems = "center";
   fieldWrap.style.marginBottom = "8px";
-  fieldWrap.appendChild(createDiamondSVG());
+  fieldWrap.style.minHeight = "204px";
+  let diamondNode = createDiamondSVG();
+  fieldWrap.appendChild(diamondNode);
   dialog.appendChild(fieldWrap);
 
   // 3) 점수판 (양 팀 점수 라이브)
@@ -232,79 +240,105 @@ function buildFinalPlaying(dialog, final, rerender) {
   logBox.style.margin = "8px 0";
   dialog.appendChild(logBox);
 
-  // 라이브 진행: setInterval 기반 step 진행 (안정적).
-  //   매 step (800ms): 한 half-inning 진행
-  //     - 초공격 → 점수 / 라인 / inning 텍스트 갱신
-  //     - 다음 step: 말공격 + 그 이닝 메인 이벤트 로그
-  //     - 다음 이닝으로
-  // 옛 세이브 호환: 캐시된 옛 simulator 결과는 innings 가 없을 수 있음 — fallback 빈 배열
+  // 라이브 진행: half-inning 단위 async 루프.
+  //   - 그 half에 메인 이벤트가 있으면 POV 씬으로 swap → 각 이벤트마다 1.6s 시각화 + 텍스트 로그
+  //   - 메인 이벤트 없으면 다이아몬드 그대로, 점수만 빠르게 갱신
+  //   - 득점한 half는 다이아몬드 홈베이스 펄스
+  //
+  // 옛 세이브 호환: 캐시된 옛 simulator 결과는 innings 가 없을 수 있음 → fallback 빈 배열.
   const myInns = (isHome ? home.innings : away.innings) ?? [];
   const oppInns = (isHome ? away.innings : home.innings) ?? [];
   const totalInnings = Math.max(myInns.length, oppInns.length, 9);
-  const events = result.mainPlayer?.events ?? [];
+  const allEvents = result.mainPlayer?.events ?? [];
 
   let myRun = 0, oppRun = 0;
-  let inIdx = 0;
-  let phase = 0;       // 0 = 초공격, 1 = 말공격
-  let timer = null;
+  let cancelled = false;
 
-  function step() {
-    if (inIdx >= totalInnings) {
-      if (timer) { clearInterval(timer); timer = null; }
-      final.status = "result";
-      saveGame();
-      rerender();
-      return;
-    }
-    const i = inIdx;
-    if (phase === 0) {
-      // 초공격 — 상대 점수 (홈팀이면 opp 가 원정)
-      inningTag.textContent = `${i + 1}회초`;
-      const awayRuns = isHome ? (oppInns[i] ?? 0) : (myInns[i] ?? 0);
-      if (isHome) {
-        oppRun += awayRuns;
-        oppScore.textContent = String(oppRun);
-        highlight(oppScore);
-      } else {
-        myRun += awayRuns;
-        myScore.textContent = String(myRun);
-        highlight(myScore);
-      }
-      updateLineScoreCell(lineScore, isHome ? "opp" : "my", i, awayRuns);
-      phase = 1;
+  // 메인 이벤트의 half 분류:
+  //   role=batter → 자기팀 공격 = isHome ? "bottom" : "top"
+  //   role=pitcher → 자기팀 수비 = isHome ? "top" : "bottom"
+  function eventHalf(ev) {
+    if (ev.role === "batter") return isHome ? "bottom" : "top";
+    return isHome ? "top" : "bottom";
+  }
+  function eventsForHalf(inning, half) {
+    return allEvents.filter(ev => ev.inning === inning + 1 && eventHalf(ev) === half);
+  }
+  function runsForHalf(inning, half) {
+    // half="top" = 원정팀 득점, half="bottom" = 홈팀 득점
+    const isMyHalf = (half === "top") === !isHome;
+    const arr = isMyHalf ? myInns : oppInns;
+    return arr[inning] ?? 0;
+  }
+  function applyRuns(inning, half) {
+    const runs = runsForHalf(inning, half);
+    const isMyHalf = (half === "top") === !isHome;
+    if (isMyHalf) {
+      myRun += runs;
+      myScore.textContent = String(myRun);
+      highlight(myScore);
     } else {
-      inningTag.textContent = `${i + 1}회말`;
-      const homeRuns = isHome ? myInns[i] : oppInns[i];
-      if (homeRuns != null) {
-        if (isHome) {
-          myRun += homeRuns;
-          myScore.textContent = String(myRun);
-          highlight(myScore);
-        } else {
-          oppRun += homeRuns;
-          oppScore.textContent = String(oppRun);
-          highlight(oppScore);
-        }
-        updateLineScoreCell(lineScore, isHome ? "my" : "opp", i, homeRuns);
-      }
-      // 그 이닝의 메인 캐릭터 이벤트 로그 (한 번에 다 추가)
-      const inningEvents = events.filter(ev => ev.inning === i + 1);
-      for (const ev of inningEvents) {
-        const row = document.createElement("div");
-        const roleColor = ev.role === "batter" ? "var(--accent)" : "var(--accent-2)";
-        const roleLbl = ev.role === "batter" ? t("weekly.batLabel") : t("weekly.pitLabel");
-        row.innerHTML = `<span style="color:${roleColor}; font-weight:700">[${i + 1}] ${roleLbl}</span> ${t("event." + ev.type)}`;
-        logBox.appendChild(row);
-      }
-      logBox.scrollTop = logBox.scrollHeight;
-      phase = 0;
-      inIdx++;
+      oppRun += runs;
+      oppScore.textContent = String(oppRun);
+      highlight(oppScore);
     }
+    updateLineScoreCell(lineScore, isMyHalf ? "my" : "opp", inning, runs);
+    if (runs > 0) pulseDiamondHome(diamondNode);
+  }
+  function swapField(node) {
+    while (fieldWrap.firstChild) fieldWrap.removeChild(fieldWrap.firstChild);
+    fieldWrap.appendChild(node);
+    diamondNode = node;
+  }
+  function appendEventLog(ev) {
+    const row = document.createElement("div");
+    const roleColor = ev.role === "batter" ? "var(--accent)" : "var(--accent-2)";
+    const roleLbl = ev.role === "batter" ? t("weekly.batLabel") : t("weekly.pitLabel");
+    row.innerHTML = `<span style="color:${roleColor}; font-weight:700">[${ev.inning}] ${roleLbl}</span> ${t("event." + ev.type)}`;
+    logBox.appendChild(row);
+    logBox.scrollTop = logBox.scrollHeight;
+  }
+  function waitMs(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  async function playHalf(inning, half) {
+    if (cancelled) return;
+    inningTag.textContent = `${inning + 1}${half === "top" ? "회초" : "회말"}`;
+    const evs = eventsForHalf(inning, half);
+    if (evs.length > 0) {
+      // role 별 mode (한 half 내에선 동일 role 로 통일됨)
+      const mode = evs[0].role === "batter" ? "bat" : "pit";
+      const scene = createPOVScene(mode);
+      swapField(scene.el);
+      for (const ev of evs) {
+        if (cancelled) return;
+        await scene.playPitch(ev);
+        appendEventLog(ev);
+        await waitMs(180);
+      }
+      // 다이아몬드 복원 (펄스가 새 다이아몬드에 찍히도록 점수 갱신 전 swap)
+      swapField(createDiamondSVG());
+    } else {
+      await waitMs(360);
+    }
+    applyRuns(inning, half);
+    await waitMs(280);
   }
 
-  // 첫 step 즉시 실행 + setInterval 800ms 진행
-  step();
-  timer = setInterval(step, 800);
+  (async function runGame() {
+    for (let i = 0; i < totalInnings; i++) {
+      if (cancelled) return;
+      await playHalf(i, "top");
+      // 마지막 이닝 끝내기: myInns[i] 또는 oppInns[i] 가 null 이면 그 half 는 진행 안 함
+      const skipBottom = i === totalInnings - 1 && (myInns[i] === null || oppInns[i] === null);
+      if (!skipBottom) {
+        await playHalf(i, "bottom");
+      }
+    }
+    if (cancelled) return;
+    final.status = "result";
+    saveGame();
+    rerender();
+  })();
 }
 
 // 다이아몬드 SVG (정적)
@@ -324,8 +358,10 @@ function createDiamondSVG() {
   return svg;
 }
 
-// 라인 스코어 테이블 (1~9이닝 + R)
+// 라인 스코어 테이블 — 정규 9칸 + 연장 칸 동적 추가 + R
 function renderLineScoreTable(my, opp) {
+  const totalCols = Math.max((my.innings ?? []).length, (opp.innings ?? []).length, 9);
+
   const table = document.createElement("table");
   table.style.width = "100%";
   table.style.borderCollapse = "collapse";
@@ -334,9 +370,13 @@ function renderLineScoreTable(my, opp) {
   table.style.textAlign = "center";
 
   const headRow = document.createElement("tr");
-  headRow.innerHTML = `<th style="text-align:left; padding:2px 4px;"></th>`
-    + Array.from({ length: 9 }, (_, i) => `<th style="padding:2px 3px; color:var(--muted)">${i + 1}</th>`).join("")
-    + `<th style="padding:2px 6px; color:var(--accent-2); border-left:1px solid var(--border)">R</th>`;
+  const headCells = [`<th style="text-align:left; padding:2px 4px;"></th>`];
+  for (let i = 0; i < totalCols; i++) {
+    const extra = i >= 9;
+    headCells.push(`<th style="padding:2px 3px; color:${extra ? "var(--accent-2)" : "var(--muted)"}">${i + 1}</th>`);
+  }
+  headCells.push(`<th style="padding:2px 6px; color:var(--accent-2); border-left:1px solid var(--border)">R</th>`);
+  headRow.innerHTML = headCells.join("");
   const thead = document.createElement("thead");
   thead.appendChild(headRow);
   table.appendChild(thead);
@@ -348,7 +388,7 @@ function renderLineScoreTable(my, opp) {
     const teamName = side === "my" ? my.team.name : opp.team.name;
     const teamColor = side === "my" ? "var(--accent)" : "var(--muted)";
     let row = `<td style="text-align:left; padding:3px 4px; color:${teamColor}; font-weight:700">${truncate(teamName, 6)}</td>`;
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < totalCols; i++) {
       row += `<td data-cell="${side}-${i}" style="padding:2px 3px; color:var(--muted)">-</td>`;
     }
     row += `<td data-cell="${side}-R" style="padding:2px 6px; color:${teamColor}; font-weight:700; border-left:1px solid var(--border)">0</td>`;
@@ -809,11 +849,15 @@ function renderHeaderInfo(player, league, season) {
     player.condition > 70 ? "good" : player.condition < 30 ? "bad" : null,
     "sm",
   ));
+  const activeTournamentNames = getActiveTournaments(state.player.stage, state.gameDate)
+    .map(tn => t("tournament." + tn.key))
+    .join(" · ");
   grid.appendChild(infoBlock(
     t("weekly.infoWeek"),
     t("weekly.weekVal", { cur: season.weekIndex + 1, max: league.weeksPerSeason }),
     null,
     "sm",
+    activeTournamentNames || null,
   ));
   if (player.injury) {
     grid.appendChild(infoBlock(
@@ -830,7 +874,7 @@ function renderHeaderInfo(player, league, season) {
   return panel;
 }
 
-function infoBlock(label, value, tone, size = "md") {
+function infoBlock(label, value, tone, size = "md", sub = null) {
   const d = document.createElement("div");
   d.style.minWidth = size === "sm" ? "0" : "100px";
 
@@ -853,6 +897,19 @@ function infoBlock(label, value, tone, size = "md") {
 
   d.appendChild(l);
   d.appendChild(v);
+
+  if (sub) {
+    const s = document.createElement("div");
+    s.textContent = sub;
+    s.style.color = "var(--accent-2)";
+    s.style.fontSize = "10px";
+    s.style.lineHeight = "1.2";
+    s.style.marginTop = "1px";
+    s.style.whiteSpace = "nowrap";
+    s.style.overflow = "hidden";
+    s.style.textOverflow = "ellipsis";
+    d.appendChild(s);
+  }
   return d;
 }
 
@@ -1012,11 +1069,95 @@ function renderLastWeekBody(results) {
         pLine.innerHTML = `<span style="color:var(--accent-2)">${t("weekly.pitLabel")}</span> ${recap}`;
         detail.appendChild(pLine);
       }
+      // POV 재생 버튼 (이벤트가 있을 때만)
+      if ((mp.events ?? []).length > 0) {
+        const playBtn = document.createElement("button");
+        playBtn.style.cssText = "margin-top:5px; align-self:flex-start; padding:4px 10px; font-size:11px; background:var(--panel-2); border:1px solid var(--accent); color:var(--accent); border-radius:4px; cursor:pointer;";
+        playBtn.textContent = t("weekly.btnReplay");
+        playBtn.addEventListener("pointerdown", e => {
+          e.preventDefault();
+          openGameReplayModal(r);
+        });
+        detail.appendChild(playBtn);
+      }
       line.appendChild(detail);
     }
     wrap.appendChild(line);
   }
   return wrap;
+}
+
+// 일반 경기 POV 미리보기 모달 — 메인 캐릭터 이벤트만 순차 재생.
+// 결승 모달의 라인스코어/점수판은 생략, POV 씬 + 짧은 텍스트 로그만.
+function openGameReplayModal(gameResult) {
+  const events = gameResult.mainPlayer?.events ?? [];
+  if (events.length === 0) return;
+
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+
+  const dialog = document.createElement("div");
+  dialog.className = "modal-dialog";
+  dialog.style.position = "relative";
+  dialog.style.maxWidth = "360px";
+
+  // 헤더
+  const header = document.createElement("div");
+  header.style.cssText = "margin-bottom:8px; font-size:13px; font-weight:700; text-align:center;";
+  const my = gameResult.home.team.isPlayerTeam ? gameResult.home : gameResult.away;
+  const opp = my === gameResult.home ? gameResult.away : gameResult.home;
+  header.textContent = `${my.team.name} ${my.score} : ${opp.score} ${opp.team.name}`;
+  dialog.appendChild(header);
+
+  // POV 씬 컨테이너 — role 별 mode 가 다를 수 있으므로 동적 swap
+  const sceneWrap = document.createElement("div");
+  sceneWrap.style.cssText = "display:flex; justify-content:center; margin-bottom:8px; min-height:200px;";
+  dialog.appendChild(sceneWrap);
+
+  // 이벤트 로그 — 누적
+  const logBox = document.createElement("div");
+  logBox.style.cssText = "background:var(--panel-2); border:1px solid var(--border); border-radius:6px; padding:6px 10px; max-height:100px; overflow-y:auto; font-size:11px; line-height:1.4; margin-bottom:10px;";
+  dialog.appendChild(logBox);
+
+  // 닫기 버튼
+  const closeBtn = document.createElement("button");
+  closeBtn.textContent = t("common.close") || "닫기";
+  closeBtn.style.cssText = "width:100%; padding:8px; font-size:13px;";
+  closeBtn.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    cancelled = true;
+    backdrop.remove();
+  });
+  dialog.appendChild(closeBtn);
+
+  backdrop.appendChild(dialog);
+  document.body.appendChild(backdrop);
+
+  let cancelled = false;
+  let currentScene = null;
+  let currentMode = null;
+
+  (async function run() {
+    for (const ev of events) {
+      if (cancelled) return;
+      const mode = ev.role === "batter" ? "bat" : "pit";
+      if (mode !== currentMode) {
+        currentScene = createPOVScene(mode);
+        while (sceneWrap.firstChild) sceneWrap.removeChild(sceneWrap.firstChild);
+        sceneWrap.appendChild(currentScene.el);
+        currentMode = mode;
+      }
+      await currentScene.playPitch(ev);
+      if (cancelled) return;
+      const row = document.createElement("div");
+      const roleColor = ev.role === "batter" ? "var(--accent)" : "var(--accent-2)";
+      const roleLbl = ev.role === "batter" ? t("weekly.batLabel") : t("weekly.pitLabel");
+      row.innerHTML = `<span style="color:${roleColor}; font-weight:700">[${ev.inning}] ${roleLbl}</span> ${t("event." + ev.type)}`;
+      logBox.appendChild(row);
+      logBox.scrollTop = logBox.scrollHeight;
+      await new Promise(r => setTimeout(r, 150));
+    }
+  })();
 }
 
 function renderStandingsBody(league) {
@@ -1319,6 +1460,84 @@ function renderCareerHighGrid(player) {
   return grid;
 }
 
+// 통산 기록 슬라이드 — 누적 stat (시즌 종료 시점에 시즌 결과 합산 후 표시되도록 시즌 시점 stats + 누적 추가)
+function renderCareerTotalsBody(player) {
+  // 시즌 종료 시점에선 advanceToNextSeason 이 아직 호출되지 않아 careerStats 가 갱신 안 됨.
+  // → 현재 careerStats 와 이번 시즌 seasonStats 를 합산해서 미리 보여줌.
+  const c = player.careerStats ?? {};
+  const s = player.seasonStats ?? {};
+  const add = (k) => (c[k] ?? 0) + (s[k] ?? 0);
+
+  const games = add("games");
+  const pa = add("pa");
+  const ab = add("ab");
+  const h = add("h");
+  const hr = add("hr");
+  const pK = add("pK");
+  const ip = add("ip");
+  const er = add("er");
+  const ba = ab > 0 ? (h / ab).toFixed(3).replace(/^0/, "") : ".---";
+  const era = ip > 0 ? ((er / ip) * 9).toFixed(2) : "-";
+
+  const grid = document.createElement("div");
+  grid.style.cssText = "display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:6px 8px;";
+
+  grid.appendChild(infoBlock(t("weekly.statG"),   String(games), null, "sm"));
+  grid.appendChild(infoBlock(t("weekly.statBa"),  ba, null, "sm"));
+  grid.appendChild(infoBlock(t("weekly.statH"),   String(h), null, "sm"));
+  grid.appendChild(infoBlock(t("weekly.statHr"),  String(hr), null, "sm"));
+  grid.appendChild(infoBlock(t("weekly.statPa"),  String(pa), null, "sm"));
+  grid.appendChild(infoBlock(t("weekly.statKK"),  String(pK), null, "sm"));
+  grid.appendChild(infoBlock(t("weekly.statIp"),  String(ip), null, "sm"));
+  grid.appendChild(infoBlock(t("weekly.statEra"), era, null, "sm"));
+
+  return grid;
+}
+
+// 시즌 수상 슬라이드 — 이번 시즌 수상 + 통산 수상 카운트
+function renderAwardsBody(player, season) {
+  const wrap = document.createElement("div");
+
+  // 이번 시즌
+  const seasonWon = season?.awardsThisSeason ?? [];
+  if (seasonWon.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "muted small";
+    empty.style.padding = "4px 2px";
+    empty.textContent = t("weekly.noAwards");
+    wrap.appendChild(empty);
+  } else {
+    for (const key of seasonWon) {
+      const row = document.createElement("div");
+      row.style.cssText = "padding:7px 10px; background:var(--panel-2); border-left:3px solid var(--accent-2); border-radius:4px; margin-bottom:5px; font-weight:600; font-size:13px;";
+      row.textContent = t("award." + key);
+      wrap.appendChild(row);
+    }
+  }
+
+  // 통산 수상 (이번 시즌 포함)
+  const careerAwards = player.awards ?? [];
+  if (careerAwards.length > 0) {
+    const title = document.createElement("h3");
+    title.style.cssText = "margin:12px 0 6px; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px;";
+    title.textContent = t("weekly.careerAwardsTitle");
+    wrap.appendChild(title);
+
+    const counts = {};
+    for (const a of careerAwards) counts[a.key] = (counts[a.key] ?? 0) + 1;
+    const order = ["mvp", "twoWayMvp", "rookie", "battingTitle", "hrKing", "rbiKing", "kKing", "eraTitle"];
+    const sortedKeys = Object.keys(counts).sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    for (const key of sortedKeys) {
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex; justify-content:space-between; padding:4px 8px; font-size:12px; border-bottom:1px solid var(--border);";
+      row.innerHTML = `<span>${t("award." + key)}</span><span style="font-weight:700; color:var(--accent-2)">×${counts[key]}</span>`;
+      wrap.appendChild(row);
+    }
+  }
+
+  return wrap;
+}
+
 function renderSeasonEnd(root, route) {
   root.innerHTML = "";
   const { player, league } = state;
@@ -1363,11 +1582,13 @@ function renderSeasonEnd(root, route) {
   careerPanel.appendChild(renderCareerHighGrid(player));
   wrap.appendChild(careerPanel);
 
-  // 2) Carousel — 시즌 성적 / 리그 순위 / 능력치
+  // 2) Carousel — 시즌 성적 / 시즌 수상 / 통산 기록 / 리그 순위 / 능력치
   const slides = [
-    { title: t("weekly.seasonStatsTitle"), render: () => renderSeasonBody(player) },
-    { title: t("weekly.standingsTitle"),   render: () => renderStandingsBody(league) },
-    { title: t("weekly.statsTitle"),       render: () => renderAttributesBody(player) },
+    { title: t("weekly.seasonStatsTitle"),   render: () => renderSeasonBody(player) },
+    { title: t("weekly.awardsTitle"),        render: () => renderAwardsBody(player, state.season) },
+    { title: t("weekly.careerTotalsTitle"),  render: () => renderCareerTotalsBody(player) },
+    { title: t("weekly.standingsTitle"),     render: () => renderStandingsBody(league) },
+    { title: t("weekly.statsTitle"),         render: () => renderAttributesBody(player) },
   ];
   if (seasonEndCarouselIdx >= slides.length) seasonEndCarouselIdx = 0;
   wrap.appendChild(renderCarousel(slides, {
@@ -1376,11 +1597,12 @@ function renderSeasonEnd(root, route) {
   }));
 
   // 3) 진행 버튼 분기
-  const isGraduation = player.stage === "high" && player.grade >= 3;
+  const isGraduation = (player.stage === "high" && player.grade >= 3)
+                     || (player.stage === "univ" && player.grade >= 4);
   if (state.career?.ended) {
     wrap.appendChild(renderCareerEndedPanel(route));
   } else if (isGraduation) {
-    wrap.appendChild(renderGraduationPanel(route));
+    wrap.appendChild(renderCareerPathPanel(route));
   } else {
     // "확인" 버튼 → 휴식기 모달
     const btnPanel = document.createElement("section");
@@ -1669,26 +1891,169 @@ function renderCareerEndedPanel(route) {
   return panel;
 }
 
-function renderGraduationPanel(route) {
+// 진로 선택 패널 — 졸업 시 표시. 카드 4개: 프로1군 / 프로2군 / 대학 / 은퇴.
+function renderCareerPathPanel(route) {
   const panel = document.createElement("section");
   panel.className = "panel";
-  const note = document.createElement("div");
-  note.className = "notice";
-  note.textContent = t("weekly.seasonEndFinalNote");
-  panel.appendChild(note);
-  const btn = document.createElement("button");
-  btn.className = "primary";
-  btn.textContent = t("weekly.btnGraduate");
-  btn.style.marginTop = "12px";
-  btn.addEventListener("click", () => {
+  panel.style.padding = "12px";
+
+  const title = document.createElement("h3");
+  title.style.cssText = "margin:0 0 6px; font-size:14px; color:var(--accent-2);";
+  title.textContent = t("careerPath.title");
+  panel.appendChild(title);
+
+  const desc = document.createElement("div");
+  desc.className = "muted small";
+  desc.style.cssText = "margin-bottom:8px; font-size:11px;";
+  desc.textContent = t("careerPath.desc");
+  panel.appendChild(desc);
+
+  const eligible = eligibleCareerPaths(state.player);
+  const scoreLine = document.createElement("div");
+  scoreLine.className = "muted small";
+  scoreLine.style.cssText = "margin-bottom:10px; font-size:11px;";
+  scoreLine.textContent = t("careerPath.yourScore", { score: eligible.score.toFixed(0) });
+  panel.appendChild(scoreLine);
+
+  const grid = document.createElement("div");
+  grid.style.cssText = "display:grid; grid-template-columns:1fr 1fr; gap:8px;";
+
+  const options = [
+    { key: "univ",   labelKey: "univLabel",   descKey: "univDesc",   enabled: eligible.univ },
+    { key: "kbo",    labelKey: "kboLabel",    descKey: "kboDesc",    enabled: eligible.kbo },
+    { key: "mlb",    labelKey: "mlbLabel",    descKey: "mlbDesc",    enabled: eligible.mlb },
+    { key: "retire", labelKey: "retireLabel", descKey: "retireDesc", enabled: eligible.retire },
+  ];
+
+  for (const opt of options) {
+    const card = document.createElement("button");
+    card.style.cssText = `
+      display:block; padding:10px; text-align:left;
+      background:var(--panel-2); border:1px solid var(--border); border-radius:6px;
+      cursor:${opt.enabled ? "pointer" : "not-allowed"};
+      opacity:${opt.enabled ? "1" : "0.45"};
+      width:100%; color:inherit; font-family:inherit;
+    `;
+    card.disabled = !opt.enabled;
+
+    const lbl = document.createElement("div");
+    lbl.style.cssText = "font-weight:700; font-size:13px; margin-bottom:3px; color:var(--accent);";
+    lbl.textContent = t("careerPath." + opt.labelKey);
+    card.appendChild(lbl);
+
+    const d = document.createElement("div");
+    d.style.cssText = "font-size:10px; color:var(--muted); line-height:1.3;";
+    if (opt.key === "mlb" && opt.enabled) {
+      const offerNames = eligible.mlbOffers.map(o => o.name).join(", ");
+      d.textContent = t("careerPath.mlbOffer", { teams: offerNames });
+    } else {
+      d.textContent = opt.enabled ? t("careerPath." + opt.descKey) : t("careerPath.locked");
+    }
+    card.appendChild(d);
+
+    if (opt.enabled) {
+      card.addEventListener("pointerdown", e => {
+        e.preventDefault();
+        chooseCareerPath(opt.key, eligible, route);
+      });
+    }
+    grid.appendChild(card);
+  }
+  panel.appendChild(grid);
+  return panel;
+}
+
+// 진로 카드 선택 처리:
+//   univ   → 그대로 univ stage 진입
+//   kbo    → 드래프트 → 1군/2군/미지명 분기. 미지명이면 은퇴 toast + retire.
+//   mlb    → 오퍼 팀 선택 모달 → 수락 시 시작 stage 결정 (마이너 단계)
+//   retire → 은퇴
+function chooseCareerPath(key, eligible, route) {
+  const proceed = (stage, teamOverride = null) => {
     advanceToNextSeason();
-    transitionAfterSeason();
+    transitionToStage(stage, teamOverride);
     state.offseason = null;
+    state.paused = true;
     saveGame();
     route("weekly");
-  });
-  panel.appendChild(btn);
-  return panel;
+  };
+
+  if (key === "univ" || key === "retire") {
+    proceed(key === "univ" ? "univ" : "retire");
+    return;
+  }
+  if (key === "kbo") {
+    const draft = kboDraft(state.player);
+    if (!draft.picked) {
+      pushToast(t("careerPath.draftUndrafted"), "bad");
+      proceed("retire");
+      return;
+    }
+    pushToast(t("careerPath.draftPicked", { stage: t("stage." + draft.stage) }), "good");
+    proceed(draft.stage);
+    return;
+  }
+  if (key === "mlb") {
+    openMLBOfferModal(eligible.mlbOffers, (chosenTeam) => {
+      if (!chosenTeam) {
+        // 거절 → KBO 드래프트로 fallback
+        const draft = kboDraft(state.player);
+        if (!draft.picked) {
+          pushToast(t("careerPath.draftUndrafted"), "bad");
+          proceed("retire");
+        } else {
+          pushToast(t("careerPath.draftPicked", { stage: t("stage." + draft.stage) }), "good");
+          proceed(draft.stage);
+        }
+      } else {
+        const startStage = determineMLBStartStage(compositeScore(state.player));
+        proceed(startStage, chosenTeam.name);
+      }
+    });
+  }
+}
+
+// MLB 오퍼 모달 — 팀 목록 + 수락(팀 선택)/거절. 거절 시 onChoose(null).
+function openMLBOfferModal(offers, onChoose) {
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  const dialog = document.createElement("div");
+  dialog.className = "modal-dialog";
+  dialog.style.position = "relative";
+  dialog.style.maxWidth = "340px";
+
+  const h = document.createElement("h2");
+  h.textContent = t("careerPath.mlbOfferTitle");
+  dialog.appendChild(h);
+
+  const desc = document.createElement("div");
+  desc.className = "muted small";
+  desc.style.margin = "0 0 12px";
+  desc.textContent = t("careerPath.mlbOfferDesc");
+  dialog.appendChild(desc);
+
+  function pick(team) {
+    backdrop.remove();
+    onChoose(team);
+  }
+
+  for (const team of offers) {
+    const btn = document.createElement("button");
+    btn.style.cssText = "display:block; width:100%; padding:10px; margin-bottom:6px; text-align:left; background:var(--panel-2); border:1px solid var(--accent); color:inherit; font-family:inherit; cursor:pointer; border-radius:6px;";
+    btn.innerHTML = `<div style="font-weight:700; color:var(--accent); font-size:13px">${team.name}</div><div style="font-size:10px; color:var(--muted); margin-top:2px">${t("careerPath.teamStrength", { strength: team.strength })}</div>`;
+    btn.addEventListener("pointerdown", e => { e.preventDefault(); pick(team); });
+    dialog.appendChild(btn);
+  }
+
+  const reject = document.createElement("button");
+  reject.className = "danger";
+  reject.style.cssText = "width:100%; margin-top:8px; padding:10px;";
+  reject.textContent = t("careerPath.mlbReject");
+  reject.addEventListener("pointerdown", e => { e.preventDefault(); pick(null); });
+  dialog.appendChild(reject);
+
+  backdrop.appendChild(dialog);
+  document.body.appendChild(backdrop);
 }
 
 // (옛 renderOffseasonPick / Proposal / Result / offseasonCategoryCard 는 휴식기 모달로 대체됨 — 제거)

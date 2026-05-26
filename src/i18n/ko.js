@@ -30,12 +30,15 @@ export const ko = {
   },
 
   stage: {
-    high: "고교야구",
-    univ: "대학야구",
-    pro2: "퓨처스리그",
-    pro1: "1군",
-    japan: "일본 프로야구",
-    mlb: "메이저리그",
+    high:    "고교야구",
+    univ:    "대학야구",
+    pro2:    "KBO 2군",
+    pro1:    "KBO 1군",
+    japan:   "일본 프로야구",
+    mlb:     "MLB",
+    mlb_aaa: "MLB AAA",
+    mlb_aa:  "MLB AA",
+    mlb_a:   "MLB 싱글A",
   },
 
   stat: {
@@ -272,12 +275,12 @@ export const ko = {
   // 한국 고교야구 대회 (tournaments.js)
   tournament: {
     weekly_first:  "전반기 주말리그",
-    emart_cup:     "신세계 이마트배",
-    gold_lion:     "황금사자기",
+    emart_cup:     "현무기",
+    gold_lion:     "백호기",
     weekly_second: "후반기 주말리그",
     blue_dragon:   "청룡기",
     president_cup: "대통령배",
-    phoenix_cup:   "봉황대기",
+    phoenix_cup:   "주작기",
   },
 
   // 대회 결과
@@ -285,6 +288,18 @@ export const ko = {
     champion:   "우승",
     runner:     "준우승",
     eliminated: "본선 탈락",
+  },
+
+  // 시즌 수상 (awards.js)
+  award: {
+    battingTitle: "타격왕",
+    hrKing:       "홈런왕",
+    rbiKing:      "타점왕",
+    kKing:        "탈삼진왕",
+    eraTitle:     "평균자책점왕",
+    rookie:       "신인왕",
+    mvp:          "최우수선수상 (MVP)",
+    twoWayMvp:    "양방향 MVP",
   },
 
   // 타석 결과 (simulator → events.type)
@@ -348,10 +363,38 @@ export const ko = {
 
   log: {
     careerStart: "{school} 야구부 입단! 고교 1학년 시작.",
-    graduation: "고교 졸업 — Phase 3에서 진로 분기 예정",
+    graduation: "졸업 — 진로를 선택하세요",
     seasonStart: "{team} {grade}학년 시즌 시작.",
     seasonEnd: "{stage} {grade}학년 시즌 종료",
     trainingCritical: "{label} 대성공! 효과 2배",
+    stageTransition: "{stage} {team} 입단!",
+    retired: "야구 인생을 마감합니다.",
+    promoted: "{stage} {team} 콜업!",
+  },
+
+  // 진로 선택 (career.js)
+  careerPath: {
+    title: "진로 선택",
+    desc: "졸업합니다. 다음 단계를 선택하세요.",
+    univLabel:   "대학 진학",
+    univDesc:    "대학 야구로 기량을 다듬는다.",
+    kboLabel:    "KBO 드래프트",
+    kboDesc:     "능력치에 따라 1군 또는 2군 지명. 미지명 가능.",
+    mlbLabel:    "MLB 입단",
+    mlbDesc:     "오퍼가 있어야 가능.",
+    mlbOffer:    "오퍼: {teams}",
+    retireLabel: "은퇴",
+    retireDesc:  "야구 인생을 마감한다.",
+    locked:      "오퍼 없음",
+    yourScore:   "종합 점수: {score}",
+
+    mlbOfferTitle: "MLB 오퍼",
+    mlbOfferDesc:  "다음 팀에서 오퍼가 왔습니다. 하나를 선택하거나 거절하세요.",
+    mlbReject:     "거절 (KBO 드래프트로)",
+    teamStrength:  "팀 전력: {strength}",
+
+    draftPicked:    "{stage} 지명!",
+    draftUndrafted: "드래프트 미지명 — 야구 인생을 마감합니다.",
   },
 
   menu: {
@@ -405,6 +448,10 @@ export const ko = {
     mvpBadge: "MVP",
     mvpAwarded: "{tournament} MVP 수상!",
     noTournamentsYet: "기록 없음",
+    awardsTitle: "시즌 수상",
+    noAwards: "수상 없음",
+    careerTotalsTitle: "통산 기록",
+    careerAwardsTitle: "통산 수상",
 
     valGame: "경기",
     valTraining: "훈련({short})",
@@ -414,6 +461,7 @@ export const ko = {
 
     btnPlay: "▶  재생",
     btnPause: "⏸  일시정지",
+    btnReplay: "▶ POV 재생",
 
     btnAutoOpen: "자동 훈련 — 프리셋 선택",
     btnAutoClose: "자동 훈련 닫기",

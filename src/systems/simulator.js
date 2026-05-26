@@ -1,9 +1,45 @@
 // 경기 자동 시뮬레이션 (Phase 1: POV 없이 결과만)
 // 9이닝 × 양팀 약 36타석. 매치업 공식으로 결과 산출.
+// 동점/연장은 리그별 규정에 따름 — STAGE_RULES 참조.
 
 import { getTeamById } from "./league.js";
 import { npcOverall } from "./npc.js";
 import { getEffectiveBatter, getEffectivePitcher, BATTER_STATS, PITCHER_STATS, emptyStats } from "./player.js";
+
+// 리그별 동점/연장 규정 (2026 기준, WebSearch 결과 기반)
+//   regulation:     정규 이닝
+//   maxExtra:       최대 연장 이닝 수 (Infinity = 결판날 때까지)
+//   tiebreaker:     연장 진입 시 시작 베이스 (null이면 정상 룰)
+//                   { fromInning, runners: [1루, 2루, 3루] }
+//   tieAllowed:     true면 maxExtra 후 동점 시 무승부 인정
+const STAGE_RULES = {
+  // 한국 고교 — 본 게임은 토너먼트 진행이므로 사실상 결승 외에도 무승부 없음.
+  // 단, league.schedule 의 일반 경기는 주말리그(권역 풀리그) 시뮬레이션으로 무승부 허용.
+  high:        { regulation: 9, maxExtra: 3,        tiebreaker: { fromInning: 10, runners: [true, true, false] }, tieAllowed: true  },
+  high_final:  { regulation: 9, maxExtra: Infinity, tiebreaker: { fromInning: 10, runners: [true, true, false] }, tieAllowed: false },
+  // 한국 대학 (U-리그/주말리그) — 정규는 무승부 즉시, 결승만 승부치기
+  univ:        { regulation: 9, maxExtra: 0,        tiebreaker: null,                                              tieAllowed: true  },
+  univ_final:  { regulation: 9, maxExtra: Infinity, tiebreaker: { fromInning: 10, runners: [true, true, false] }, tieAllowed: false },
+  // KBO 1군 — 2026 시즌 부터 10~12회 승부치기, 12회 후 무승부
+  pro1:        { regulation: 9, maxExtra: 3,        tiebreaker: { fromInning: 10, runners: [true, true, false] }, tieAllowed: true  },
+  pro1_final:  { regulation: 9, maxExtra: 6,        tiebreaker: null,                                              tieAllowed: true  },
+  // KBO 퓨처스 (2군) — 연장 없이 9회 후 즉시 무승부
+  pro2:        { regulation: 9, maxExtra: 0,        tiebreaker: null,                                              tieAllowed: true  },
+  // 일본 NPB — 12회까지, 정상 연장 (승부치기 없음)
+  japan:       { regulation: 9, maxExtra: 3,        tiebreaker: null,                                              tieAllowed: true  },
+  japan_final: { regulation: 9, maxExtra: 6,        tiebreaker: null,                                              tieAllowed: true  },
+  // MLB — 10회부터 2루 ghost runner, 무승부 없음
+  mlb:         { regulation: 9, maxExtra: Infinity, tiebreaker: { fromInning: 10, runners: [false, true, false] }, tieAllowed: false },
+  mlb_final:   { regulation: 9, maxExtra: Infinity, tiebreaker: null,                                              tieAllowed: false },
+  // MLB 마이너 — 메이저와 동일 룰
+  mlb_aaa:     { regulation: 9, maxExtra: Infinity, tiebreaker: { fromInning: 10, runners: [false, true, false] }, tieAllowed: false },
+  mlb_aa:      { regulation: 9, maxExtra: Infinity, tiebreaker: { fromInning: 10, runners: [false, true, false] }, tieAllowed: false },
+  mlb_a:       { regulation: 9, maxExtra: Infinity, tiebreaker: { fromInning: 10, runners: [false, true, false] }, tieAllowed: false },
+};
+
+function getStageRule(stage) {
+  return STAGE_RULES[stage] ?? STAGE_RULES.high;
+}
 
 // 결과 종류: K(삼진), BB(볼넷), 1B(안타), 2B(2루타), 3B(3루타), HR(홈런), OUT(범타)
 // type 키만 반환. 표시용 라벨은 UI 에서 i18n 의 event.<type> 로 조회.
@@ -76,25 +112,40 @@ export function simulateGame(league, gameDef, mainPlayer) {
   const homeInnings = [];
   const awayInnings = [];
 
-  for (let inning = 1; inning <= 9; inning++) {
+  const rule = getStageRule(league.stage);
+  const maxInning = rule.regulation + (rule.maxExtra === Infinity ? 999 : rule.maxExtra);
+  // 정규 이닝 완료 후엔 매 이닝 끝마다 결판 체크. tieAllowed=false 이고 max 도달했는데도 동점이면 추가로 이어감.
+  for (let inning = 1; inning <= maxInning; inning++) {
+    const useTiebreaker = rule.tiebreaker && inning >= rule.tiebreaker.fromInning;
+    const initialBases = useTiebreaker ? [...rule.tiebreaker.runners] : [false, false, false];
+
     const awayRuns = playHalfInning(awayLineup, homePitcher, myBoxBatter, myBoxPitcher, events, () => {
       const b = awayLineup[awayBatterIdx % awayLineup.length];
       awayBatterIdx++;
       return b;
-    }, inning);
+    }, inning, initialBases);
     awayScore += awayRuns;
     awayInnings.push(awayRuns);
-    if (inning === 9 && homeScore > awayScore) {
-      homeInnings.push(null); // 끝내기 — 9말 안 함
+
+    // 끝내기: 정규 마지막 이닝 이상 + 홈 리드면 9말(또는 그 이상 말) 생략
+    if (inning >= rule.regulation && homeScore > awayScore) {
+      homeInnings.push(null);
       break;
     }
+
     const homeRuns = playHalfInning(homeLineup, awayPitcher, myBoxBatter, myBoxPitcher, events, () => {
       const b = homeLineup[homeBatterIdx % homeLineup.length];
       homeBatterIdx++;
       return b;
-    }, inning);
+    }, inning, initialBases);
     homeScore += homeRuns;
     homeInnings.push(homeRuns);
+
+    // 정규 이닝 완료 후 점수가 다르면 종료. 동점이면 연장(또는 무승부 cap 도달).
+    if (inning >= rule.regulation && homeScore !== awayScore) break;
+    // 무승부 허용 + 한도 도달이면 동점 무승부로 종료
+    if (inning >= maxInning && rule.tieAllowed) break;
+    // 무승부 불허 + 무한 연장은 동점이면 계속 (위 for 가 maxInning=999 까지 진행)
   }
 
   let winner;
@@ -198,11 +249,11 @@ function asPitcherEntry(mainPlayer) {
   };
 }
 
-function playHalfInning(battingLineup, pitcher, myBox, myPbox, events, nextBatter, inning = 0) {
+function playHalfInning(battingLineup, pitcher, myBox, myPbox, events, nextBatter, inning = 0, initialBases = null) {
   let outs = 0;
   let runs = 0;
-  // 베이스: [1루, 2루, 3루] — 주자 있으면 true
-  let bases = [false, false, false];
+  // 베이스: [1루, 2루, 3루] — 주자 있으면 true. 승부치기/ghost runner 시 시작 베이스 지정.
+  let bases = initialBases ? [...initialBases] : [false, false, false];
 
   while (outs < 3) {
     const batter = nextBatter();

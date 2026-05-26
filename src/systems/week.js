@@ -10,6 +10,7 @@ import { simulateGame } from "./simulator.js";
 import { getPlayerTeam, standings } from "./league.js";
 import { t } from "../i18n/index.js";
 import { checkFinalAdvance } from "./finals.js";
+import { evaluateAndApplySeasonAwards } from "./awards.js";
 import { checkScheduledEvents } from "./seasonEvents.js";
 
 export function createSeason(stage) {
@@ -92,6 +93,9 @@ export function endWeek() {
   // 시즌 종료 체크
   if (season.weekIndex >= league.weeksPerSeason) {
     season.finished = true;
+    // 시즌 수상 판정 — player.awards 에 누적, season.awardsThisSeason 에 키 배열 저장
+    const wonKeys = evaluateAndApplySeasonAwards(player, league, state.gameDate);
+    season.awardsThisSeason = wonKeys;
     pushLog({
       msg: t("log.seasonEnd", { stage: t("stage." + league.stage), grade: player.grade }),
       kind: "info",

@@ -78,6 +78,7 @@ export function createPlayer({ name, talent, hand = "right", faceId = "f1" }) {
     careerHistory: [],
     seasonStats: emptyStats(),
     careerStats: emptyStats(),
+    awards: [],   // {year, grade, stage, key}
   };
 }
 
@@ -99,6 +100,22 @@ export function ageMultiplier(age) {
   return 0.2;
 }
 
+// 주인공 stat 한계 — stage 별 (콜업할수록 잠금 해제). 절대 최대 300.
+const PLAYER_STAT_CAP_BY_STAGE = {
+  high:    150,
+  univ:    175,
+  pro2:    200,
+  pro1:    250,
+  mlb_a:   200,
+  mlb_aa:  250,
+  mlb_aaa: 275,
+  mlb:     300,
+  japan:   250,
+};
+export function getPlayerStatCap(player) {
+  return PLAYER_STAT_CAP_BY_STAGE[player?.stage] ?? 150;
+}
+// 호환용 (옛 코드/세이브) — 의미는 "기본 cap"
 export const STAT_CAP = 150;
 
 // 단일 훈련 적용 (하루치)
@@ -115,7 +132,7 @@ export function applyTraining(player, trainingKey) {
   for (const stat of tr.stats) {
     const base = (0.5 + Math.random() * 0.9) * 2.0;
     const boost = talentBoost[stat] ?? 1.0;
-    const cap = STAT_CAP;
+    const cap = getPlayerStatCap(player);
     const target = player.batter[stat] !== undefined ? player.batter : player.pitcher;
     if (target[stat] === undefined) continue;
     const curr = target[stat];
@@ -223,7 +240,7 @@ export function applyGameExperience(player, mainPlayerResult) {
   function bump(group, stat, amount) {
     if (player[group][stat] === undefined) return;
     const adj = amount * ageMult * 1.5;
-    const cap = STAT_CAP;
+    const cap = getPlayerStatCap(player);
     const curr = player[group][stat];
     const diminish = Math.max(0.15, (cap - curr) / cap);
     const delta = +(adj * diminish).toFixed(3);
