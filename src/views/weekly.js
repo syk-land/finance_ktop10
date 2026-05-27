@@ -121,10 +121,27 @@ function buildFinalAnnounce(dialog, final, rerender) {
 
   const desc = document.createElement("p");
   desc.className = "muted small";
-  desc.style.margin = "0 0 14px";
+  desc.style.margin = "0 0 8px";
   desc.style.lineHeight = "1.5";
   desc.textContent = t("weekly.finalAdvanceDesc", { opponent: final.opponent.name });
   dialog.appendChild(desc);
+
+  // 메인 출장 여부 — 메인 팀 SP 풀과의 코치판단 결과로 등판 확률 미리 표시
+  const myTeam = getPlayerTeam(state.league);
+  const ch = appearanceChance(state.player, myTeam);
+  const lineup = document.createElement("div");
+  lineup.className = "small";
+  lineup.style.margin = "0 0 14px";
+  lineup.style.lineHeight = "1.5";
+  lineup.style.padding = "6px 10px";
+  lineup.style.background = "var(--panel-2)";
+  lineup.style.border = "1px solid var(--border)";
+  lineup.style.borderRadius = "6px";
+  lineup.innerHTML = t("weekly.finalAppearance", {
+    bat: Math.round(ch.bat * 100),
+    pit: Math.round(ch.pit * 100),
+  });
+  dialog.appendChild(lineup);
 
   const btn = document.createElement("button");
   btn.className = "primary";
@@ -918,9 +935,16 @@ function renderHeaderInfo(player, league, season) {
 
   grid.appendChild(infoBlock(t("weekly.infoAge"), t("common.age", { age: player.age }), null, "sm"));
   grid.appendChild(infoBlock(t("weekly.infoTalent"), t("talent." + player.talent), null, "sm"));
-  grid.appendChild(infoBlock(t("weekly.infoOverall"), overallScore(player).toFixed(1), null, "sm"));
-  grid.appendChild(infoBlock(t("weekly.infoBatOvr"), batterOVR(player).toFixed(1), null, "sm"));
-  grid.appendChild(infoBlock(t("weekly.infoPitOvr"), pitcherOVR(player).toFixed(1), null, "sm"));
+  // 종합 셀 하나에 타자 / 투수 OVR 합쳐 표시 — "타 35.2 / 투 30.1" 형식
+  grid.appendChild(infoBlock(
+    t("weekly.infoOverall"),
+    t("weekly.batPitOvrVal", {
+      bat: batterOVR(player).toFixed(1),
+      pit: pitcherOVR(player).toFixed(1),
+    }),
+    null,
+    "sm",
+  ));
   grid.appendChild(infoBlock(
     t("weekly.infoStamina"),
     t("weekly.staminaVal", { cur: Math.round(player.stamina), max: player.maxStamina }),

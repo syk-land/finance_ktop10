@@ -266,7 +266,8 @@ function spawnFireworks(svg) {
 
   const t0 = performance.now();
   function frame(now) {
-    const t = (now - t0) / 1000;
+    // t 자체에 speedMult 역수를 곱해 폭죽 전체 진행을 가속 (위치+불투명도 동기)
+    const t = ((now - t0) / 1000) / speedMult();
     const p = Math.min(1, t / 0.9);
     for (const pt of particles) {
       if (pt.flash) {
@@ -290,6 +291,7 @@ function spawnFireworks(svg) {
 }
 
 function animateBall(ball, from, to, duration) {
+  const dur = duration * speedMult();
   return new Promise(resolve => {
     const t0 = performance.now();
     const fromR = from.r ?? +ball.getAttribute("r");
@@ -297,7 +299,7 @@ function animateBall(ball, from, to, duration) {
     const fromOp = +ball.style.opacity || 1;
     const toOp = to.opacity ?? 1;
     function frame(now) {
-      const p = Math.min(1, (now - t0) / duration);
+      const p = Math.min(1, (now - t0) / dur);
       const x = from.x + (to.x - from.x) * p;
       const y = from.y + (to.y - from.y) * p;
       const r = fromR + (toR - fromR) * p;
@@ -314,10 +316,11 @@ function animateBall(ball, from, to, duration) {
 }
 
 function swingBat(bat) {
-  // 짧은 회전 애니메이션 (rotate 20 → -60 → 20)
+  // 짧은 회전 애니메이션 (rotate 20 → -60 → 20). 속도 배율 적용.
   const baseTransform = "rotate({deg} 14 -32)";
   const start = 20, mid = -70, end = 20;
-  const dur1 = 120, dur2 = 180;
+  const mult = speedMult();
+  const dur1 = 120 * mult, dur2 = 180 * mult;
   const t0 = performance.now();
   function frame(now) {
     const t = now - t0;
@@ -362,10 +365,13 @@ function hideLabel(host) {
   if (g) g.style.opacity = "0";
 }
 
+// state.tickSpeed (1x=500ms) 에 비례 — 4x면 0.25배. waitMs/animateBall/swingBat/폭죽 공통.
+function speedMult() {
+  return (state.tickSpeed ?? 500) / 500;
+}
+
 function waitMs(ms) {
-  // state.tickSpeed (1x=500ms) 에 비례 — 4x면 0.25배 속도.
-  const mult = (state.tickSpeed ?? 500) / 500;
-  return new Promise(r => setTimeout(r, ms * mult));
+  return new Promise(r => setTimeout(r, ms * speedMult()));
 }
 
 // 다이아몬드 위 점수 펄스 (메인 이벤트 없는 이닝의 득점용)

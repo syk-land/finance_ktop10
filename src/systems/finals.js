@@ -63,7 +63,9 @@ function makeOpponentTeam(myTeamStrength, league) {
     name: pick.name,
     region: pick.region,
     strength: finalStrength,
-    roster: createRoster(finalStrength, [16, 18]),
+    // stage 옵션 필수 — 누락 시 getNpcStatCap 가 default 150 폴백해서
+    // 결승 상대 NPC 가 일반 리그 NPC(cap 100) 보다 1.5배 강하게 생성됨 (압살 게임 원인).
+    roster: createRoster(finalStrength, [16, 18], { stage: "high", teamName: pick.name }),
     record: { w: 0, l: 0, t: 0 },
     isPlayerTeam: false,
   };
