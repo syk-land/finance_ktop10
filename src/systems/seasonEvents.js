@@ -45,9 +45,9 @@ function fameUp(player, delta) {
   player.fame = (player.fame ?? 0) + delta;
 }
 
-// 프로 단계 (KBO/일본/MLB) — 대표팀 선출 조건 공통
+// 프로 단계 (KBO 1군/MLB) — 대표팀 선출 조건 공통
 function isProStage(stage) {
-  return stage === "pro1" || stage === "mlb" || stage === "japan";
+  return stage === "pro1" || stage === "mlb";
 }
 
 // 등록된 이벤트 카탈로그.
@@ -111,14 +111,14 @@ export const SEASON_EVENTS = [
     },
   },
 
-  // 아시안게임 — 4년 주기 (올림픽 사이), 9월. KBO/일본. 금메달이면 병역 면제.
+  // 아시안게임 — 4년 주기 (올림픽 사이), 9월. KBO. 금메달이면 병역 면제.
   {
     key: "asian_games",
     type: "modal",
     handlerKey: "intlTournamentLive",
     canReplaceOffseason: true,
     trigger(player, gameDate) {
-      return (player.stage === "pro1" || player.stage === "japan")
+      return player.stage === "pro1"
         && gameDate.month === 9
         && gameDate.dayOfMonth <= 14
         && gameDate.year % 4 === 2

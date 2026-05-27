@@ -39,9 +39,6 @@ const STAGE_RULES = {
   pro1_final:  { regulation: 9, maxExtra: 6,        tiebreaker: null,                                              tieAllowed: true,  mercyRule: null },
   // KBO 퓨처스 (2군) — 연장 없이 9회 후 즉시 무승부.
   pro2:        { regulation: 9, maxExtra: 0,        tiebreaker: null,                                              tieAllowed: true,  mercyRule: null },
-  // 일본 NPB — 12회까지, 정상 연장 (승부치기 없음).
-  japan:       { regulation: 9, maxExtra: 3,        tiebreaker: null,                                              tieAllowed: true,  mercyRule: null },
-  japan_final: { regulation: 9, maxExtra: 6,        tiebreaker: null,                                              tieAllowed: true,  mercyRule: null },
   // MLB — 10회부터 2루 ghost runner, 무승부 없음.
   mlb:         { regulation: 9, maxExtra: Infinity, tiebreaker: { fromInning: 10, runners: [false, true, false] }, tieAllowed: false, mercyRule: null },
   mlb_final:   { regulation: 9, maxExtra: Infinity, tiebreaker: null,                                              tieAllowed: false, mercyRule: null },

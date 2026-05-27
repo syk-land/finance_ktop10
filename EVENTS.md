@@ -126,10 +126,10 @@
 | ~~10~~ | ~~FA 이벤트화~~ | ✅ 완료 | 4년 계약 + 만료 시 잔류/이적 모달. 트레이드는 차후 분리 |
 | ~~11~~ | ~~포스트시즌 시리즈제 (3/5/7전제)~~ | ✅ 완료 | `postseason.js` seriesLength + recordSeriesGame |
 | ~~12~~ | ~~시즌 중 이벤트 라이브 모달~~ | ✅ 완료 | WBC/올림픽/아시안게임/프리미어12 modal 전환 |
-| 13 | 일본 프로야구 진출 경로 | 보류 | 사용자 결정으로 제외 |
+| ~~13~~ | ~~일본 프로야구 진출 경로~~ | 영구 제외 | 사용자 결정 — 코드/i18n/팀풀에서 완전 삭제 |
 | ~~14~~ | ~~끝내기(walkoff) 마일스톤~~ | ✅ 완료 | simulator 가 walkoff:true 부착 + milestones 검출 |
 | ~~15~~ | ~~명예의 전당 헌액~~ | ✅ 완료 | `hallOfFame.js` — 점수 300/200 임계로 헌액/영구결번/일반 |
-| 16 | **트레이드 이벤트화** | — | FA 와 별도 — 휴식기 중 NPC 트레이드 제안 모달 |
+| ~~16~~ | ~~트레이드 이벤트화~~ | ✅ 완료 | 휴식기 진입 시 8% 확률 NPC 트레이드 제안, 수락/거절 모달 |
 
 ### 다음 작업 권장 (2-3개 묶음)
 
@@ -140,7 +140,6 @@
 
 **E안 — "커리어 분기 확장"**
 - #10 FA / 트레이드
-- #13 일본 프로야구 진출
 - #15 명예의 전당 엔딩
 
 ### 즉시 가능 (1-2시간 작업)
@@ -256,7 +255,7 @@ high:        { ..., mercyRule: [{afterInning: 5, diff: 10}, {afterInning: 7, dif
 high_final:  { ..., mercyRule: null },
 univ:        { ..., mercyRule: [{afterInning: 5, diff: 10}, {afterInning: 7, diff: 7}] },
 univ_final:  { ..., mercyRule: null },
-// 그 외 pro1/pro2/japan/mlb: null
+// 그 외 pro1/pro2/mlb: null
 ```
 
 - 이닝 종료 후 `isMercyTriggered(rule.mercyRule, inning, homeScore, awayScore)` 체크 → 임계 초과 시 즉시 break
@@ -291,3 +290,4 @@ univ_final:  { ..., mercyRule: null },
 - 2026-05-27 v0.3 후반 패치 #2 — 코치판단(D안) 출장(약체 메인 NPC SP에 마운드 양보), 결승 상대 NPC cap 누락 버그 fix(OVR 134→91 정상화 — 결승 압살 진짜 원인), HS 토너먼트 stage 가드(진로분기 후 HS 결승 진출 X), 결승 모달 일시정지+배속 컨트롤, 결승 알림 모달 메인 출장 표시, 성적기반 결승 보상(`performanceMultiplier` 0.3~1.0), 상태카드 OVR 합쳐 표시, 레이더/막대 그래프 동적 cap, HS 시즌 25→26주(주작기 결승 시즌 내), Firebase Hosting + GitHub Actions 자동 배포
 - 2026-05-27 v0.4 — #2~#9 한 묶음 완료. 새 시스템 4개(`milestones`, `military`, `postseason`, `relations`). 사용자 요구로 국제대회 → 병역 면제 + 시즌 휴식기 대체(`intl_tournament`) 통합. 우선순위 표를 #10 이후로 갱신, 다음 묶음 D/E 안 제시.
 - 2026-05-27 v0.5 — 잔여 이벤트 5건 일괄 완료. #14 끝내기(walkoff) 검출, #11 PO 시리즈제 (KBO wc 단판/spo 3전2승/po 5전3승/ks 7전4승, MLB wc 3전2승/ds 5전3승/cs·ws 7전4승), #15 명예의 전당 (`hallOfFame.js` — 헌액/영구결번/일반은퇴 3단계), #12 WBC/올림픽/아시안게임/프리미어12 라이브 모달 전환 (handlerKey `intlTournamentLive`), #10 FA 시스템 (4년 계약 + 만료 시 잔류/이적 모달). #13 일본 진출은 보류. 차후: #16 트레이드, 회귀 시스템 (섹션 2.5 메모).
+- 2026-05-27 v0.5.1 — #13 일본 프로야구 영구 삭제 (stage/cap/팀풀/i18n/aged range/simulator 전수). #16 트레이드 시스템 (`career.js:maybeTradeOffer` 8% 확률 + `applyTradeAccept`, 휴식기 진입 시 FA 다음 단계). 차후 작업 = 회귀 시스템 (섹션 2.5) 뿐.

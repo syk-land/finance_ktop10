@@ -8,7 +8,7 @@ import {
   BATTER_STATS, PITCHER_STATS, TALENTS, overallScore, getStatLabels, getPlayerStatCap, applyGameExperience,
 } from "../systems/player.js";
 import { advanceToNextSeason, mergeSeasonStats } from "../systems/week.js";
-import { transitionAfterSeason, transitionToStage, eligibleCareerPaths, kboDraft, determineMLBStartStage, compositeScore, checkFreeAgency, applyFreeAgencyDecision } from "../systems/career.js";
+import { transitionAfterSeason, transitionToStage, eligibleCareerPaths, kboDraft, determineMLBStartStage, compositeScore, checkFreeAgency, applyFreeAgencyDecision, maybeTradeOffer, applyTradeAccept } from "../systems/career.js";
 import { getPlayerTeam, standings } from "../systems/league.js";
 import { createFaceSVG } from "../render/avatars.js";
 import { AUTO_PRESETS, autoFillWeek } from "../systems/autoTrain.js";
@@ -990,7 +990,7 @@ function renderHeaderInfo(player, league, season) {
   h.style.minWidth = "0";
   h.style.overflow = "hidden";
   h.style.textOverflow = "ellipsis";
-  // 고교/대학은 "{team} {grade}학년", 프로/MLB/일본은 "{team} {등급라벨}"
+  // 고교/대학은 "{team} {grade}학년", 프로/MLB 는 "{team} {등급라벨}"
   const isSchoolStage = player.stage === "high" || player.stage === "univ";
   h.textContent = isSchoolStage
     ? t("weekly.titleWithTeamGrade", {
@@ -1844,13 +1844,21 @@ function renderSeasonEnd(root, route) {
     btn.style.fontWeight = "700";
     btn.addEventListener("pointerdown", e => {
       e.preventDefault();
-      // FA 자격 (계약 만료) 있으면 먼저 FA 모달, 종료 후 휴식기로.
+      // 휴식기 진입 흐름:
+      //   1) FA 자격 (계약 만료) 있으면 FA 모달 → 휴식기.
+      //   2) FA 없으면 트레이드 굴림 (8% 확률). 제안 시 트레이드 모달 → 휴식기.
+      //   3) 둘 다 없으면 바로 휴식기.
       const fa = checkFreeAgency(state.player);
       if (fa) {
         showFreeAgencyModal(fa, route, () => showOffseasonModal(route));
-      } else {
-        showOffseasonModal(route);
+        return;
       }
+      const trade = maybeTradeOffer(state.player);
+      if (trade) {
+        showTradeModal(trade, route, () => showOffseasonModal(route));
+        return;
+      }
+      showOffseasonModal(route);
     });
     btnPanel.appendChild(btn);
     wrap.appendChild(btnPanel);
@@ -1927,6 +1935,65 @@ function showFreeAgencyModal(fa, route, onClose) {
     noOffers.textContent = t("fa.noOffers");
     dialog.appendChild(noOffers);
   }
+
+  backdrop.appendChild(dialog);
+  document.body.appendChild(backdrop);
+}
+
+// ─── 트레이드 모달 ────────────────────────────────────────────────
+// 휴식기 진입 시 8% 확률로 발동 (FA 자격 없을 때만). 수락 시 새 팀 + 계약 인수.
+function showTradeModal(trade, route, onClose) {
+  state.paused = true;
+  saveGame();
+
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  const dialog = document.createElement("div");
+  dialog.className = "modal-dialog";
+  dialog.style.maxWidth = "360px";
+
+  const h = document.createElement("h2");
+  h.textContent = t("trade.title");
+  dialog.appendChild(h);
+
+  const desc = document.createElement("p");
+  desc.className = "muted small";
+  desc.style.cssText = "margin:0 0 14px; line-height:1.5;";
+  desc.textContent = t("trade.desc", {
+    fromTeam: trade.fromTeam,
+    currentTeam: state.player.teamName,
+    years: trade.yearsLeft,
+  });
+  dialog.appendChild(desc);
+
+  function finish() {
+    state.paused = false;
+    saveGame();
+    backdrop.remove();
+    onClose?.();
+  }
+
+  const acceptBtn = document.createElement("button");
+  acceptBtn.className = "primary";
+  acceptBtn.style.cssText = "width:100%; padding:10px; margin-bottom:6px; font-weight:700;";
+  acceptBtn.textContent = t("trade.btnAccept", { team: trade.fromTeam });
+  acceptBtn.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    applyTradeAccept(state.player, trade.fromTeam);
+    pushToast(t("trade.acceptResult", { team: trade.fromTeam }), "good");
+    finish();
+  });
+  dialog.appendChild(acceptBtn);
+
+  const declineBtn = document.createElement("button");
+  declineBtn.style.cssText = "width:100%; padding:10px; font-weight:700;";
+  declineBtn.textContent = t("trade.btnDecline");
+  declineBtn.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    pushToast(t("trade.declineResult"), "info");
+    finish();
+  });
+  dialog.appendChild(declineBtn);
 
   backdrop.appendChild(dialog);
   document.body.appendChild(backdrop);

@@ -41,15 +41,6 @@ export const UNIV_TEAMS_EN = [
   { name: "Capital U",         region: "Capital",     strength: 62 },
 ];
 
-export const JAPAN_TEAMS_EN = [
-  { name: "Tokyo Giants",       region: "Tokyo",      strength: 80 },
-  { name: "Hanshin Tigers",     region: "Osaka",      strength: 78 },
-  { name: "Hiroshima Carp",     region: "Hiroshima",  strength: 75 },
-  { name: "Yokohama BayStars",  region: "Yokohama",   strength: 73 },
-  { name: "Chunichi Dragons",   region: "Nagoya",     strength: 72 },
-  { name: "Yakult Swallows",    region: "Tokyo",      strength: 70 },
-];
-
 export const MLB_TEAMS_EN = [
   { name: "LA Dodgers",        region: "LA",       strength: 85 },
   { name: "NY Yankees",        region: "NY",       strength: 84 },

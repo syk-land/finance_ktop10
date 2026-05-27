@@ -34,7 +34,6 @@ export const en = {
     univ:    "College",
     pro2:    "KBO Futures",
     pro1:    "KBO",
-    japan:   "NPB",
     mlb:     "MLB",
     mlb_aaa: "AAA",
     mlb_aa:  "AA",
@@ -46,7 +45,6 @@ export const en = {
   stageShort: {
     pro2:    "Futures",
     pro1:    "KBO",
-    japan:   "NPB",
     mlb:     "Majors",
     mlb_aaa: "AAA",
     mlb_aa:  "AA",
@@ -400,6 +398,16 @@ export const en = {
   },
 
   // Military service (military.js)
+  // Trade — career.js + weekly.js. 8% chance on offseason entry if contract has 1+ year left.
+  trade: {
+    title:         "Trade Offer",
+    desc:          "{fromTeam} wants to trade for you. You'd carry over your remaining {years} year(s) of contract.",
+    btnAccept:     "Accept (move to {team})",
+    btnDecline:    "Decline (stay)",
+    acceptResult:  "Traded to {team}! Fame +5",
+    declineResult: "Trade declined — staying put",
+  },
+
   // FA (free agency) — career.js + weekly.js
   fa: {
     title:        "Free Agency",

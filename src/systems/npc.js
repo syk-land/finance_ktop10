@@ -30,7 +30,6 @@ const NPC_STAT_CAP_BY_STAGE = {
   mlb_aa:  150,
   mlb_aaa: 180,
   mlb:     200,
-  japan:   175,
 };
 export function getNpcStatCap(stage) {
   return NPC_STAT_CAP_BY_STAGE[stage] ?? 150;
@@ -163,7 +162,6 @@ export const STAGE_AGE_RANGE = {
   mlb_aa:  [20, 28],
   mlb_aaa: [22, 32],
   mlb:     [22, 40],
-  japan:   [20, 38],
 };
 export function stageAgeRange(stage) {
   return STAGE_AGE_RANGE[stage] ?? [19, 35];

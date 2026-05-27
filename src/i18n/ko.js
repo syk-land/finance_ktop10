@@ -34,7 +34,6 @@ export const ko = {
     univ:    "대학야구",
     pro2:    "KBO 2군",
     pro1:    "KBO 1군",
-    japan:   "일본 프로야구",
     mlb:     "MLB",
     mlb_aaa: "MLB AAA",
     mlb_aa:  "MLB AA",
@@ -46,7 +45,6 @@ export const ko = {
   stageShort: {
     pro2:    "2군",
     pro1:    "1군",
-    japan:   "NPB",
     mlb:     "메이저",
     mlb_aaa: "AAA",
     mlb_aa:  "AA",
@@ -401,6 +399,16 @@ export const ko = {
     rewardTitle:   "라운드 보상",
     btnNextRound:  "다음 라운드로",
     btnEnd:        "확인",
+  },
+
+  // 트레이드 — career.js + weekly.js. 계약 잔여 1년+ 일 때 휴식기 진입 시 8% 확률.
+  trade: {
+    title:         "트레이드 제안",
+    desc:          "{fromTeam} 이(가) 당신을 영입하고 싶다는 트레이드 제안을 보냈다. 잔여 계약 {years}년을 그대로 가져갈 수 있다.",
+    btnAccept:     "수락 ({team} 으로 이적)",
+    btnDecline:    "거절 (잔류)",
+    acceptResult:  "{team} 으로 트레이드! 명성 +5",
+    declineResult: "트레이드 거절 — 현 팀에 잔류",
   },
 
   // FA (자유계약) — career.js + weekly.js

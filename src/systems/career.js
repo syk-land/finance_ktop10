@@ -254,6 +254,34 @@ export function applyFreeAgencyDecision(player, decision, newTeamName = null) {
   return { stayed: false, teamName: player.teamName };
 }
 
+// 트레이드 굴림 — 휴식기 진입 시 낮은 확률로 다른 팀이 제안.
+// 조건: 프로/MLB + 계약 잔여 1년 이상 (계약 중 트레이드만, 만료는 FA 분기).
+// 8% 확률로 한 팀이 제안. 거절해도 페널티 없음 (선수 동의권).
+// 수락 시 계약 yearsLeft 그대로 인수 + 팀 변경.
+export function maybeTradeOffer(player) {
+  if (!player.contract || player.contract.yearsLeft <= 0) return null;
+  if (player.stage === "high" || player.stage === "univ" || player.stage === "retire") return null;
+  if (Math.random() > 0.08) return null;
+
+  const pool = getTeamPool(player.stage, getLocale());
+  if (!pool || pool.length < 2) return null;
+  const candidates = pool.filter(t => t.name !== player.teamName);
+  if (candidates.length === 0) return null;
+  const fromTeam = candidates[Math.floor(Math.random() * candidates.length)];
+  return {
+    fromTeam: fromTeam.name,
+    yearsLeft: player.contract.yearsLeft,
+  };
+}
+
+// 트레이드 수락 — 새 팀 이적, 계약 잔여 인수, 명성 +5, league 재구성.
+export function applyTradeAccept(player, newTeamName) {
+  player.teamName = newTeamName;
+  // contract.yearsLeft 그대로 유지 — 계약 인수
+  state.league = createLeague(player.stage, player.teamName);
+  player.fame = (player.fame ?? 0) + 5;
+}
+
 // 콜업 사다리 — 시즌 종료 시 능력치가 임계 넘으면 다음 단계로 자동 승격
 const PROMOTION_LADDER = {
   pro2:    { next: "pro1",    minScore: 80  },

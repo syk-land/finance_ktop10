@@ -21,3 +21,4 @@ tmp/
 
 # Claude Code 로컬 설정 (개인 권한)
 .claude/settings.local.json
+probe-debug.mjs

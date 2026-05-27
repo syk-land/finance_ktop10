@@ -124,7 +124,6 @@ const PLAYER_STAT_CAP_BY_STAGE = {
   mlb_aa:  250,
   mlb_aaa: 275,
   mlb:     300,
-  japan:   250,
 };
 export function getPlayerStatCap(player) {
   return PLAYER_STAT_CAP_BY_STAGE[player?.stage] ?? 150;
