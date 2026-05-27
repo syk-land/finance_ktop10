@@ -76,6 +76,7 @@ export function createPlayer({ name, talent, hand = "right", faceId = "f1" }) {
     gamesSinceLastPitch: 99, // 투수 등판 휴식 카운터
     fame: 0,
     money: 0,
+    contract: null,           // { yearsLeft } — 프로 진입 시 설정. 0 도달 시 FA.
     careerHistory: [],
     seasonStats: emptyStats(),
     careerStats: emptyStats(),

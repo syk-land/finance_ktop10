@@ -191,6 +191,10 @@ export function transitionToStage(targetStage, teamNameOverride = null) {
   player.teamName = chosenTeamName;
   player.gamesSinceLastPitch = 99;
   player.injury = null;
+  // 프로/MLB 진입 시 4년 계약. 학생(univ) 진학은 계약 없음.
+  if (targetStage !== "univ" && targetStage !== "retire") {
+    player.contract = { yearsLeft: 4 };
+  }
 
   resetGameDateForNewSeason(state.gameDate);
   state.league = createLeague(targetStage, player.teamName);
@@ -211,6 +215,43 @@ function pickTeamForStage(pool, player) {
   if (score >= 85)  return sorted[Math.floor(Math.random() * Math.min(3, sorted.length))];
   if (score >= 70)  return sorted[Math.floor(Math.random() * Math.ceil(sorted.length / 2))];
   return sorted[Math.floor(Math.random() * sorted.length)];
+}
+
+// FA 자격 — 프로 진입 후 계약 4년 만료. yearsLeft === 0 일 때 발동.
+// 휴식기 직전 weekly.js 가 호출해 state.pendingFA 세팅.
+export function checkFreeAgency(player) {
+  if (!player.contract) return null;
+  if (player.contract.yearsLeft > 0) return null;
+  if (player.stage === "high" || player.stage === "univ" || player.stage === "retire") return null;
+  const score = compositeScore(player);
+  // FA 오퍼: compositeScore + fame 으로 결정. 점수 낮으면 잔류 권장 (오퍼 없음).
+  const pool = getTeamPool(player.stage, getLocale());
+  if (!pool || pool.length === 0) return { offers: [], canStay: true };
+  const sorted = [...pool].filter(t => t.name !== player.teamName)
+                          .sort((a, b) => b.strength - a.strength);
+  let offers;
+  if (score >= 120) offers = sorted.slice(0, 3);
+  else if (score >= 100) offers = pickRandom(sorted.slice(0, Math.min(8, sorted.length)), 2);
+  else if (score >= 80)  offers = pickRandom(sorted, 1);
+  else offers = [];
+  return { offers, canStay: true, score };
+}
+
+// FA 결정 적용 — stay: 같은 팀 4년 재계약 / leave: 새 팀 4년 계약.
+// 새 팀은 같은 stage 의 다른 팀. 명성/계약금 보너스도 같이 부여.
+export function applyFreeAgencyDecision(player, decision, newTeamName = null) {
+  if (decision === "stay") {
+    player.contract = { yearsLeft: 4 };
+    player.fame = (player.fame ?? 0) + 5;  // 잔류 — 작은 명성 보너스
+    return { stayed: true, teamName: player.teamName };
+  }
+  // leave — 새 팀 이적
+  player.teamName = newTeamName ?? player.teamName;
+  player.contract = { yearsLeft: 4 };
+  player.fame = (player.fame ?? 0) + 12;  // 이적 — 큰 명성 보너스
+  // 새 팀으로 league 재구성. 메인 stage 동일.
+  state.league = createLeague(player.stage, player.teamName);
+  return { stayed: false, teamName: player.teamName };
 }
 
 // 콜업 사다리 — 시즌 종료 시 능력치가 임계 넘으면 다음 단계로 자동 승격

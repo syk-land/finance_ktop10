@@ -212,6 +212,10 @@ export function advanceToNextSeason() {
   // 리셋
   player.seasonStats = emptyStatsLike(player.seasonStats);
   ageUp(player);
+  // 계약 연차 감소 (프로/MLB 단계만). 0 도달 시 transitionAfterSeason 다음 endWeek 에서 FA 모달.
+  if (player.contract && player.contract.yearsLeft > 0) {
+    player.contract.yearsLeft -= 1;
+  }
   return { stage: player.stage, grade: player.grade };
 }
 

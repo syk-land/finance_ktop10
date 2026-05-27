@@ -123,12 +123,13 @@
 | ~~7~~ | ~~드래프트 라이브 모달~~ | ✅ v0.4 완료 | `weekly.js:openDraftLiveModal` |
 | ~~8~~ | ~~멘토/라이벌 영구 NPC~~ | ✅ v0.4 완료 | `relations.js` — 휴식기 이벤트 연동은 추가 작업 |
 | ~~9~~ | ~~골든글러브~~ | ✅ v0.4 완료 | `awards.js` |
-| 10 | FA / 트레이드 이벤트화 | — | offseason 카테고리 1개 추가 |
-| 11 | 포스트시즌 시리즈제 (5전3승 / 7전4승) | — | `postseason.js` 의 단판을 다단계 누적으로 확장 |
-| 12 | 시즌 중 이벤트 라이브 모달 | — | 현재 toast 만. 모달 + 메달 굴림을 시즌 중으로 이동 |
-| 13 | 일본 프로야구 진출 경로 | — | `japan` stage 가 정의만 있고 진입 경로 없음 |
-| 14 | 끝내기(walkoff) 마일스톤 | — | 9말 + 메인 마지막 타석 추적 필요 |
-| 15 | 명예의 전당 헌액 (은퇴 후 엔딩) | — | careerStats + championships 기반 점수 |
+| ~~10~~ | ~~FA 이벤트화~~ | ✅ 완료 | 4년 계약 + 만료 시 잔류/이적 모달. 트레이드는 차후 분리 |
+| ~~11~~ | ~~포스트시즌 시리즈제 (3/5/7전제)~~ | ✅ 완료 | `postseason.js` seriesLength + recordSeriesGame |
+| ~~12~~ | ~~시즌 중 이벤트 라이브 모달~~ | ✅ 완료 | WBC/올림픽/아시안게임/프리미어12 modal 전환 |
+| 13 | 일본 프로야구 진출 경로 | 보류 | 사용자 결정으로 제외 |
+| ~~14~~ | ~~끝내기(walkoff) 마일스톤~~ | ✅ 완료 | simulator 가 walkoff:true 부착 + milestones 검출 |
+| ~~15~~ | ~~명예의 전당 헌액~~ | ✅ 완료 | `hallOfFame.js` — 점수 300/200 임계로 헌액/영구결번/일반 |
+| 16 | **트레이드 이벤트화** | — | FA 와 별도 — 휴식기 중 NPC 트레이드 제안 모달 |
 
 ### 다음 작업 권장 (2-3개 묶음)
 
@@ -144,9 +145,31 @@
 
 ### 즉시 가능 (1-2시간 작업)
 
-- **#14 끝내기 검출** — `simulator.js:simulateGame` 의 break 직전 walkoff 판정
-- **멘토/라이벌 이름 주입** — `offseason.js` 의 `rival`/`mentor_pitcher` 이벤트 desc 에 player.relations 이름 변수화 (현재는 일반 텍스트)
-- **세이브 마이그레이션 보강** — v0.4 신규 필드(`militaryExempt`, `pendingTournament`, `relations`, `milestones`) 들이 옛 세이브에 없을 때 기본값 세팅
+- **세이브 마이그레이션 보강** — v0.4 신규 필드(`militaryExempt`, `pendingTournament`, `milestones`) 들이 옛 세이브에 없을 때 기본값 세팅
+
+---
+
+## 2.5. 차후 개발 — 회귀 시스템 (Regression / NewGame+)
+
+> 사용자가 직접 설계 예정. 본 섹션은 인터페이스 메모.
+
+**컨셉**: 은퇴/사망/엔딩 후 다시 16세부터 시작. 이전 커리어 성과에 비례해 초기 능력치를 더 가져가거나 특수 능력이 생김.
+
+**현재 코드 준비 상태**:
+- `createPlayer` base 스탯이 44~52 ("평균 살짝 위") — 회귀 보너스 적재 자리 확보
+- `careerStats`, `careerHistory`, `championships`, `tournamentHistory`, `awards` 가 누적 상태로 보존됨
+- 은퇴 분기 (`career.js:transitionToStage("retire")`) 존재
+
+**구현 시 고려할 훅 포인트**:
+1. **저장 키 분리**: 현재 saveGame 은 단일 슬롯. 회귀 시 이전 커리어를 별도 슬롯(`legacy:<n>`)에 보관, 신규 게임 메인 슬롯 사용
+2. **회귀 보너스 산출**: 이전 커리어의 `careerStats.h / hr / w / k` + `championships.length` + `tournamentHistory champion 횟수` 로 점수 산출
+3. **시작 스탯 부스트**: `createPlayer` 호출 시 회귀 슬롯이 있으면 base 스탯에 +N 가산. 점수 임계별로 +5~+30
+4. **특수 능력 (talent 슬롯 확장)**: 현재 talent 는 단일 (contact/power/etc.). 회귀 후엔 base 재능에 추가로 보조 재능 1~2개 (예: "역전 본능", "결승전 특화")
+5. **UI**: 메인 메뉴에 "회귀하기" 옵션 + 이전 커리어 요약 + 부스트 미리보기
+
+**잠재적 충돌 영역**:
+- `i18n` setLocale 가 옛 세이브 키와 회귀 슬롯 양쪽에 적용되도록 (현재 단일 키)
+- 회귀 횟수 N+1 의 부스트 누적 룰 (선형/체감)
 
 ---
 
@@ -267,3 +290,4 @@ univ_final:  { ..., mercyRule: null },
 - 2026-05-27 v0.3 후반 패치 — R/RBI 정식 추적, HBP→부상 트리거 + 메인 면역 + NPC 부상 시스템, 투수 교체 + bullpen 휴식, W/L/SV 결승투수, 콜드게임 (5회 10점 / 7회 7점), 결승 모달 실시간 점수, 세이브 키 `version` → `saveVersion`
 - 2026-05-27 v0.3 후반 패치 #2 — 코치판단(D안) 출장(약체 메인 NPC SP에 마운드 양보), 결승 상대 NPC cap 누락 버그 fix(OVR 134→91 정상화 — 결승 압살 진짜 원인), HS 토너먼트 stage 가드(진로분기 후 HS 결승 진출 X), 결승 모달 일시정지+배속 컨트롤, 결승 알림 모달 메인 출장 표시, 성적기반 결승 보상(`performanceMultiplier` 0.3~1.0), 상태카드 OVR 합쳐 표시, 레이더/막대 그래프 동적 cap, HS 시즌 25→26주(주작기 결승 시즌 내), Firebase Hosting + GitHub Actions 자동 배포
 - 2026-05-27 v0.4 — #2~#9 한 묶음 완료. 새 시스템 4개(`milestones`, `military`, `postseason`, `relations`). 사용자 요구로 국제대회 → 병역 면제 + 시즌 휴식기 대체(`intl_tournament`) 통합. 우선순위 표를 #10 이후로 갱신, 다음 묶음 D/E 안 제시.
+- 2026-05-27 v0.5 — 잔여 이벤트 5건 일괄 완료. #14 끝내기(walkoff) 검출, #11 PO 시리즈제 (KBO wc 단판/spo 3전2승/po 5전3승/ks 7전4승, MLB wc 3전2승/ds 5전3승/cs·ws 7전4승), #15 명예의 전당 (`hallOfFame.js` — 헌액/영구결번/일반은퇴 3단계), #12 WBC/올림픽/아시안게임/프리미어12 라이브 모달 전환 (handlerKey `intlTournamentLive`), #10 FA 시스템 (4년 계약 + 만료 시 잔류/이적 모달). #13 일본 진출은 보류. 차후: #16 트레이드, 회귀 시스템 (섹션 2.5 메모).

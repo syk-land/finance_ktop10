@@ -54,6 +54,16 @@ function detectGameBattingMilestones(player, main, gameDate) {
   for (let i = 0; i < gs; i++) {
     award(player, "grandSlam", { fame: 5 }, gameDate, { stack: true });
   }
+  // 끝내기 — simulator 가 결승점 PA 이벤트에 walkoff:true 부착.
+  // walkoff HR 은 더 큰 보상.
+  for (const ev of events) {
+    if (!ev.walkoff) continue;
+    if (ev.type === "HR") {
+      award(player, "walkoffHR", { fame: 20, mental: 2 }, gameDate, { stack: true });
+    } else {
+      award(player, "walkoff", { fame: 10, mental: 1 }, gameDate, { stack: true });
+    }
+  }
 }
 
 function detectGamePitchingMilestones(player, main, gameDate) {

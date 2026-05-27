@@ -235,9 +235,24 @@ export function simulateGame(league, gameDef, mainPlayer) {
       homeBatterIdx++;
       return b;
     }, inning, [...initialBases], awayDefense, "away", () => ({ home: homeScore, away: awayScore }));
+    const homeScoreBeforeBottom = homeScore;
     homeScore += homeRuns;
     homeInnings.push(homeRuns);
     recordLead(leadHistory, inning, homeScore, awayScore, homeMound, awayMound);
+
+    // 끝내기(walkoff) 검출 — 정규 이닝 이상 bottom 에서 홈팀이 동점/뒤짐을 깨고 리드.
+    // 메인이 홈팀 + 이번 half 마지막 메인 PA 가 결승점이면 walkoff 플래그.
+    if (inning >= rule.regulation && homeScoreBeforeBottom <= awayScore && homeScore > awayScore && home.isPlayerTeam) {
+      // 이번 half 마지막 메인 batter 이벤트를 찾아 walkoff 표시
+      for (let i = events.length - 1; i >= 0; i--) {
+        const ev = events[i];
+        if (ev.inning !== inning) break;
+        if (ev.role === "batter" && (ev.runsScored ?? 0) > 0) {
+          ev.walkoff = true;
+          break;
+        }
+      }
+    }
 
     // 콜드게임 — 이닝 종료 시 점수차 임계. 결승전(mercyRule=null)에는 미적용.
     if (isMercyTriggered(rule.mercyRule, inning, homeScore, awayScore)) {

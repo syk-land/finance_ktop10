@@ -24,6 +24,19 @@ const STAT_MIN = 20;
 export const KBO_BRACKET = ["wc", "spo", "po", "ks"];
 export const MLB_BRACKET = ["wc", "ds", "cs", "ws"];
 
+// 라운드별 시리즈 길이 (실제 KBO/MLB 규정 반영)
+//   KBO: wc 1게임(단판), spo 3전2승, po 5전3승, ks 7전4승
+//   MLB: wc 3전2승, ds 5전3승, cs·ws 7전4승
+const SERIES_LENGTH_KBO = { wc: 1, spo: 3, po: 5, ks: 7 };
+const SERIES_LENGTH_MLB = { wc: 3, ds: 5, cs: 7, ws: 7 };
+export function seriesLengthFor(stage, round) {
+  const table = stage === "pro1" ? SERIES_LENGTH_KBO : SERIES_LENGTH_MLB;
+  return table[round] ?? 1;
+}
+export function winsToClinch(seriesLength) {
+  return Math.ceil(seriesLength / 2);
+}
+
 function bracketForStage(stage) {
   if (stage === "pro1") return KBO_BRACKET;
   if (stage === "mlb")  return MLB_BRACKET;
@@ -66,9 +79,12 @@ export function checkPostseasonAdvance(player, league) {
     rank,
     teamStrength: myTeam.strength ?? 70,
     opponent: makeOpponentForRound(myTeam.strength ?? 70, startRound, player.stage),
-    status: "announce",  // announce → playing → result
+    status: "announce",  // announce → playing → gameResult → (다음 경기로 반복 or 라운드 종료)
     result: null,
-    completedRounds: [],  // [{round, won, scoreMy, scoreOpp}]
+    completedRounds: [],   // [{round, won, scoreMy, scoreOpp}] — 라운드 단위 (시리즈 종합)
+    seriesWins: { my: 0, opp: 0 },        // 현재 라운드 시리즈 누적
+    seriesGames: [],                       // 현재 라운드 게임별 [{won, scoreMy, scoreOpp}]
+    seriesLength: seriesLengthFor(player.stage, startRound),
     stage: player.stage,
   };
 }
@@ -81,7 +97,33 @@ export function advanceToNextRound(ps) {
   ps.status = "announce";
   ps.result = null;
   ps.opponent = makeOpponentForRound(ps.teamStrength, ps.round, ps.stage);
+  ps.seriesWins = { my: 0, opp: 0 };
+  ps.seriesGames = [];
+  ps.seriesLength = seriesLengthFor(ps.stage, ps.round);
   return true;
+}
+
+// 시리즈 한 게임 결과 누적. clinched 면 라운드 종료 (advanceToNextRound 호출 가능).
+export function recordSeriesGame(ps, won, scoreMy, scoreOpp) {
+  ps.seriesWins = ps.seriesWins ?? { my: 0, opp: 0 };
+  ps.seriesGames = ps.seriesGames ?? [];
+  if (won) ps.seriesWins.my++;
+  else     ps.seriesWins.opp++;
+  ps.seriesGames.push({ won, scoreMy, scoreOpp });
+}
+
+// 시리즈가 누군가의 승리로 결정됐는지
+export function isSeriesClinched(ps) {
+  const need = winsToClinch(ps.seriesLength ?? 1);
+  return (ps.seriesWins?.my ?? 0) >= need || (ps.seriesWins?.opp ?? 0) >= need;
+}
+
+// 시리즈 최종 승자 — clinched 일 때만 의미 있음
+export function seriesWinner(ps) {
+  const need = winsToClinch(ps.seriesLength ?? 1);
+  if ((ps.seriesWins?.my ?? 0) >= need) return "my";
+  if ((ps.seriesWins?.opp ?? 0) >= need) return "opp";
+  return null;
 }
 
 function makeOpponentForRound(myStrength, round, stage) {

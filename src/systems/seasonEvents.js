@@ -72,11 +72,11 @@ export const SEASON_EVENTS = [
   // 올스타전 보상 — UI 가 라이브 모달 종료 후 호출.
   // (apply 가 SEASON_EVENTS 의 일부가 아니라 별도 export 함수로 빼서 모달 종료 시점에 부여)
 
-  // WBC — 4년 주기, 3월 초. KBO/MLB. 명성 60+. 시즌 휴식기 대체 (메달/우승 굴림).
-  // 2026, 2030, 2034... → year % 4 === 2
+  // WBC — 4년 주기, 3월 초. KBO/MLB. 명성 60+. 라이브 모달.
   {
     key: "wbc",
-    type: "toast",
+    type: "modal",
+    handlerKey: "intlTournamentLive",
     canReplaceOffseason: true,
     trigger(player, gameDate) {
       return (player.stage === "pro1" || player.stage === "mlb")
@@ -90,14 +90,13 @@ export const SEASON_EVENTS = [
       bumpAll(player, 1);
       bump(player, "pitcher", "mental", 3);
     },
-    toastKey: "seasonEvent.wbc",
   },
 
-  // 올림픽 — 4년 주기 짝수년, 7-8월. KBO/MLB/일본. 동메달 이상이면 병역 면제.
-  // 2028, 2032... → year % 4 === 0
+  // 올림픽 — 4년 주기 짝수년, 7-8월. KBO/MLB. 동메달 이상이면 병역 면제.
   {
     key: "olympics",
-    type: "toast",
+    type: "modal",
+    handlerKey: "intlTournamentLive",
     canReplaceOffseason: true,
     trigger(player, gameDate) {
       return isProStage(player.stage)
@@ -110,13 +109,13 @@ export const SEASON_EVENTS = [
       bumpAll(player, 2);
       bump(player, "pitcher", "mental", 4);
     },
-    toastKey: "seasonEvent.olympics",
   },
 
   // 아시안게임 — 4년 주기 (올림픽 사이), 9월. KBO/일본. 금메달이면 병역 면제.
   {
     key: "asian_games",
-    type: "toast",
+    type: "modal",
+    handlerKey: "intlTournamentLive",
     canReplaceOffseason: true,
     trigger(player, gameDate) {
       return (player.stage === "pro1" || player.stage === "japan")
@@ -130,13 +129,13 @@ export const SEASON_EVENTS = [
       bumpAll(player, 1);
       bump(player, "pitcher", "mental", 3);
     },
-    toastKey: "seasonEvent.asian_games",
   },
 
   // 프리미어12 — 4년 주기, 11월. 면제 X.
   {
     key: "premier12",
-    type: "toast",
+    type: "modal",
+    handlerKey: "intlTournamentLive",
     canReplaceOffseason: true,
     trigger(player, gameDate) {
       return isProStage(player.stage)
@@ -148,7 +147,6 @@ export const SEASON_EVENTS = [
       fameUp(player, 10);
       bumpAll(player, 1);
     },
-    toastKey: "seasonEvent.premier12",
   },
 ];
 
@@ -200,6 +198,54 @@ export function applyAllStarReward(player) {
   fameUp(player, 8);
   bump(player, "pitcher", "mental", 2);
   bump(player, "batter", "eye", 1);
+}
+
+// 국제대회 (WBC/올림픽/아시안게임/프리미어12) 보상 부여 + 휴식기 대체 효과.
+// 라이브 모달 종료 시 UI 가 호출.
+export function applyIntlTournamentReward(player, eventKey, year) {
+  const ev = SEASON_EVENTS.find(e => e.key === eventKey);
+  if (!ev) return;
+  if (ev.apply) ev.apply(player);
+  // canReplaceOffseason 면 휴식기에서 intl_tournament 카테고리로 대체 (offseason.js 가 읽음)
+  if (ev.canReplaceOffseason) {
+    player.pendingTournament = { key: eventKey, year };
+  }
+}
+
+// 국제대회 단판 라이브 시뮬레이션 — 대표팀 vs 상대국 대표팀.
+// 양 팀 모두 stage cap 의 95% 강도 (국대급).
+export function simulateIntlTournamentGame(player, league) {
+  const baseStage = player.stage === "mlb" ? "mlb" : "pro1";
+  const ageRange = [22, 36];
+  const myTeam = getPlayerTeam(league);
+  if (!myTeam) return null;
+
+  const eliteStrength = 95;
+  const myNational = {
+    id: -400,
+    name: t("seasonEvent.intlMyTeamName"),
+    strength: eliteStrength,
+    roster: createRoster(eliteStrength, ageRange, { stage: baseStage }),
+    record: { w: 0, l: 0, t: 0 },
+    isPlayerTeam: true,
+  };
+  const oppNational = {
+    id: -401,
+    name: t("seasonEvent.intlOppTeamName"),
+    strength: eliteStrength,
+    roster: createRoster(eliteStrength, ageRange, { stage: baseStage }),
+    record: { w: 0, l: 0, t: 0 },
+    isPlayerTeam: false,
+  };
+  const tempLeague = {
+    stage: baseStage === "mlb" ? "mlb_final" : "pro1_final",
+    teams: [myNational, oppNational],
+    schedule: [],
+    weeksPerSeason: 1,
+    gamesPerWeek: 1,
+  };
+  const gameDef = { home: myNational.id, away: oppNational.id };
+  return simulateGame(tempLeague, gameDef, player);
 }
 
 // 올스타전 단판 시뮬레이션.
