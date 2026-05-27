@@ -81,28 +81,36 @@ function simulateAtBat(batter, pitcher) {
   const breaking = p.breaking ?? 50;
 
   const stuffAvg = (velocity + breaking) / 2;
-  const contactDiff = contact - stuffAvg;
-  const eyeDiff = eye - control;
+  // 큰 격차일수록 추가 감쇄 — 30 OVR 차이가 비현실적 ERA 폭증 만들던 문제 완화.
+  // softDiff(x): |x|>15 부터 점점 평탄화. 30 격차도 효과 18 정도로 묶임.
+  function softDiff(x) {
+    const sign = x < 0 ? -1 : 1;
+    const a = Math.abs(x);
+    if (a <= 15) return x;
+    return sign * (15 + (a - 15) * 0.4);
+  }
+  const contactDiff = softDiff(contact - stuffAvg);
+  const eyeDiff     = softDiff(eye - control);
 
   const r = Math.random() * 100;
 
-  const kChance = clamp(22 - contactDiff * 0.4 - eyeDiff * 0.15, 3, 45);
-  const bbChance = clamp(9 + eyeDiff * 0.3, 3, 25);
-  // 사구 — 제구 낮을수록 증가. 베이스라인 ~1%.
+  // 계수 감쇄 (0.4→0.28, 0.15→0.10, 0.35→0.24, 0.5→0.30) — 실제 야구 매치업 spread (.150 AVG) 에 가깝게.
+  const kChance = clamp(22 - contactDiff * 0.28 - eyeDiff * 0.10, 5, 38);
+  const bbChance = clamp(9 + eyeDiff * 0.22, 3, 22);
   const hbpChance = clamp(1.0 - (control - 50) * 0.03, 0.3, 3.0);
 
   if (r < kChance) return { type: "K" };
   if (r < kChance + bbChance) return { type: "BB" };
   if (r < kChance + bbChance + hbpChance) return { type: "HBP" };
 
-  const inPlayHitChance = clamp(30 + contactDiff * 0.35, 18, 62);
+  const inPlayHitChance = clamp(30 + contactDiff * 0.24, 20, 52);
   const r2 = Math.random() * 100;
   if (r2 < inPlayHitChance) {
     const r3 = Math.random() * 100;
-    const powerDiff = power - velocity;
-    const hrChance = clamp(powerDiff * 0.5 + 5, 1, 25);
+    const powerDiff = softDiff(power - velocity);
+    const hrChance = clamp(powerDiff * 0.30 + 4, 1, 18);
     const tripleChance = 1.5;
-    const doubleChance = clamp(powerDiff * 0.3 + 10, 5, 22);
+    const doubleChance = clamp(powerDiff * 0.22 + 10, 5, 20);
     if (r3 < hrChance) return { type: "HR" };
     if (r3 < hrChance + tripleChance) return { type: "3B" };
     if (r3 < hrChance + tripleChance + doubleChance) return { type: "2B" };
@@ -332,20 +340,25 @@ export function pitcherOVR(player) {
 // 출장 룰:
 //   - 타자: 부상 아니면 매 경기 무조건 출장 (양방향 주전 가정)
 //   - 투수: 휴식 기반 베이스 확률 × 코치판단 곱
-//     - 휴식: 0경기=0%, 1경기=50%, 2경기+=100%
-//     - 코치판단: 메인 pitcher OVR vs 팀 SP 평균 OVR 비율로 감쇄.
-//       메인이 약체면 코치가 NPC 에이스를 우선 등판시킴 (35:0 압살 게임 방지)
+//     실제 5선발 로테이션 모방 — SP 는 4-5일 휴식 후 등판.
+//     시즌 78게임 × 평균 등판률 ~20% = 시즌당 ~15-20회 등판 (KBO 선발 26-30회 의 비례)
+//   - 코치판단: 메인 pitcher OVR vs 팀 SP 평균 OVR 비율로 감쇄.
 function pitcherChanceByRest(restGames) {
-  if (restGames === 0) return 0;
-  if (restGames === 1) return 0.5;
-  return 1;
+  if (restGames <= 0) return 0;
+  if (restGames === 1) return 0.05;  // 직후 — 거의 X (긴급 구원만)
+  if (restGames === 2) return 0.20;  // 짧은 휴식
+  if (restGames === 3) return 0.55;  // 정상 휴식 시작
+  if (restGames === 4) return 0.85;  // 4일 휴식 — SP 정상
+  return 1.0;                        // 5일+ — 풀 휴식
 }
 
-// 코치판단 — 0~1. 1 = 정상 등판, 0.05 = 거의 안 등판.
+// 코치판단 — 0~1. 1 = 정상 등판, 0.15 = 거의 안 등판.
+// 실제 야구 현실 반영: 약체 선발도 시즌 등판은 한다 (5선발 로테이션, 결과 나쁘면 단축 등판).
+// 결승전 압살 방지는 라이브 모달 결승 분기에서만 강하게 작동, 일반 시즌은 완만.
 function coachJudgment(player, team) {
   if (!team || !Array.isArray(team.roster)) return 1;
   const mainOvr = pitcherOVR(player);
-  if (!isFinite(mainOvr)) return 0.05;  // 메인 stat 손상 — 안전상 거의 등판 X
+  if (!isFinite(mainOvr)) return 0.15;
   const sps = team.roster.filter(p =>
     p.role === "pitcher" && p.pos === "SP" && !p.injury && p.pitcher
   );
@@ -355,11 +368,13 @@ function coachJudgment(player, team) {
   const avgSpOvr = ovrs.reduce((s, v) => s + v, 0) / ovrs.length;
   if (!isFinite(avgSpOvr) || avgSpOvr <= 0) return 1;
   const ratio = mainOvr / avgSpOvr;
-  if (!isFinite(ratio)) return 0.05;
-  if (ratio >= 1.10) return 1.00;
-  if (ratio >= 0.90) return 0.70;
-  if (ratio >= 0.70) return 0.30;
-  return 0.05;
+  if (!isFinite(ratio)) return 0.15;
+  if (ratio >= 1.10) return 1.00;  // 에이스 수준 — 무조건 등판
+  if (ratio >= 0.95) return 0.90;  // 거의 동급 — 정상 등판
+  if (ratio >= 0.80) return 0.70;  // 약간 약체 — 자주 등판
+  if (ratio >= 0.65) return 0.45;  // 약체 — 절반 정도
+  if (ratio >= 0.50) return 0.25;  // 더 약체 — 가끔
+  return 0.10;                     // 극단 약체 — 드물게라도 등판
 }
 
 // UI 표시용 — 현재 출장 확률 (0~1). team 생략 시 코치판단 = 1.

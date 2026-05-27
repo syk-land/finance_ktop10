@@ -49,10 +49,11 @@ function statFromGauss(base, sigma, weight = 1.0, cap = 150) {
 }
 
 // 팀 강도(strength) + stage cap 에 따라 평균 능력치 결정.
-// 평균은 stage cap 의 약 90% 에 두어 사용자 의도("MLB 선수들이 200 수준")와 일치.
-// 팀 strength 는 같은 stage 내 강팀/약팀 미세 보정.
+// 평균은 stage cap 의 약 75% — 옛 90% 는 메인 성장과 격차 너무 커 ERA 30 같은 비현실 결과.
+// 75% 평균 + sigma 14 면 약체 NPC ~cap*0.6 ~ 강체 NPC ~cap*0.9 분포.
+// 팀 strength 영향도 강화(0.3→0.6) — 강팀/약팀 격차 가시화.
 function stageBase(strength, cap) {
-  return cap * 0.9 + (strength - 60) * 0.3;
+  return cap * 0.75 + (strength - 60) * 0.6;
 }
 
 function createBatter(strength, ageRange = [19, 35], cap = 150) {
@@ -61,7 +62,7 @@ function createBatter(strength, ageRange = [19, 35], cap = 150) {
   const base = stageBase(strength, cap);
   const batter = {};
   for (const s of BATTER_STATS) {
-    batter[s] = statFromGauss(base, 8, w[s] ?? 1.0, cap);
+    batter[s] = statFromGauss(base, 14, w[s] ?? 1.0, cap);
   }
   return {
     id: _npcIdCounter++,
@@ -81,7 +82,7 @@ function createPitcher(strength, ageRange = [19, 35], cap = 150) {
   const base = stageBase(strength, cap);
   const pitcher = {};
   for (const s of PITCHER_STATS) {
-    pitcher[s] = statFromGauss(base, 8, 1.0, cap);
+    pitcher[s] = statFromGauss(base, 14, 1.0, cap);
   }
   return {
     id: _npcIdCounter++,

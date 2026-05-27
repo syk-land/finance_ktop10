@@ -42,8 +42,9 @@ export const TRAININGS = {
 };
 
 export function createPlayer({ name, talent, hand = "right", faceId = "f1" }) {
-  const baseBatter = { contact: 35, power: 30, eye: 35, speed: 40, defense: 38 };
-  const basePitcher = { velocity: 35, control: 32, breaking: 28, stamina: 40, mental: 38 };
+  // 시작 스탯: 평균(50) 살짝 위 — 16세 유망주가 동급 또래보다 약간 두각. 회귀 시스템으로 더 높은 값에서 시작하는 안도 지원.
+  const baseBatter = { contact: 50, power: 44, eye: 50, speed: 52, defense: 50 };
+  const basePitcher = { velocity: 50, control: 46, breaking: 42, stamina: 52, mental: 50 };
   // 재능에 따라 시작값 살짝 보정
   const boosts = TALENTS[talent].boost;
   const batter = { ...baseBatter };
@@ -99,14 +100,17 @@ export function emptyStats() {
   };
 }
 
-// 나이별 훈련 효율 배수
+// 나이별 훈련/경기 경험치 효율 배수.
+// 30세 이후 급격히 감소 — 실제 야구에서 노장은 경험으로 stat 안 오름 (오히려 노화 감쇄가 우세).
+// applyGameExperience 와 applyTraining 양쪽에서 사용.
 export function ageMultiplier(age) {
   if (age <= 18) return 1.6;
   if (age <= 22) return 1.3;
   if (age <= 27) return 1.0;
-  if (age <= 31) return 0.7;
-  if (age <= 35) return 0.4;
-  return 0.2;
+  if (age <= 30) return 0.6;
+  if (age <= 33) return 0.3;
+  if (age <= 36) return 0.1;
+  return 0.05;  // 37+ 거의 0 — 노장의 stat 변화는 ageUp 감쇄가 지배
 }
 
 // 주인공 stat 한계 — stage 별 (콜업할수록 잠금 해제). 절대 최대 300.
@@ -144,7 +148,9 @@ export function applyTraining(player, trainingKey) {
   const critMult = critical ? 2.0 : 1.0;
   const gained = {};
   for (const stat of tr.stats) {
-    const base = (0.5 + Math.random() * 0.9) * 2.0;
+    // 훈련 효율 축소 — 옛 base ×2.0 은 HS 졸업 시 OVR 130+ 까지 끌어올려 비현실.
+    // ×0.8 로 낮춰 22~25시즌 커리어 곡선이 실제 야구에 가깝게 (피크 OVR 130~140).
+    const base = (0.5 + Math.random() * 0.9) * 0.8;
     const boost = talentBoost[stat] ?? 1.0;
     const cap = getPlayerStatCap(player);
     const target = player.batter[stat] !== undefined ? player.batter : player.pitcher;
@@ -332,7 +338,9 @@ export function applyGameExperience(player, mainPlayerResult) {
 
   function bump(group, stat, amount) {
     if (player[group][stat] === undefined) return;
-    const adj = amount * ageMult * 1.5;
+    // 경기 경험치 효율 축소 — 옛 ×1.5 는 매 시즌 stat +10~20 으로 노화 감쇄를 압도.
+    // ×0.7 로 낮춰 30대 후반에 노화 감쇄가 우세해지도록 (실제 야구 곡선).
+    const adj = amount * ageMult * 0.7;
     const cap = getPlayerStatCap(player);
     const curr = player[group][stat];
     const diminish = Math.max(0.15, (cap - curr) / cap);
@@ -399,22 +407,31 @@ export function applyGameExperience(player, mainPlayerResult) {
   return { gained };
 }
 
-// 나이 진행 (시즌 종료 시)
+// 나이 진행 (시즌 종료 시) — 실제 야구 노화 곡선 반영.
+// 24-29 피크 → 30-32 미세 → 33-35 점진 → 36-39 가속 → 40+ 급격.
+// 한 시즌 stat 변화 기댓값: 30세 -0.1, 35세 -1.0, 38세 -2.3, 40세 -3.4.
 export function ageUp(player) {
   player.age += 1;
   player.grade += 1;
-  // 노화로 인한 능력 자연 감소 (28세 이후 점진적)
-  if (player.age >= 28) {
-    const declineChance = (player.age - 28) * 0.05;
-    for (const stat of BATTER_STATS) {
-      if (Math.random() < declineChance) {
-        player.batter[stat] = Math.max(20, player.batter[stat] - rndInt(0, 3));
-      }
+  const age = player.age;
+  if (age < 30) return;  // 29세까지 자연 감소 없음
+
+  // 구간별 (확률, 최대 감쇄폭). 감쇄가 발생하면 rndInt(1, max).
+  let declineChance, declineMax;
+  if (age >= 40)      { declineChance = 0.85; declineMax = 6; }
+  else if (age >= 38) { declineChance = 0.70; declineMax = 5; }
+  else if (age >= 36) { declineChance = 0.50; declineMax = 4; }
+  else if (age >= 33) { declineChance = 0.30; declineMax = 3; }
+  else                { declineChance = 0.10; declineMax = 2; }  // 30-32
+
+  for (const stat of BATTER_STATS) {
+    if (Math.random() < declineChance) {
+      player.batter[stat] = Math.max(20, player.batter[stat] - rndInt(1, declineMax));
     }
-    for (const stat of PITCHER_STATS) {
-      if (Math.random() < declineChance) {
-        player.pitcher[stat] = Math.max(20, player.pitcher[stat] - rndInt(0, 3));
-      }
+  }
+  for (const stat of PITCHER_STATS) {
+    if (Math.random() < declineChance) {
+      player.pitcher[stat] = Math.max(20, player.pitcher[stat] - rndInt(1, declineMax));
     }
   }
 }
