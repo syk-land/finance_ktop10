@@ -510,6 +510,8 @@ export const ko = {
     infoCondition: "컨디션",
     infoWeek: "주차",
     infoInjury: "부상",
+    infoBatOvr: "타자 종합",
+    infoPitOvr: "투수 종합",
     staminaVal: "{cur} / {max}",
     injuryVal: "{type} ({weeks}주)",
     weekVal: "{cur} / {max}",

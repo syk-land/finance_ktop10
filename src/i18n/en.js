@@ -506,6 +506,8 @@ export const en = {
     infoCondition: "Condition",
     infoWeek: "Week",
     infoInjury: "Injury",
+    infoBatOvr: "Bat OVR",
+    infoPitOvr: "Pit OVR",
     staminaVal: "{cur} / {max}",
     injuryVal: "{type} ({weeks}w)",
     weekVal: "{cur} / {max}",

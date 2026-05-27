@@ -5,7 +5,7 @@
 
 import { state, saveGame, pushToast } from "../state.js";
 import {
-  BATTER_STATS, PITCHER_STATS, TALENTS, overallScore, getStatLabels,
+  BATTER_STATS, PITCHER_STATS, TALENTS, overallScore, getStatLabels, getPlayerStatCap,
 } from "../systems/player.js";
 import { advanceToNextSeason } from "../systems/week.js";
 import { transitionAfterSeason, transitionToStage, eligibleCareerPaths, kboDraft, determineMLBStartStage, compositeScore } from "../systems/career.js";
@@ -13,7 +13,7 @@ import { getPlayerTeam, standings } from "../systems/league.js";
 import { createFaceSVG } from "../render/avatars.js";
 import { AUTO_PRESETS, autoFillWeek } from "../systems/autoTrain.js";
 import { CATEGORY_KEYS, applyCategoryAndPickEvent, applyEventChoice, getAvailableCategories } from "../systems/offseason.js";
-import { appearanceChance } from "../systems/simulator.js";
+import { appearanceChance, batterOVR, pitcherOVR } from "../systems/simulator.js";
 import { createRadarSVG } from "../render/radar.js";
 import { formatGameDate, t } from "../i18n/index.js";
 import { getActiveTournaments } from "../data/tournaments.js";
@@ -325,7 +325,11 @@ function buildFinalPlaying(dialog, final, rerender) {
     logBox.appendChild(row);
     logBox.scrollTop = logBox.scrollHeight;
   }
-  function waitMs(ms) { return new Promise(r => setTimeout(r, ms)); }
+  // 결승 모달 딜레이를 state.tickSpeed (1x=500ms) 에 비례. 4x면 모달도 0.25배 속도.
+  function waitMs(ms) {
+    const mult = (state.tickSpeed ?? 500) / 500;
+    return new Promise(r => setTimeout(r, ms * mult));
+  }
 
   async function playHalf(inning, half) {
     if (cancelled) return;
@@ -915,6 +919,8 @@ function renderHeaderInfo(player, league, season) {
   grid.appendChild(infoBlock(t("weekly.infoAge"), t("common.age", { age: player.age }), null, "sm"));
   grid.appendChild(infoBlock(t("weekly.infoTalent"), t("talent." + player.talent), null, "sm"));
   grid.appendChild(infoBlock(t("weekly.infoOverall"), overallScore(player).toFixed(1), null, "sm"));
+  grid.appendChild(infoBlock(t("weekly.infoBatOvr"), batterOVR(player).toFixed(1), null, "sm"));
+  grid.appendChild(infoBlock(t("weekly.infoPitOvr"), pitcherOVR(player).toFixed(1), null, "sm"));
   grid.appendChild(infoBlock(
     t("weekly.infoStamina"),
     t("weekly.staminaVal", { cur: Math.round(player.stamina), max: player.maxStamina }),
@@ -1286,7 +1292,7 @@ function renderStandingsBody(league) {
 // 시즌 종료 화면용 — 능력치 (레이더 + 막대 그래프) body
 function renderAttributesBody(player) {
   const wrap = document.createElement("div");
-  const chances = appearanceChance(player);
+  const chances = appearanceChance(player, getPlayerTeam(state.league));
   const statLabels = getStatLabels();
 
   const row = document.createElement("div");
@@ -1300,8 +1306,10 @@ function renderAttributesBody(player) {
   const values = {};
   for (const s of BATTER_STATS) values[s] = player.batter[s];
   for (const s of PITCHER_STATS) values[s] = player.pitcher[s];
+  // 레이더/막대 그래프 max 는 player stage 의 stat cap 동적 적용 (HS 150 → MLB 300)
+  const cap = getPlayerStatCap(player);
   radarBox.appendChild(createRadarSVG(values, labels, {
-    size: 160, min: 0, max: 150, labelMap: statLabels,
+    size: 160, min: 0, max: cap, labelMap: statLabels,
   }));
   row.appendChild(radarBox);
 
@@ -1312,10 +1320,10 @@ function renderAttributesBody(player) {
   barsCol.style.flexDirection = "column";
   barsCol.style.gap = "3px";
   for (const s of BATTER_STATS) {
-    barsCol.appendChild(statBarRow(statLabels[s], player.batter[s], "var(--accent)"));
+    barsCol.appendChild(statBarRow(statLabels[s], player.batter[s], "var(--accent)", cap));
   }
   for (const s of PITCHER_STATS) {
-    barsCol.appendChild(statBarRow(statLabels[s], player.pitcher[s], "var(--accent-2)"));
+    barsCol.appendChild(statBarRow(statLabels[s], player.pitcher[s], "var(--accent-2)", cap));
   }
   row.appendChild(barsCol);
   wrap.appendChild(row);
@@ -1443,7 +1451,7 @@ function drainPendingToasts() {
 function showCriticalToast(msg) { showToast(msg, "good"); }
 
 // 능력치 1개 행 — 라벨 + 막대 그래프 + 수치. STAT_CAP(150) 기준.
-function statBarRow(label, value, color) {
+function statBarRow(label, value, color, max = 150) {
   const row = document.createElement("div");
   row.className = "stat-row";
 
@@ -1456,7 +1464,7 @@ function statBarRow(label, value, color) {
   const fill = document.createElement("div");
   fill.className = "stat-fill";
   fill.style.background = color;
-  fill.style.width = `${Math.min(100, (value / 150) * 100)}%`;
+  fill.style.width = `${Math.min(100, (value / max) * 100)}%`;
   bar.appendChild(fill);
 
   const v = document.createElement("div");

@@ -168,7 +168,7 @@ export function simulateGame(league, gameDef, mainPlayer) {
   const away = getTeamById(league, gameDef.away);
 
   const playerTeam = mainPlayer && (home.isPlayerTeam ? home : away.isPlayerTeam ? away : null);
-  const roles = mainPlayer && playerTeam ? decideRolesForGame(mainPlayer) : { bat: false, pitch: false };
+  const roles = mainPlayer && playerTeam ? decideRolesForGame(mainPlayer, playerTeam) : { bat: false, pitch: false };
 
   const homeLineup = buildLineup(home, playerTeam === home && roles.bat ? mainPlayer : null);
   const awayLineup = buildLineup(away, playerTeam === away && roles.bat ? mainPlayer : null);
@@ -329,29 +329,51 @@ export function pitcherOVR(player) {
   return (p.velocity + p.control + p.breaking + p.stamina + p.mental) / 5;
 }
 
-// 출장 룰 (Phase 1, 단순화):
+// 출장 룰:
 //   - 타자: 부상 아니면 매 경기 무조건 출장 (양방향 주전 가정)
-//   - 투수: 직전 경기 등판 → 등판 불가, 1경기 휴식 → 50%, 2경기+ 휴식 → 무조건 등판
+//   - 투수: 휴식 기반 베이스 확률 × 코치판단 곱
+//     - 휴식: 0경기=0%, 1경기=50%, 2경기+=100%
+//     - 코치판단: 메인 pitcher OVR vs 팀 SP 평균 OVR 비율로 감쇄.
+//       메인이 약체면 코치가 NPC 에이스를 우선 등판시킴 (35:0 압살 게임 방지)
 function pitcherChanceByRest(restGames) {
   if (restGames === 0) return 0;
   if (restGames === 1) return 0.5;
   return 1;
 }
 
-// UI 표시용 — 현재 출장 확률 (0~1)
-export function appearanceChance(player) {
-  if (player.injury) return { bat: 0, pitch: 0 };
-  const restGames = player.gamesSinceLastPitch ?? 99;
-  return { bat: 1, pitch: pitcherChanceByRest(restGames) };
+// 코치판단 — 0~1. 1 = 정상 등판, 0.05 = 거의 안 등판.
+function coachJudgment(player, team) {
+  if (!team) return 1;
+  const mainOvr = pitcherOVR(player);
+  const sps = team.roster.filter(p =>
+    p.role === "pitcher" && p.pos === "SP" && !p.injury
+  );
+  if (sps.length === 0) return 1;
+  const avgSpOvr = sps.reduce((s, p) => s + npcOverall(p), 0) / sps.length;
+  if (avgSpOvr <= 0) return 1;
+  const ratio = mainOvr / avgSpOvr;
+  if (ratio >= 1.10) return 1.00;
+  if (ratio >= 0.90) return 0.70;
+  if (ratio >= 0.70) return 0.30;
+  return 0.05;
 }
 
-function decideRolesForGame(player) {
+// UI 표시용 — 현재 출장 확률 (0~1). team 생략 시 코치판단 = 1.
+export function appearanceChance(player, team = null) {
+  if (player.injury) return { bat: 0, pitch: 0 };
+  const restGames = player.gamesSinceLastPitch ?? 99;
+  const judgment = coachJudgment(player, team);
+  return { bat: 1, pitch: pitcherChanceByRest(restGames) * judgment };
+}
+
+function decideRolesForGame(player, team) {
   if (player.injury) return { bat: false, pitch: false };
   const restGames = player.gamesSinceLastPitch ?? 99;
-  const pitchChance = pitcherChanceByRest(restGames);
+  const restChance = pitcherChanceByRest(restGames);
+  const judgment = coachJudgment(player, team);
   return {
     bat: true,
-    pitch: Math.random() < pitchChance,
+    pitch: Math.random() < restChance * judgment,
   };
 }
 

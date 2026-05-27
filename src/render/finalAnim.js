@@ -11,6 +11,7 @@
 
 import { svgEl } from "./svg.js";
 import { t } from "../i18n/index.js";
+import { state } from "../state.js";
 
 const W = 320, H = 220;
 const ZONE = { x: 130, y: 95, w: 60, h: 65 };
@@ -362,7 +363,9 @@ function hideLabel(host) {
 }
 
 function waitMs(ms) {
-  return new Promise(r => setTimeout(r, ms));
+  // state.tickSpeed (1x=500ms) 에 비례 — 4x면 0.25배 속도.
+  const mult = (state.tickSpeed ?? 500) / 500;
+  return new Promise(r => setTimeout(r, ms * mult));
 }
 
 // 다이아몬드 위 점수 펄스 (메인 이벤트 없는 이닝의 득점용)
