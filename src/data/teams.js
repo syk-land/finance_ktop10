@@ -68,10 +68,10 @@ export const MLB_TEAMS = [
 ];
 
 // stage 별 시즌 메타 (locale에 영향 없음)
-// 고교: 실제 한국 고교야구 일정 (3월 ~ 8월 말, 약 25주, 권역 풀리그라 주 1경기)
-// 토너먼트 결승전은 별도 모달로 추가 시뮬되므로 정규 리그 + 결승 합치면 시즌당 ~28-32경기.
+// 고교: 실제 한국 고교야구 일정 (3월 ~ 8월 말, 약 26주). 주작기(phoenix_cup)가
+// 8.6~8.29 라 시즌 26주(3.1 + 182일 = 8.29 경) 까지 가야 결승까지 시즌 안에 진행됨.
 const STAGE_META = {
-  high:    { weeksPerSeason: 25, gamesPerWeek: 1 },
+  high:    { weeksPerSeason: 26, gamesPerWeek: 1 },
   univ:    { weeksPerSeason: 22, gamesPerWeek: 2 },
   pro2:    { weeksPerSeason: 26, gamesPerWeek: 3 },
   pro1:    { weeksPerSeason: 26, gamesPerWeek: 3 },

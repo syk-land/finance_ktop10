@@ -72,6 +72,7 @@ function createBatter(strength, ageRange = [19, 35], cap = 150) {
     batter,
     pitcher: null,
     seasonStats: emptyStats(),
+    injury: null, // {weeksLeft, severity} 또는 null. week.js 가 매주 감소.
   };
 }
 
@@ -91,6 +92,8 @@ function createPitcher(strength, ageRange = [19, 35], cap = 150) {
     batter: null,
     pitcher,
     seasonStats: emptyStats(),
+    injury: null,
+    gamesSinceLastPitch: 99, // SP/RP 모두 게임에서 사용되면 0으로 reset. week.js endWeek 후 ++.
   };
 }
 

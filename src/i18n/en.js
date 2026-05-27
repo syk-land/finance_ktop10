@@ -431,6 +431,12 @@ export const en = {
     SF:  "Sac Fly",
     SB:  "Stolen Base",
     CS:  "Caught Stealing",
+    PIT_CHANGE: "Pitching change",
+    COLD_GAME: "Game called (mercy rule)",
+  },
+
+  toast: {
+    mainReplaced: "You were pulled from the mound",
   },
 
   hand: {
@@ -645,6 +651,8 @@ export const en = {
     infoCondition: "Condition",
     infoWeek: "Week",
     infoInjury: "Injury",
+    batPitOvrVal: "B {bat} / P {pit}",
+    finalAppearance: "<b>Your appearance</b> — bat {bat}% · pit {pit}%",
     staminaVal: "{cur} / {max}",
     injuryVal: "{type} ({weeks}w)",
     weekVal: "{cur} / {max}",
@@ -659,6 +667,11 @@ export const en = {
     statK: "K",
     statSb: "SB",
     statHbp: "HBP",
+    statR: "R",
+    statRbi: "RBI",
+    statW: "W",
+    statL: "L",
+    statSv: "SV",
     statG: "G",
     statBa: "AVG",
     statOps: "OPS",

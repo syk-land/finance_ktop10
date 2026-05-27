@@ -99,20 +99,27 @@
 | 노히트노런 / 퍼펙트 | `pitcherBox.pH===0` 검출 | 매우 낮음 |
 | 완봉 / 완투 | `er===0` + 9이닝 | 매우 낮음 |
 
-> **참고**: `careerStats.w/l/sv` 가 `week.js:mergeSeasonStats` 에서 누적 안 됨. `game.winner` 비교로 채워야 함.
+> **참고**: ~~`careerStats.w/l/sv` 가 `week.js:mergeSeasonStats` 에서 누적 안 됨~~ → v0.3 후반 패치에서 simulator 가 결승투수 결정 + mergeSeasonStats 누적까지 완료.
 
 ---
 
-## 3. 우선순위 권장 (v0.4 갱신)
+## 3. 우선순위 권장 (v0.4 + v0.3 후반 패치 통합)
 
 | 순위 | 작업 | 상태 | 비고 |
 |---|---|---|---|
 | ~~1~~ | ~~타석 결과 확장 (HBP/도루/희생타/병살/실책)~~ | ✅ v0.3 완료 | — |
+| ~~1a~~ | ~~R / RBI 정식 추적~~ | ✅ v0.3 후반 패치 완료 | `applyResult` 가 `scoredRunners`/`rbi` 반환 |
+| ~~1b~~ | ~~투수 교체 + W/L/SV~~ | ✅ v0.3 후반 패치 완료 | mound state + 결승투수 결정 + bullpen 휴식 |
+| ~~1c~~ | ~~NPC 부상 시스템~~ | ✅ v0.3 후반 패치 완료 | NPC injury 필드 + 라인업 자동 제외 |
+| ~~1d~~ | ~~콜드게임 (mercy rule)~~ | ✅ v0.3 후반 패치 완료 | 한국 고교/대학 5회 10점 / 7회 7점, 결승전 미적용 |
+| ~~1e~~ | ~~결승 모달 실시간 점수~~ | ✅ v0.3 후반 패치 완료 | `events.runsScored` + 메인 PA 즉시 반영 |
+| ~~1f~~ | ~~코치판단 출장~~ | ✅ v0.3 후반 패치 #2 완료 | 약체 메인 → NPC SP 에 마운드 양보 (OVR 비율 감쇄) |
 | ~~2~~ | ~~마일스톤 자동 검출 + 토스트~~ | ✅ v0.4 완료 | `milestones.js` |
 | ~~3~~ | ~~시즌 중 이벤트 카탈로그~~ (올스타·WBC·올림픽·아시안게임·프리미어12) | ✅ v0.4 완료 | `seasonEvents.js` SEASON_EVENTS 5개 |
 | ~~4~~ | ~~군 입대~~ + 국제대회 면제 연동 | ✅ v0.4 완료 | `military.js`, offseason `intl_tournament` |
 | ~~5~~ | ~~포스트시즌~~ (KBO wc·spo·po·ks / MLB wc·ds·cs·ws) | ✅ v0.4 (단판) | `postseason.js` — 시리즈제는 미구현 |
 | ~~6~~ | ~~부상 부위 + 후유증 + 토미존~~ | ✅ v0.4 완료 | `applyInjury` 확장, 7부위 |
+| ~~6a~~ | ~~HBP → 부상 트리거~~ | ✅ v0.3 후반 패치 완료 | HBP 5% 부상 굴림, 메인 0.4x |
 | ~~7~~ | ~~드래프트 라이브 모달~~ | ✅ v0.4 완료 | `weekly.js:openDraftLiveModal` |
 | ~~8~~ | ~~멘토/라이벌 영구 NPC~~ | ✅ v0.4 완료 | `relations.js` — 휴식기 이벤트 연동은 추가 작업 |
 | ~~9~~ | ~~골든글러브~~ | ✅ v0.4 완료 | `awards.js` |
@@ -191,16 +198,55 @@
 - 완봉: `pbox.er === 0` 이고 선발 그대로 끝까지
 - 통산 임계: `careerStats.h` 가 1000/2000/3000 을 이번 경기에서 처음 넘어선 순간
 
-### HBP → 부상 (#6 일부)
+### HBP → 부상 — v0.3 후반 패치 구현 노트
 
-`simulator.js:simulateAtBat` 에서 HBP 분기 직후 부상 굴림. severity 는 minor 위주.
+`simulator.js:playHalfInning` 의 HBP 분기 직후 부상 굴림. 메인은 `HBP_INJURY_RATE × MAIN_INJURY_LUCK` = 5% × 0.4 = 2%. NPC 는 베이스 5%.
+
+- `rollHbpSeverity()` — minor 65% / moderate 27% / severe 8% (기존 `applyInjury` 와 같은 분포)
+- 메인: `myBox._hbpInjury = {severity, weeksLeft}` → simulateGame 결과의 `mainPlayer.hbpInjury` 에 attached → `week.js` 가 `applyInjury(player, severity)` 호출
+- NPC: 라인업 entry 가 그대로 NPC 객체이므로 `batter.injury = {...}` 직접 적용
+
+### 투수 교체 — v0.3 후반 패치 구현 노트
+
+- `createMoundState(team, startingPitcher)` — `current`, `usedIds:Set`, `pitcherStats:Map(id → {paFaced, runsAllowed, outsRecorded})`
+- `shouldReplacePitcher` 굴림: 이닝 시작 + PA 직후
+  - 메인: PA 30+ / 허용 6점+ / (PA 25+ AND 허용 5점+) 중 하나
+  - NPC: PA 25+ / 허용 6점+ / 7회+ 리드 3점 이내 시 클로저 등판
+- `pickReliever`: 휴식 1게임+ → RP 우선 → OVR 순. 후보 없으면 부상자라도 강행 fallback
+- 메인 강판 시 simulator 결과 `mainPlayer.pitcherReplaced = true` → week.js 가 토스트 발사
+- `myPbox.ipOuts` 가 outs 단위 누적 (강판되면 27 미만) → mergeSeasonStats 에서 `ss.ipOuts += box.ipOuts`, `ss.ip = ss.ipOuts / 3`. 표시는 `floor(ipOuts/3).${ipOuts%3}` 분수
+- NPC pitcher entity 에 `gamesSinceLastPitch` 필드 (`npc.js`). `endWeek` 가 매주 ++ + 사용한 NPC ID set 으로 reset
+
+### W / L / SV (결승투수) — v0.3 후반 패치 구현 노트
+
+- `recordLead(history, ...)` 가 매 half-inning 후 lead 변경 시점 + 양팀 등판 투수 기록
+- 게임 종료 시 마지막 lead 항목 → winning/losing pitcher
+- SV: winning team 마지막 등판이 winningPitcher 와 다르고 + outsRecorded ≥ 3 + 리드 3점 이내
+- 메인이 결승투수면 `myPbox.w/l/sv++` 누적
+
+### 콜드게임 — v0.3 후반 패치 구현 노트
+
+`STAGE_RULES` 에 `mercyRule: [{afterInning, diff}, ...]` 옵션:
 
 ```js
-if (resolvedType === "HBP" && batter.isMain && Math.random() < 0.02) {
-  // applyInjury 는 player 객체 필요 — 결과 객체에 hbpInjury 플래그 실어서
-  // week.js 가 후처리하는 패턴이 자연스러움 (simulator 가 직접 player 변형 X)
-}
+high:        { ..., mercyRule: [{afterInning: 5, diff: 10}, {afterInning: 7, diff: 7}] },
+high_final:  { ..., mercyRule: null },
+univ:        { ..., mercyRule: [{afterInning: 5, diff: 10}, {afterInning: 7, diff: 7}] },
+univ_final:  { ..., mercyRule: null },
+// 그 외 pro1/pro2/japan/mlb: null
 ```
+
+- 이닝 종료 후 `isMercyTriggered(rule.mercyRule, inning, homeScore, awayScore)` 체크 → 임계 초과 시 즉시 break
+- events 에 `COLD_GAME` 이벤트 push
+- 결과 객체에 `coldGame: true` 플래그
+- 결승 모달 라이브 로그가 이 이벤트를 `[N] 콜드게임 종료` 로 표시 + 그 시점 runGame 루프 break
+
+### 결승 모달 실시간 점수 — v0.3 후반 패치 구현 노트
+
+- simulator `events.push` 에 `runsScored` 첨부 (해당 PA 의 ab.runs)
+- weekly.js `playHalf` 가 메인 이벤트 시각화 직후 `addInstantRuns(half, ev.runsScored)` 호출 → 점수 + 라인스코어 즉시 갱신
+- half 끝 일괄 반영분에서 메인 PA 점수 합 (`mainRunsThisHalf`) 을 빼서 중복 방지
+- 라이브 로그에 `+N` 형식으로 메인 PA 활약 강조 (`<span style="color:var(--good)">+N</span>`)
 
 ---
 
@@ -218,4 +264,6 @@ if (resolvedType === "HBP" && batter.isMain && Math.random() < 0.02) {
 
 - 2026-05-26 v0.2 (`05b3a42`) 기준 초안 작성
 - 2026-05-26 v0.3 — #1 타석 결과 확장 완료, 우선순위 표 갱신, 다음 작업 묶음 A/B/C 안 추가
+- 2026-05-27 v0.3 후반 패치 — R/RBI 정식 추적, HBP→부상 트리거 + 메인 면역 + NPC 부상 시스템, 투수 교체 + bullpen 휴식, W/L/SV 결승투수, 콜드게임 (5회 10점 / 7회 7점), 결승 모달 실시간 점수, 세이브 키 `version` → `saveVersion`
+- 2026-05-27 v0.3 후반 패치 #2 — 코치판단(D안) 출장(약체 메인 NPC SP에 마운드 양보), 결승 상대 NPC cap 누락 버그 fix(OVR 134→91 정상화 — 결승 압살 진짜 원인), HS 토너먼트 stage 가드(진로분기 후 HS 결승 진출 X), 결승 모달 일시정지+배속 컨트롤, 결승 알림 모달 메인 출장 표시, 성적기반 결승 보상(`performanceMultiplier` 0.3~1.0), 상태카드 OVR 합쳐 표시, 레이더/막대 그래프 동적 cap, HS 시즌 25→26주(주작기 결승 시즌 내), Firebase Hosting + GitHub Actions 자동 배포
 - 2026-05-27 v0.4 — #2~#9 한 묶음 완료. 새 시스템 4개(`milestones`, `military`, `postseason`, `relations`). 사용자 요구로 국제대회 → 병역 면제 + 시즌 휴식기 대체(`intl_tournament`) 통합. 우선순위 표를 #10 이후로 갱신, 다음 묶음 D/E 안 제시.

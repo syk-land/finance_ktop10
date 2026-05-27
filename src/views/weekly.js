@@ -5,7 +5,7 @@
 
 import { state, saveGame, pushToast } from "../state.js";
 import {
-  BATTER_STATS, PITCHER_STATS, TALENTS, overallScore, getStatLabels,
+  BATTER_STATS, PITCHER_STATS, TALENTS, overallScore, getStatLabels, getPlayerStatCap,
 } from "../systems/player.js";
 import { advanceToNextSeason } from "../systems/week.js";
 import { transitionAfterSeason, transitionToStage, eligibleCareerPaths, kboDraft, determineMLBStartStage, compositeScore } from "../systems/career.js";
@@ -13,7 +13,7 @@ import { getPlayerTeam, standings } from "../systems/league.js";
 import { createFaceSVG } from "../render/avatars.js";
 import { AUTO_PRESETS, autoFillWeek } from "../systems/autoTrain.js";
 import { CATEGORY_KEYS, applyCategoryAndPickEvent, applyEventChoice, getAvailableCategories } from "../systems/offseason.js";
-import { appearanceChance } from "../systems/simulator.js";
+import { appearanceChance, batterOVR, pitcherOVR } from "../systems/simulator.js";
 import { createRadarSVG } from "../render/radar.js";
 import { formatGameDate, t, getLocale } from "../i18n/index.js";
 import { getActiveTournaments } from "../data/tournaments.js";
@@ -128,10 +128,28 @@ function buildFinalAnnounce(dialog, final, rerender) {
 
   const desc = document.createElement("p");
   desc.className = "muted small";
-  desc.style.margin = "0 0 14px";
+  desc.style.margin = "0 0 8px";
   desc.style.lineHeight = "1.5";
   desc.textContent = t("weekly.finalAdvanceDesc", { opponent: final.opponent.name });
   dialog.appendChild(desc);
+
+  // 메인 출장 여부 — 메인 팀 SP 풀과의 코치판단 결과로 등판 확률 미리 표시
+  const myTeam = getPlayerTeam(state.league);
+  const ch = appearanceChance(state.player, myTeam);
+  const lineup = document.createElement("div");
+  lineup.className = "small";
+  lineup.style.margin = "0 0 14px";
+  lineup.style.lineHeight = "1.5";
+  lineup.style.padding = "6px 10px";
+  lineup.style.background = "var(--panel-2)";
+  lineup.style.border = "1px solid var(--border)";
+  lineup.style.borderRadius = "6px";
+  const pct = v => (isFinite(v) ? Math.round(v * 100) : 0);
+  lineup.innerHTML = t("weekly.finalAppearance", {
+    bat: pct(ch.bat),
+    pit: pct(ch.pit),
+  });
+  dialog.appendChild(lineup);
 
   const btn = document.createElement("button");
   btn.className = "primary";
@@ -247,6 +265,45 @@ function buildFinalPlaying(dialog, final, rerender) {
   logBox.style.margin = "8px 0";
   dialog.appendChild(logBox);
 
+  // 6) 라이브 컨트롤 — 일시정지 + 배속. tickSpeed 토글로 라이브 속도도 동기화됨.
+  const ctrlRow = document.createElement("div");
+  ctrlRow.style.display = "flex";
+  ctrlRow.style.gap = "4px";
+  ctrlRow.style.justifyContent = "center";
+  ctrlRow.style.alignItems = "center";
+  ctrlRow.style.margin = "0 0 8px";
+  const pauseState = { paused: false };
+  const pauseBtn = document.createElement("button");
+  pauseBtn.textContent = pauseState.paused ? t("weekly.btnPlay") : t("weekly.btnPause");
+  pauseBtn.style.padding = "4px 12px";
+  pauseBtn.style.fontSize = "12px";
+  pauseBtn.style.fontWeight = "700";
+  pauseBtn.style.minWidth = "60px";
+  pauseBtn.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    pauseState.paused = !pauseState.paused;
+    pauseBtn.textContent = pauseState.paused ? t("weekly.btnPlay") : t("weekly.btnPause");
+  });
+  ctrlRow.appendChild(pauseBtn);
+  for (const sp of [{lbl: "0.5x", ms: 1000}, {lbl: "1x", ms: 500}, {lbl: "2x", ms: 250}, {lbl: "4x", ms: 125}]) {
+    const b = document.createElement("button");
+    b.textContent = sp.lbl;
+    b.style.padding = "4px 8px";
+    b.style.fontSize = "12px";
+    b.style.minWidth = "0";
+    if (state.tickSpeed === sp.ms) b.classList.add("primary");
+    b.addEventListener("pointerdown", e => {
+      e.preventDefault();
+      state.tickSpeed = sp.ms;
+      saveGame();
+      // 다른 속도 버튼 primary 클래스 갱신
+      for (const c of ctrlRow.children) if (c !== pauseBtn) c.classList.remove("primary");
+      b.classList.add("primary");
+    });
+    ctrlRow.appendChild(b);
+  }
+  dialog.appendChild(ctrlRow);
+
   // 라이브 진행: half-inning 단위 async 루프.
   //   - 그 half에 메인 이벤트가 있으면 POV 씬으로 swap → 각 이벤트마다 1.6s 시각화 + 텍스트 로그
   //   - 메인 이벤트 없으면 다이아몬드 그대로, 점수만 빠르게 갱신
@@ -265,6 +322,11 @@ function buildFinalPlaying(dialog, final, rerender) {
   //   role=batter → 자기팀 공격 = isHome ? "bottom" : "top"
   //   role=pitcher → 자기팀 수비 = isHome ? "top" : "bottom"
   function eventHalf(ev) {
+    if (ev.type === "PIT_CHANGE") {
+      // sideIsPlayer=true: 메인측 마운드 교체 = 메인이 수비하는 half
+      // sideIsPlayer=false: 상대 마운드 교체 = 메인이 공격하는 half
+      return ev.sideIsPlayer ? (isHome ? "top" : "bottom") : (isHome ? "bottom" : "top");
+    }
     if (ev.role === "batter") return isHome ? "bottom" : "top";
     return isHome ? "top" : "bottom";
   }
@@ -292,6 +354,21 @@ function buildFinalPlaying(dialog, final, rerender) {
     updateLineScoreCell(lineScore, isMyHalf ? "my" : "opp", inning, runs);
     if (runs > 0) pulseDiamondHome(diamondNode);
   }
+  // 메인 PA 한 건이 만든 점수를 즉시 반영. half 끝 일괄 반영분에서는 빼서 중복 방지.
+  function addInstantRuns(half, n) {
+    if (!n) return;
+    const isMyHalf = (half === "top") === !isHome;
+    if (isMyHalf) {
+      myRun += n;
+      myScore.textContent = String(myRun);
+      highlight(myScore);
+    } else {
+      oppRun += n;
+      oppScore.textContent = String(oppRun);
+      highlight(oppScore);
+    }
+    if (diamondNode) pulseDiamondHome(diamondNode);
+  }
   function swapField(node) {
     while (fieldWrap.firstChild) fieldWrap.removeChild(fieldWrap.firstChild);
     fieldWrap.appendChild(node);
@@ -299,35 +376,76 @@ function buildFinalPlaying(dialog, final, rerender) {
   }
   function appendEventLog(ev) {
     const row = document.createElement("div");
-    const roleColor = ev.role === "batter" ? "var(--accent)" : "var(--accent-2)";
-    const roleLbl = ev.role === "batter" ? t("weekly.batLabel") : t("weekly.pitLabel");
-    row.innerHTML = `<span style="color:${roleColor}; font-weight:700">[${ev.inning}] ${roleLbl}</span> ${t("event." + ev.type)}`;
+    if (ev.type === "PIT_CHANGE") {
+      row.innerHTML = `<span style="color:var(--muted); font-weight:700">[${ev.inning}] ${t("event.PIT_CHANGE")}</span> ${ev.from} → <span style="color:${ev.toIsMain ? "var(--accent-2)" : "inherit"}">${ev.to}</span>`;
+    } else if (ev.type === "COLD_GAME") {
+      row.innerHTML = `<span style="color:var(--accent); font-weight:700">[${ev.inning}] ${t("event.COLD_GAME")}</span>`;
+    } else {
+      const roleColor = ev.role === "batter" ? "var(--accent)" : "var(--accent-2)";
+      const roleLbl = ev.role === "batter" ? t("weekly.batLabel") : t("weekly.pitLabel");
+      const runSuffix = (ev.runsScored ?? 0) > 0 ? ` <span style="color:var(--good); font-weight:700">+${ev.runsScored}</span>` : "";
+      row.innerHTML = `<span style="color:${roleColor}; font-weight:700">[${ev.inning}] ${roleLbl}</span> ${t("event." + ev.type)}${runSuffix}`;
+    }
     logBox.appendChild(row);
     logBox.scrollTop = logBox.scrollHeight;
   }
-  function waitMs(ms) { return new Promise(r => setTimeout(r, ms)); }
+  // 결승 모달 딜레이를 state.tickSpeed (1x=500ms) 에 비례. 4x면 모달도 0.25배 속도.
+  // pauseState.paused 가 true 이면 토글될 때까지 hold (50ms 폴링).
+  function waitMs(ms) {
+    const mult = (state.tickSpeed ?? 500) / 500;
+    return new Promise(async r => {
+      await new Promise(rr => setTimeout(rr, ms * mult));
+      while (pauseState.paused && !cancelled) {
+        await new Promise(rr => setTimeout(rr, 50));
+      }
+      r();
+    });
+  }
 
   async function playHalf(inning, half) {
     if (cancelled) return;
     inningTag.textContent = `${inning + 1}${half === "top" ? "회초" : "회말"}`;
     const evs = eventsForHalf(inning, half);
+    // 이 half 의 메인 이벤트들이 만든 점수의 합 — half 끝 일괄 반영분에서 빼야 함.
+    let mainRunsThisHalf = 0;
     if (evs.length > 0) {
       // role 별 mode (한 half 내에선 동일 role 로 통일됨)
-      const mode = evs[0].role === "batter" ? "bat" : "pit";
+      const mainEvs = evs.filter(e => e.role === "batter" || e.role === "pitcher");
+      const mode = mainEvs[0]?.role === "batter" ? "bat" : "pit";
       const scene = createPOVScene(mode);
       swapField(scene.el);
       for (const ev of evs) {
         if (cancelled) return;
+        if (ev.role === "system") {
+          // 투수 교체 / 콜드게임 — 로그만, 시각화 X
+          appendEventLog(ev);
+          await waitMs(360);
+          continue;
+        }
         await scene.playPitch(ev);
         appendEventLog(ev);
+        // 메인 PA 의 점수 즉시 반영
+        if (ev.runsScored > 0) {
+          mainRunsThisHalf += ev.runsScored;
+          addInstantRuns(half, ev.runsScored);
+          updateLineScoreCellAdd(lineScore, ((half === "top") === !isHome) ? "my" : "opp", inning, ev.runsScored);
+        }
         await waitMs(180);
       }
-      // 다이아몬드 복원 (펄스가 새 다이아몬드에 찍히도록 점수 갱신 전 swap)
       swapField(createDiamondSVG());
     } else {
       await waitMs(360);
     }
-    applyRuns(inning, half);
+    // half 끝 — NPC 가 만든 잔여 점수만 반영 (메인 PA 점수는 위에서 이미 반영).
+    const totalHalfRuns = runsForHalf(inning, half);
+    const remaining = Math.max(0, totalHalfRuns - mainRunsThisHalf);
+    if (remaining > 0) addInstantRuns(half, remaining);
+    // 라인 스코어는 항상 최종 점수로 동기화 (이미 메인 반영분은 increment 됐으니 전체 - 메인 만큼 추가)
+    if (remaining > 0) {
+      updateLineScoreCellAdd(lineScore, ((half === "top") === !isHome) ? "my" : "opp", inning, remaining);
+    } else if (totalHalfRuns === 0 && mainRunsThisHalf === 0) {
+      updateLineScoreCell(lineScore, ((half === "top") === !isHome) ? "my" : "opp", inning, 0);
+    }
     await waitMs(280);
   }
 
@@ -335,10 +453,15 @@ function buildFinalPlaying(dialog, final, rerender) {
     for (let i = 0; i < totalInnings; i++) {
       if (cancelled) return;
       await playHalf(i, "top");
-      // 마지막 이닝 끝내기: myInns[i] 또는 oppInns[i] 가 null 이면 그 half 는 진행 안 함
       const skipBottom = i === totalInnings - 1 && (myInns[i] === null || oppInns[i] === null);
       if (!skipBottom) {
         await playHalf(i, "bottom");
+      }
+      // 콜드게임 이벤트가 있으면 그 이닝 마지막 후 게임 종료
+      const cold = allEvents.find(e => e.type === "COLD_GAME" && e.inning === i + 1);
+      if (cold) {
+        appendEventLog(cold);
+        break;
       }
     }
     if (cancelled) return;
@@ -413,6 +536,18 @@ function updateLineScoreCell(table, side, inningIdx, runs) {
     if (runs > 0) cell.style.color = "var(--text)";
   }
   // R 누적
+  const rCell = table.querySelector(`[data-cell='${side}-R']`);
+  if (rCell) rCell.textContent = String((+rCell.textContent || 0) + runs);
+}
+
+// 라인 스코어 칸에 +N 만 누적 — 실시간 메인 PA 점수 반영용.
+function updateLineScoreCellAdd(table, side, inningIdx, runs) {
+  const cell = table.querySelector(`[data-cell='${side}-${inningIdx}']`);
+  if (cell) {
+    const cur = cell.textContent === "-" || cell.textContent === "" ? 0 : (+cell.textContent || 0);
+    cell.textContent = String(cur + runs);
+    if (cur + runs > 0) cell.style.color = "var(--text)";
+  }
   const rCell = table.querySelector(`[data-cell='${side}-R']`);
   if (rCell) rCell.textContent = String((+rCell.textContent || 0) + runs);
 }
@@ -861,7 +996,16 @@ function renderHeaderInfo(player, league, season) {
 
   grid.appendChild(infoBlock(t("weekly.infoAge"), t("common.age", { age: player.age }), null, "sm"));
   grid.appendChild(infoBlock(t("weekly.infoTalent"), t("talent." + player.talent), null, "sm"));
-  grid.appendChild(infoBlock(t("weekly.infoOverall"), overallScore(player).toFixed(1), null, "sm"));
+  // 종합 셀 하나에 타자 / 투수 OVR 합쳐 표시 — "타 35.2 / 투 30.1" 형식
+  grid.appendChild(infoBlock(
+    t("weekly.infoOverall"),
+    t("weekly.batPitOvrVal", {
+      bat: batterOVR(player).toFixed(1),
+      pit: pitcherOVR(player).toFixed(1),
+    }),
+    null,
+    "sm",
+  ));
   grid.appendChild(infoBlock(
     t("weekly.infoStamina"),
     t("weekly.staminaVal", { cur: Math.round(player.stamina), max: player.maxStamina }),
@@ -961,7 +1105,11 @@ function renderSeasonBody(player) {
   const ba = s.ab > 0 ? (s.h / s.ab).toFixed(3).replace(/^0/, "") : ".---";
   const obp = (s.ab + s.bb) > 0 ? ((s.h + s.bb) / (s.ab + s.bb)).toFixed(3).replace(/^0/, "") : ".---";
   const slg = s.ab > 0 ? (s.tb / s.ab).toFixed(3).replace(/^0/, "") : ".---";
-  const era = s.ip > 0 ? ((s.er / s.ip) * 9).toFixed(2) : "-";
+  // IP — outs 단위 누적 (ipOuts) 우선. 없으면 ip 값(이닝) 그대로.
+  const totalOuts = s.ipOuts ?? Math.round((s.ip ?? 0) * 3);
+  const ipDisplay = totalOuts > 0 ? `${Math.floor(totalOuts / 3)}.${totalOuts % 3}` : "-";
+  const ipForEra = totalOuts / 3;
+  const era = ipForEra > 0 ? ((s.er / ipForEra) * 9).toFixed(2) : "-";
   const ops = s.ab > 0 ? (parseFloat("0" + obp) + parseFloat("0" + slg)).toFixed(3) : "-";
 
   const batCard = statBlock(t("weekly.seasonBatter"), "var(--accent)");
@@ -969,6 +1117,8 @@ function renderSeasonBody(player) {
   batCard.body.appendChild(infoBlock(t("weekly.statPa"),  s.pa,       null, "sm"));
   batCard.body.appendChild(infoBlock(t("weekly.statH"),   s.h,        null, "sm"));
   batCard.body.appendChild(infoBlock(t("weekly.statHr"),  s.hr,       null, "sm"));
+  batCard.body.appendChild(infoBlock(t("weekly.statR"),   s.r   ?? 0, null, "sm"));
+  batCard.body.appendChild(infoBlock(t("weekly.statRbi"), s.rbi ?? 0, null, "sm"));
   batCard.body.appendChild(infoBlock(t("weekly.statBa"),  ba,         null, "sm"));
   batCard.body.appendChild(infoBlock(t("weekly.statOps"), ops,        null, "sm"));
   batCard.body.appendChild(infoBlock(t("weekly.statSb"),  s.sb  ?? 0, null, "sm"));
@@ -977,10 +1127,13 @@ function renderSeasonBody(player) {
   wrap.appendChild(batCard.root);
 
   const pitCard = statBlock(t("weekly.seasonPitcher"), "var(--accent-2)");
-  pitCard.body.appendChild(infoBlock(t("weekly.statPitchG"), s.pitchG, null, "sm"));
-  pitCard.body.appendChild(infoBlock(t("weekly.statIp"),    s.ip,      null, "sm"));
-  pitCard.body.appendChild(infoBlock(t("weekly.statEra"),   era,       null, "sm"));
-  pitCard.body.appendChild(infoBlock(t("weekly.statKK"),    s.pK,      null, "sm"));
+  pitCard.body.appendChild(infoBlock(t("weekly.statPitchG"), s.pitchG,    null, "sm"));
+  pitCard.body.appendChild(infoBlock(t("weekly.statIp"),    ipDisplay,    null, "sm"));
+  pitCard.body.appendChild(infoBlock(t("weekly.statEra"),   era,          null, "sm"));
+  pitCard.body.appendChild(infoBlock(t("weekly.statKK"),    s.pK,         null, "sm"));
+  pitCard.body.appendChild(infoBlock(t("weekly.statW"),     s.w  ?? 0,    null, "sm"));
+  pitCard.body.appendChild(infoBlock(t("weekly.statL"),     s.l  ?? 0,    null, "sm"));
+  pitCard.body.appendChild(infoBlock(t("weekly.statSv"),    s.sv ?? 0,    null, "sm"));
   wrap.appendChild(pitCard.root);
 
   // 이번 시즌의 대회 기록
@@ -1224,7 +1377,7 @@ function renderStandingsBody(league) {
 // 시즌 종료 화면용 — 능력치 (레이더 + 막대 그래프) body
 function renderAttributesBody(player) {
   const wrap = document.createElement("div");
-  const chances = appearanceChance(player);
+  const chances = appearanceChance(player, getPlayerTeam(state.league));
   const statLabels = getStatLabels();
 
   const row = document.createElement("div");
@@ -1238,8 +1391,10 @@ function renderAttributesBody(player) {
   const values = {};
   for (const s of BATTER_STATS) values[s] = player.batter[s];
   for (const s of PITCHER_STATS) values[s] = player.pitcher[s];
+  // 레이더/막대 그래프 max 는 player stage 의 stat cap 동적 적용 (HS 150 → MLB 300)
+  const cap = getPlayerStatCap(player);
   radarBox.appendChild(createRadarSVG(values, labels, {
-    size: 160, min: 0, max: 150, labelMap: statLabels,
+    size: 160, min: 0, max: cap, labelMap: statLabels,
   }));
   row.appendChild(radarBox);
 
@@ -1250,10 +1405,10 @@ function renderAttributesBody(player) {
   barsCol.style.flexDirection = "column";
   barsCol.style.gap = "3px";
   for (const s of BATTER_STATS) {
-    barsCol.appendChild(statBarRow(statLabels[s], player.batter[s], "var(--accent)"));
+    barsCol.appendChild(statBarRow(statLabels[s], player.batter[s], "var(--accent)", cap));
   }
   for (const s of PITCHER_STATS) {
-    barsCol.appendChild(statBarRow(statLabels[s], player.pitcher[s], "var(--accent-2)"));
+    barsCol.appendChild(statBarRow(statLabels[s], player.pitcher[s], "var(--accent-2)", cap));
   }
   row.appendChild(barsCol);
   wrap.appendChild(row);
@@ -1396,7 +1551,7 @@ function drainPendingToasts() {
 function showCriticalToast(msg) { showToast(msg, "good"); }
 
 // 능력치 1개 행 — 라벨 + 막대 그래프 + 수치. STAT_CAP(150) 기준.
-function statBarRow(label, value, color) {
+function statBarRow(label, value, color, max = 150) {
   const row = document.createElement("div");
   row.className = "stat-row";
 
@@ -1409,7 +1564,7 @@ function statBarRow(label, value, color) {
   const fill = document.createElement("div");
   fill.className = "stat-fill";
   fill.style.background = color;
-  fill.style.width = `${Math.min(100, (value / 150) * 100)}%`;
+  fill.style.width = `${Math.min(100, (value / max) * 100)}%`;
   bar.appendChild(fill);
 
   const v = document.createElement("div");

@@ -93,7 +93,7 @@ export function emptyStats() {
     cs: 0,      // 도루 실패
     dp: 0,      // 병살타 (타자가 친 게 병살로 처리)
     e: 0,       // 상대 실책 출루 (AB 산입, H 제외)
-    pitchG: 0, ip: 0, er: 0, pK: 0, pBB: 0, pH: 0, pHR: 0, w: 0, l: 0, sv: 0,
+    pitchG: 0, ip: 0, ipOuts: 0, er: 0, pK: 0, pBB: 0, pH: 0, pHR: 0, w: 0, l: 0, sv: 0,
     // 신규: 투수 부가 통계
     pHbp: 0,    // 피사구
   };
@@ -127,6 +127,11 @@ export function getPlayerStatCap(player) {
 // 호환용 (옛 코드/세이브) — 의미는 "기본 cap"
 export const STAT_CAP = 150;
 
+// 주인공 부상 면역 보정 — 훈련/HBP 부상 굴림에 곱해서 실효율 낮춤.
+// 예: HBP 베이스 5% → 메인 실효 2% (5% × 0.4).
+// 훈련은 prelim risk(0.002~0.012)이 매우 작으므로 0.4x 곱해도 체감 차이는 적음.
+export const MAIN_INJURY_LUCK = 0.4;
+
 // 단일 훈련 적용 (하루치)
 export function applyTraining(player, trainingKey) {
   if (player.injury) return { ok: false, reason: "injured" };
@@ -151,9 +156,9 @@ export function applyTraining(player, trainingKey) {
     gained[stat] = delta;
   }
   player.stamina = Math.max(0, player.stamina + tr.stamina);
-  // 부상 체크
+  // 부상 체크 — 주인공은 MAIN_INJURY_LUCK(0.4x) 적용해 후하게.
   const lowStamina = player.stamina < 25 ? 0.02 : 0;
-  if (Math.random() < tr.injuryRisk + lowStamina) {
+  if (Math.random() < (tr.injuryRisk + lowStamina) * MAIN_INJURY_LUCK) {
     applyInjury(player);
   }
   if (critical) {
@@ -211,14 +216,23 @@ function pickBodyPart() {
 // 부상 객체 — { severity, bodyPart, weeksLeft, surgery, aftereffect, _isNew }
 // 표시용 라벨은 t("injury." + severity), t("bodyPart." + bodyPart).
 // _isNew 플래그: UI 가 한 번 토스트 띄운 후 false 로 끔.
-// forceSeverity: 0~1 roll (옛 호출 호환)
+// forceSeverity:
+//   - 0~1 숫자(roll) → 분포 기반 severity 결정 (v0.4 + offseason 호출 호환)
+//   - "minor"|"moderate"|"severe" 문자열 → 그대로 severity 사용 (v0.3 후반 패치 HBP 부상 호출 호환)
+//   - null → Math.random() 굴림
 // opts.bodyPart: 강제 부위 (생략 시 랜덤)
 export function applyInjury(player, forceSeverity = null, opts = {}) {
-  const roll = forceSeverity ?? Math.random();
+  const WEEKS_BY_SEVERITY = { minor: 1, moderate: 3, severe: 8 };
   let severity, baseWeeks;
-  if (roll < 0.65)      { severity = "minor";    baseWeeks = 1; }
-  else if (roll < 0.92) { severity = "moderate"; baseWeeks = 3; }
-  else                  { severity = "severe";   baseWeeks = 8; }
+  if (typeof forceSeverity === "string" && WEEKS_BY_SEVERITY[forceSeverity] !== undefined) {
+    severity = forceSeverity;
+    baseWeeks = WEEKS_BY_SEVERITY[severity];
+  } else {
+    const roll = typeof forceSeverity === "number" ? forceSeverity : Math.random();
+    if (roll < 0.65)      { severity = "minor";    baseWeeks = 1; }
+    else if (roll < 0.92) { severity = "moderate"; baseWeeks = 3; }
+    else                  { severity = "severe";   baseWeeks = 8; }
+  }
 
   const bodyPart = opts.bodyPart ?? pickBodyPart();
 

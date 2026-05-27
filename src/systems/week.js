@@ -4,8 +4,7 @@
 
 import { state, pushLog, pushToast } from "../state.js";
 import {
-  applyTraining, applyWork, applyRest, tickConditionWeekly, ageUp, overallScore, applyGameExperience,
-  applyInjury,
+  applyTraining, applyWork, applyRest, tickConditionWeekly, ageUp, overallScore, applyGameExperience, applyInjury,
 } from "./player.js";
 import { simulateGame } from "./simulator.js";
 import { getPlayerTeam, standings } from "./league.js";
@@ -61,6 +60,21 @@ export function endWeek() {
   tickConditionWeekly(player);
   player.stamina = Math.min(player.maxStamina, player.stamina + 50);
 
+  // NPC 부상 카운터 감소 — 게임 시뮬레이션 *전에* 처리해서, 이번 주에 새로
+  // 발생한 부상은 다음 주 endWeek 부터 깎이도록.
+  // NPC pitcher 휴식 카운터도 같이 ++ (이전 게임에 던졌으면 이번 주 휴식 1회).
+  for (const team of league?.teams ?? []) {
+    for (const np of team.roster ?? []) {
+      if (np.injury) {
+        np.injury.weeksLeft = Math.max(0, np.injury.weeksLeft - 1);
+        if (np.injury.weeksLeft <= 0) np.injury = null;
+      }
+      if (np.role === "pitcher") {
+        np.gamesSinceLastPitch = (np.gamesSinceLastPitch ?? 99) + 1;
+      }
+    }
+  }
+
   // 이번 주 일정
   const games = league.schedule[season.weekIndex] ?? [];
   const results = [];
@@ -87,17 +101,30 @@ export function endWeek() {
         }
       }
 
-      // HBP 부상 후처리 — simulator 가 batterBox.hbpInjurySeverity 로 굴림 결과만 실어 보냄
-      const sev = r.mainPlayer.batterBox?.hbpInjurySeverity;
-      if (sev && !player.injury) {
-        // applyInjury 의 forceSeverity 는 0~1 roll. HBP 굴림 분포를 그쪽으로 매핑.
-        const force = sev === "minor" ? 0.3 : sev === "moderate" ? 0.8 : 0.99;
-        applyInjury(player, force);
-        pushToast(t("toast.hbpInjury", { type: t("injury." + sev) }), "bad");
-      }
-
       // 마일스톤 검출 (단경기 + 통산)
       detectMilestones(player, r, state.gameDate);
+    }
+    // HBP 부상 후처리 — simulator 가 메인의 hbpInjury 만 부착, NPC 는 직접 적용 완료.
+    // v0.4 의 부위/후유증/토미존 로직은 applyInjury 내부에서 자동 처리됨.
+    if (r.mainPlayer?.hbpInjury && !player.injury) {
+      const sev = r.mainPlayer.hbpInjury.severity;
+      applyInjury(player, sev);
+      pushToast(t("toast.hbpInjury", { type: t("injury." + sev) }), "bad");
+    }
+    // 메인 강판 토스트 — UI 가 다음 렌더에서 띄움.
+    if (r.mainPlayer?.pitcherReplaced) {
+      pushToast(t("toast.mainReplaced"), "info");
+    }
+    // 등판한 NPC pitcher 휴식 카운터 0 으로 reset.
+    if (r.usedNpcPitcherIds) {
+      const usedSet = new Set(r.usedNpcPitcherIds);
+      for (const team of league?.teams ?? []) {
+        for (const np of team.roster ?? []) {
+          if (np.role === "pitcher" && usedSet.has(np.id)) {
+            np.gamesSinceLastPitch = 0;
+          }
+        }
+      }
     }
   }
   season.weekResults = results;
@@ -142,6 +169,8 @@ function mergeSeasonStats(player, mainPlayer) {
     const box = mainPlayer.batterBox;
     ss.pa += box.pa; ss.ab += box.ab; ss.h += box.h; ss.hr += box.hr;
     ss.bb += box.bb; ss.k += box.k; ss.tb += box.tb;
+    ss.r   = (ss.r   ?? 0) + (box.r   ?? 0);
+    ss.rbi = (ss.rbi ?? 0) + (box.rbi ?? 0);
     // 신규 부가 통계
     ss.hbp = (ss.hbp ?? 0) + (box.hbp ?? 0);
     ss.sf  = (ss.sf  ?? 0) + (box.sf  ?? 0);
@@ -153,13 +182,18 @@ function mergeSeasonStats(player, mainPlayer) {
   if (mainPlayer.pitcherBox) {
     const box = mainPlayer.pitcherBox;
     ss.pitchG++;
-    ss.ip += 9;        // 단순화: 선발 9이닝
+    // outs 단위 누적 → ip 는 ipOuts/3 합산. 강판되면 ipOuts < 27.
+    ss.ipOuts = (ss.ipOuts ?? 0) + (box.ipOuts ?? 27);
+    ss.ip = ss.ipOuts / 3;
     ss.er += box.er ?? 0;
     ss.pK += box.pK ?? 0;
     ss.pBB += box.pBB ?? 0;
     ss.pH += box.pH ?? 0;
     ss.pHR += box.pHR ?? 0;
     ss.pHbp = (ss.pHbp ?? 0) + (box.pHbp ?? 0);
+    ss.w  = (ss.w  ?? 0) + (box.w  ?? 0);
+    ss.l  = (ss.l  ?? 0) + (box.l  ?? 0);
+    ss.sv = (ss.sv ?? 0) + (box.sv ?? 0);
   }
 }
 

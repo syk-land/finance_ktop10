@@ -38,7 +38,7 @@ export function pushToast(msg, kind = "good") {
 export function saveGame() {
   try {
     const payload = {
-      version: SAVE_VERSION,
+      saveVersion: SAVE_VERSION,
       player: state.player,
       league: state.league,
       season: state.season,
@@ -60,9 +60,14 @@ export function saveGame() {
   }
 }
 
-// 옛 세이브 구조 → 현재 구조로 변환. version 누락(v1) 인 데이터를 SAVE_VERSION 으로 끌어올린다.
+// 옛 세이브 구조 → 현재 구조로 변환. saveVersion 누락(또는 옛 data.version) 인 데이터를 SAVE_VERSION 으로 끌어올린다.
 function migrateSave(data) {
-  if (data.version === SAVE_VERSION) return data;
+  // 옛 키(`version`) 흡수 — 사용자가 v0.3 이전 세이브에서 이어할 때.
+  if (data.saveVersion === undefined && data.version !== undefined) {
+    data.saveVersion = data.version;
+    delete data.version;
+  }
+  if (data.saveVersion === SAVE_VERSION) return data;
 
   // gameDate.year: 옛 형식은 1,2,3… 같은 학년 카운터. 현재는 실제 연도(2027~)
   if (data.gameDate && typeof data.gameDate.year === "number" && data.gameDate.year < 100) {
@@ -82,7 +87,17 @@ function migrateSave(data) {
   }
   // injury: 옛 구조엔 bodyPart 없음. 옛 부상은 표시 시 detected 로 폴백되니 그대로 둬도 됨.
 
-  data.version = SAVE_VERSION;
+  // NPC injury / gamesSinceLastPitch 호환 — 옛 NPC entity 에는 없었음.
+  for (const team of data.league?.teams ?? []) {
+    for (const np of team.roster ?? []) {
+      if (np.injury === undefined) np.injury = null;
+      if (np.role === "pitcher" && np.gamesSinceLastPitch === undefined) {
+        np.gamesSinceLastPitch = 99;
+      }
+    }
+  }
+
+  data.saveVersion = SAVE_VERSION;
   return data;
 }
 

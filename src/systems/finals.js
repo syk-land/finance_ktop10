@@ -63,7 +63,9 @@ function makeOpponentTeam(myTeamStrength, league) {
     name: pick.name,
     region: pick.region,
     strength: finalStrength,
-    roster: createRoster(finalStrength, [16, 18]),
+    // stage 옵션 필수 — 누락 시 getNpcStatCap 가 default 150 폴백해서
+    // 결승 상대 NPC 가 일반 리그 NPC(cap 100) 보다 1.5배 강하게 생성됨 (압살 게임 원인).
+    roster: createRoster(finalStrength, [16, 18], { stage: "high", teamName: pick.name }),
     record: { w: 0, l: 0, t: 0 },
     isPlayerTeam: false,
   };
@@ -73,6 +75,10 @@ function makeOpponentTeam(myTeamStrength, league) {
 // player.lastFinalCheckWeek 로 중복 방지.
 export function checkFinalAdvance(player, league, season, gameDate) {
   if (!player || !league || !season || !gameDate) return null;
+  // 한국 고교 토너먼트는 stage="high" 한정. 진로 분기 후 stage 가 univ/pro1/mlb
+  // 등이면 HS 결승 진출 굴림 안 함 (이전엔 stage 무관하게 굴림이라 MLB 메인이
+  // 광주일고 주작기 결승 진출하는 incorrectstate 가 나옴).
+  if (player.stage !== "high") return null;
   player.processedFinals = player.processedFinals ?? {};
 
   const list = tournamentsEndingThisWeek(gameDate, league.weeksPerSeason, season.weekIndex);
@@ -146,13 +152,41 @@ export function simulateFinal(player, league, opponent) {
   return simulateGame(finalLeague, gameDef, player);
 }
 
+// 메인 결승 성적 → 보상 배율 (0.3~1.0).
+// 출장 X → 0.3 (관전 보상), 부진 → 0.5~0.7, 평범 → 1.0.
+// MVP 보너스는 별도 (기존 분기 유지).
+function performanceMultiplier(result) {
+  const mp = result?.mainPlayer;
+  if (!mp || (!mp.roles?.bat && !mp.roles?.pitch)) return 0.3;
+  const b = mp.batterBox;
+  const p = mp.pitcherBox;
+  const batPa = b?.pa ?? 0;
+  const batH = b?.h ?? 0;
+  const batHr = b?.hr ?? 0;
+  const pOuts = p?.ipOuts ?? 0;
+  const pER = p?.er ?? 0;
+  // 부진 판정: 3타석+ 무안타 / 3이닝+ 자책 5+
+  const batBad = batPa >= 3 && batH === 0 && batHr === 0;
+  const pitBad = pOuts >= 9 && pER >= 5;
+  const both = mp.roles?.bat && mp.roles?.pitch;
+  if (both) {
+    if (batBad && pitBad) return 0.4;
+    if (batBad || pitBad) return 0.7;
+    return 1.0;
+  }
+  // 단방향 — 부진이면 절반
+  return (batBad || pitBad) ? 0.5 : 1.0;
+}
+
 // 우승/준우승 보상 적용. changes[] + mvp 여부 반환.
 // tournamentKey 가 주어지면 player.tournamentHistory 에 기록도 누적.
+// 보상은 메인 결승 성적(perfMult)에 비례 — 우승해도 메인이 부진/미출장이면 축소.
 export function applyFinalReward(player, result, tournamentKey = null) {
   const my = result?.home?.team?.isPlayerTeam ? result.home : result.away;
   const opp = my === result.home ? result.away : result.home;
   const won = result.winner && result.winner === my.team.name;
   const mvp = won && checkMVP(result);
+  const perfMult = performanceMultiplier(result);
 
   const changes = [];
   const cap = getPlayerStatCap(player);
@@ -173,16 +207,16 @@ export function applyFinalReward(player, result, tournamentKey = null) {
   }
 
   if (won) {
-    bumpAll(+3);
-    fameUp(+25);
+    bumpAll(+(3 * perfMult).toFixed(1));
+    fameUp(Math.round(25 * perfMult));
     if (mvp) {
-      // MVP 추가 보너스
+      // MVP 추가 보너스 — perfMult 영향 받지 않음 (MVP 조건 자체가 호조 보증)
       bump("pitcher", "mental", +5);
       fameUp(+10);
     }
   } else {
-    bump("pitcher", "mental", +5);
-    fameUp(+10);
+    bump("pitcher", "mental", +(5 * perfMult).toFixed(1));
+    fameUp(Math.round(10 * perfMult));
   }
 
   // 대회 기록 누적
@@ -190,5 +224,5 @@ export function applyFinalReward(player, result, tournamentKey = null) {
     pushTournamentRecord(player, tournamentKey, won ? "champion" : "runner", mvp);
   }
 
-  return { won, mvp, myScore: my.score, oppScore: opp.score, changes };
+  return { won, mvp, myScore: my.score, oppScore: opp.score, changes, perfMult };
 }

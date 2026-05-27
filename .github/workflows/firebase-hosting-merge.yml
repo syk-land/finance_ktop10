@@ -1,0 +1,21 @@
+# main 브랜치에 머지/푸시되면 Firebase Hosting (live 채널) 으로 배포.
+# 사용자가 GitHub repo Settings → Secrets 에 FIREBASE_SERVICE_ACCOUNT_BASEBALL_ALONE
+# (Firebase 콘솔에서 발급한 서비스 계정 JSON 키 내용) 을 등록해야 동작함.
+name: Deploy to Firebase Hosting on merge
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BASEBALL_ALONE }}
+          channelId: live
+          projectId: baseball-alone
