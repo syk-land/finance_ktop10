@@ -54,6 +54,14 @@ startHighSchoolCareer("김야구", "contact", highTeam);
 state.player.seasonStats = emptyStats();
 
 const seasonReports = [];
+const peakStats = {
+  batter:  { contact: 0, power: 0, eye: 0, speed: 0, defense: 0 },
+  pitcher: { velocity: 0, control: 0, breaking: 0, stamina: 0, mental: 0 },
+};
+function updatePeak() {
+  for (const k in peakStats.batter)  peakStats.batter[k]  = Math.max(peakStats.batter[k],  state.player.batter[k]);
+  for (const k in peakStats.pitcher) peakStats.pitcher[k] = Math.max(peakStats.pitcher[k], state.player.pitcher[k]);
+}
 
 function runOneSeason(stage) {
   const weeks = state.league.weeksPerSeason;
@@ -69,6 +77,7 @@ function runOneSeason(stage) {
     }
     if (state.season.finished) break;
   }
+  updatePeak();
   return { totalGames, injuredWeeks };
 }
 
@@ -200,6 +209,16 @@ console.log(`최종 단계: ${state.player.stage} (만 ${state.player.age}세, $
 console.log(`커리어 시즌 수: ${state.player.careerHistory.length}`);
 console.log(`통산 G ${cs.games ?? 0} / AVG ${careerAvg} / HR ${cs.hr ?? 0} / RBI ${cs.rbi ?? 0} / R ${cs.r ?? 0} / SB ${cs.sb ?? 0}`);
 console.log(`통산 IP ${careerIp.toFixed(1)} / ERA ${careerEra} / K ${cs.pK ?? 0} / W-L ${cs.w ?? 0}-${cs.l ?? 0} / SV ${cs.sv ?? 0}`);
+
+console.log(`\n┌─ 커리어 피크 능력치 (시즌 종료 시점 기준 최고치) ─────────`);
+const pb = peakStats.batter, pp = peakStats.pitcher;
+const fb = state.player.batter, fp = state.player.pitcher;
+console.log(`            contact  power    eye    speed defense | velo  ctrl  break stam  ment`);
+console.log(`피크 stat : ${[pb.contact,pb.power,pb.eye,pb.speed,pb.defense].map(v=>String(v.toFixed(0)).padStart(7)).join("")} |${[pp.velocity,pp.control,pp.breaking,pp.stamina,pp.mental].map(v=>String(v.toFixed(0)).padStart(6)).join("")}`);
+console.log(`최종 stat : ${[fb.contact,fb.power,fb.eye,fb.speed,fb.defense].map(v=>String(v.toFixed(0)).padStart(7)).join("")} |${[fp.velocity,fp.control,fp.breaking,fp.stamina,fp.mental].map(v=>String(v.toFixed(0)).padStart(6)).join("")}`);
+const peakBatAvg = (pb.contact+pb.power+pb.eye+pb.speed+pb.defense)/5;
+const peakPitAvg = (pp.velocity+pp.control+pp.breaking+pp.stamina+pp.mental)/5;
+console.log(`피크 평균 : 타 ${peakBatAvg.toFixed(1)} / 투 ${peakPitAvg.toFixed(1)} (stage cap pro1=160)`);
 
 console.log(`\n포스트시즌 기록 (${(state.player.tournamentHistory ?? []).filter(t => t.tournamentKey.startsWith("kbo_") || t.tournamentKey.startsWith("mlb_")).length}회 진출):`);
 for (const r of (state.player.tournamentHistory ?? [])) {
