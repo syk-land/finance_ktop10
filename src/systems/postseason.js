@@ -134,7 +134,10 @@ function makeOpponentForRound(myStrength, round, stage) {
   const strength = Math.max(60, myStrength + bonus);
   const locale = state?.locale ?? "ko";
   const poolStage = stage === "pro1" ? "pro1" : "mlb";
-  const pool = getTeamPool(poolStage, locale);
+  const rawPool = getTeamPool(poolStage, locale);
+  const myTeamName = getPlayerTeam(state.league)?.name;
+  const filtered = (rawPool ?? []).filter(p => p?.name !== myTeamName);
+  const pool = filtered.length > 0 ? filtered : (rawPool ?? []);
   const pick = pool?.[Math.floor(Math.random() * (pool?.length || 1))];
   const ageRange = stage === "pro1" ? [22, 36] : [22, 38];
   return {
