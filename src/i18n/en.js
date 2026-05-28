@@ -456,8 +456,13 @@ export const en = {
   settingsModal: {
     title:             "⚙ Settings",
     gameControl:       "Game control",
+    speed:             "Speed",
     language:          "Language",
     gameInactiveHint:  "Create a character to enable game controls.",
+    finalsModalTitle:  "Finals live modal",
+    finalsModalDesc:   "Show live visualization when advancing to a final. OFF = auto-simulate with result toast only.",
+    toggleOn:          "ON",
+    toggleOff:         "OFF",
   },
 
   // Firebase Authentication
@@ -907,6 +912,8 @@ export const en = {
     finalAppearance: "<b>Your appearance</b> — bat {bat} · pit {pit}",
     finalAppearOn:   "Yes",
     finalAppearOff:  "No",
+    finalsAutoWin:   "Won the {tournament}!",
+    finalsAutoLose:  "Lost the {tournament} final",
     staminaVal: "{cur} / {max}",
     injuryVal: "{type} ({weeks}w)",
     weekVal: "{cur} / {max}",

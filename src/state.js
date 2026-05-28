@@ -20,6 +20,7 @@ export const state = {
   pendingEvents: [],     // [{key, type, handlerKey, year}] — 시즌 중 이벤트 큐 (seasonEvents.js)
   regression: null,      // 회귀(NewGame+) 메타 — systems/regression.js 가 별도 localStorage 키로 영속화
   cloudUser: null,       // Firebase Auth 사용자 — { uid, isAnonymous, displayName?, email? }. null 이면 미로그인/비활성.
+  settings: null,        // 게임 메타 설정 — systems/settings.js 가 별도 localStorage 키로 영속화
 };
 
 export function setState(patch) {

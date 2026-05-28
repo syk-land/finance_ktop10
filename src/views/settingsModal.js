@@ -6,6 +6,7 @@
 
 import { state } from "../state.js";
 import { t, toggleLocale, localeToggleLabel } from "../i18n/index.js";
+import { setSetting, getSetting } from "../systems/settings.js";
 
 const SPEEDS = [
   { label: "0.5x", ms: 1000 },
@@ -41,7 +42,7 @@ export function openSettingsModal(route) {
   h.textContent = t("settingsModal.title");
   dialog.appendChild(h);
 
-  // 1) 게임 진행 — 일시정지 + 배속. 게임 중일 때만 활성, 그 외엔 disabled.
+  // 1) 게임 진행 — 배속만. 일시정지/재생은 topbar 의 ⏸/▶ 아이콘으로 분리됨.
   const gameActive = state.view === "weekly" && !!state.season && !!state.player;
 
   const gameSection = document.createElement("section");
@@ -50,25 +51,8 @@ export function openSettingsModal(route) {
   const gameTitle = document.createElement("div");
   gameTitle.className = "muted small";
   gameTitle.style.cssText = "font-size:11px; margin-bottom:8px; font-weight:700;";
-  gameTitle.textContent = t("settingsModal.gameControl");
+  gameTitle.textContent = t("settingsModal.speed");
   gameSection.appendChild(gameTitle);
-
-  // 일시정지/재생
-  const pauseBtn = document.createElement("button");
-  pauseBtn.type = "button";
-  pauseBtn.className = "primary";
-  pauseBtn.textContent = state.paused ? t("weekly.btnPlay") : t("weekly.btnPause");
-  pauseBtn.style.cssText = "width:100%; padding:12px; font-size:14px; font-weight:700; margin-bottom:8px;";
-  pauseBtn.disabled = !gameActive;
-  if (!gameActive) pauseBtn.style.opacity = "0.5";
-  pauseBtn.addEventListener("click", () => {
-    if (!gameActive) return;
-    state.paused = !state.paused;
-    pauseBtn.textContent = state.paused ? t("weekly.btnPlay") : t("weekly.btnPause");
-    // 재생 상태로 전환 시 모달 닫음 — 사용자가 게임 진행을 보기 편하도록.
-    if (!state.paused) closeSettingsModal();
-  });
-  gameSection.appendChild(pauseBtn);
 
   // 배속 4종
   const speedWrap = document.createElement("div");
@@ -100,6 +84,40 @@ export function openSettingsModal(route) {
   }
 
   dialog.appendChild(gameSection);
+
+  // 2) 결승 모달 자동 띄우기 토글
+  const finalsSection = document.createElement("section");
+  finalsSection.style.marginBottom = "16px";
+  const finalsRow = document.createElement("div");
+  finalsRow.style.cssText = "display:flex; justify-content:space-between; align-items:center; gap:8px;";
+  const finalsLabel = document.createElement("div");
+  finalsLabel.style.cssText = "flex:1; min-width:0;";
+  const finalsLabelTitle = document.createElement("div");
+  finalsLabelTitle.style.cssText = "font-weight:700; font-size:13px;";
+  finalsLabelTitle.textContent = t("settingsModal.finalsModalTitle");
+  finalsLabel.appendChild(finalsLabelTitle);
+  const finalsLabelDesc = document.createElement("div");
+  finalsLabelDesc.className = "muted small";
+  finalsLabelDesc.style.cssText = "font-size:11px; line-height:1.4;";
+  finalsLabelDesc.textContent = t("settingsModal.finalsModalDesc");
+  finalsLabel.appendChild(finalsLabelDesc);
+  finalsRow.appendChild(finalsLabel);
+
+  const finalsBtn = document.createElement("button");
+  finalsBtn.type = "button";
+  const isSkip = !!getSetting("skipFinalsModal");
+  finalsBtn.textContent = isSkip ? t("settingsModal.toggleOff") : t("settingsModal.toggleOn");
+  finalsBtn.className = isSkip ? "" : "primary";
+  finalsBtn.style.cssText = "padding:8px 14px; font-size:12px; font-weight:700; flex-shrink:0;";
+  finalsBtn.addEventListener("click", () => {
+    const next = !getSetting("skipFinalsModal");
+    setSetting("skipFinalsModal", next);
+    finalsBtn.textContent = next ? t("settingsModal.toggleOff") : t("settingsModal.toggleOn");
+    finalsBtn.className = next ? "" : "primary";
+  });
+  finalsRow.appendChild(finalsBtn);
+  finalsSection.appendChild(finalsRow);
+  dialog.appendChild(finalsSection);
 
   // 2) 언어 토글
   const langSection = document.createElement("section");

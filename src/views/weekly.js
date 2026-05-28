@@ -90,6 +90,26 @@ let _finalModalShown = false;
 function showFinalModalIfNeeded(route) {
   const f = state.pendingFinal;
   if (!f || _finalModalShown) return;
+
+  // 설정 — skipFinalsModal ON 이면 모달 띄우지 않고 자동 시뮬+보상+토스트만.
+  if (state.settings?.skipFinalsModal) {
+    const result = f.result ?? simulateFinal(state.player, state.league, f.opponent);
+    const reward = applyFinalReward(state.player, result, f.tournamentKey);
+    const my = result.home?.team?.isPlayerTeam ? result.home : result.away;
+    const won = result.winner && result.winner === my.team.name;
+    const kind = won ? "good" : "info";
+    const msg = won
+      ? t("weekly.finalsAutoWin", { tournament: t("tournament." + f.tournamentKey) })
+      : t("weekly.finalsAutoLose", { tournament: t("tournament." + f.tournamentKey) });
+    pushToast(msg, kind);
+    if (reward?.mvp) {
+      pushToast(t("weekly.mvpAwarded", { tournament: t("tournament." + f.tournamentKey) }), "good");
+    }
+    state.pendingFinal = null;
+    saveGame();
+    return;
+  }
+
   _finalModalShown = true;
 
   // 결승 진출 시 시즌 일시정지 — 직전 상태를 보존했다가 결승 종료 후 복원해서 자동 진행 이어감

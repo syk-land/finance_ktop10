@@ -9,6 +9,7 @@ import { renderWeekly } from "./views/weekly.js";
 import { renderShop } from "./views/shop.js";
 import { advanceOneDay } from "./systems/tick.js";
 import { loadRegressionMeta } from "./systems/regression.js";
+import { loadSettings } from "./systems/settings.js";
 import { initFirebase } from "./cloud/firebase.js";
 import { initAuth } from "./cloud/auth.js";
 import {
@@ -36,6 +37,14 @@ function updateChrome() {
   if (toggle) {
     toggle.textContent = "⚙";
     toggle.setAttribute("aria-label", t("settingsModal.title"));
+  }
+  const pauseToggle = document.getElementById("pause-toggle");
+  if (pauseToggle) {
+    const gameActive = state.view === "weekly" && !!state.season && !!state.player;
+    pauseToggle.disabled = !gameActive;
+    pauseToggle.style.opacity = gameActive ? "1" : "0.4";
+    pauseToggle.textContent = state.paused ? "▶" : "⏸";
+    pauseToggle.setAttribute("aria-label", state.paused ? t("weekly.btnPlay") : t("weekly.btnPause"));
   }
   document.title = t("app.title");
 }
@@ -138,6 +147,16 @@ function wireSettingsButton() {
   btn.addEventListener("click", () => openSettingsModal(route));
 }
 
+function wirePauseButton() {
+  const btn = document.getElementById("pause-toggle");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    if (btn.disabled) return;
+    state.paused = !state.paused;
+    updateChrome();
+  });
+}
+
 // "맨 위로" floating 버튼 — 스크롤이 일정 임계 이상이면 표시.
 function setupScrollTopButton() {
   const btn = document.createElement("button");
@@ -170,6 +189,7 @@ function setupScrollTopButton() {
 // 초기 진입
 function init() {
   loadLocaleFromStorage();
+  loadSettings();
   loadRegressionMeta();
   // Firebase Auth/Firestore 부팅 — firebaseConfig 비어있으면 silently 스킵.
   if (initFirebase()) {
@@ -177,6 +197,7 @@ function init() {
   }
   updateChrome();
   wireSettingsButton();
+  wirePauseButton();
   setupScrollTopButton();
   route("menu");
   scheduleTick();

@@ -459,8 +459,13 @@ export const ko = {
   settingsModal: {
     title:             "⚙ 설정",
     gameControl:       "게임 진행",
+    speed:             "배속",
     language:          "언어",
     gameInactiveHint:  "캐릭터를 생성하면 게임 진행을 제어할 수 있습니다.",
+    finalsModalTitle:  "결승 라이브 모달",
+    finalsModalDesc:   "결승 진출 시 라이브 시각화 모달을 띄울지. OFF 면 자동 진행 후 결과 토스트만.",
+    toggleOn:          "ON",
+    toggleOff:         "OFF",
   },
 
   // Firebase Authentication
@@ -911,6 +916,8 @@ export const ko = {
     finalAppearance: "<b>주인공 출장</b> — 타자 {bat} · 투수 {pit}",
     finalAppearOn:   "출전",
     finalAppearOff:  "벤치",
+    finalsAutoWin:   "{tournament} 우승!",
+    finalsAutoLose:  "{tournament} 결승 패배",
     staminaVal: "{cur} / {max}",
     injuryVal: "{type} ({weeks}주)",
     weekVal: "{cur} / {max}",
