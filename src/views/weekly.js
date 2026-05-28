@@ -45,15 +45,22 @@ export function renderWeekly(root, route, opts = {}) {
     return;
   }
 
-  // tick 자동 호출 시 schedule panel 만 element 자체를 보존(이벤트 리스너 유지) — pause/속도 클릭 안정.
+  // tick 자동 호출 시 schedule / settings panel 자체를 보존(이벤트 리스너 유지) — pause/속도 클릭 안정.
   // 나머지 panel (헤더, 시즌 성적, 능력치, 경기 결과, 순위) 은 매 tick 새로 그려서 실시간 갱신.
   let preservedSchedule = null;
+  let preservedSettings = null;
   if (opts.fromTick) {
-    const existing = root.querySelector("[data-keep='schedule']");
-    if (existing) {
-      preservedSchedule = existing;
-      existing.remove();              // root.innerHTML="" 전에 detach
+    const sched = root.querySelector("[data-keep='schedule']");
+    if (sched) {
+      preservedSchedule = sched;
+      sched.remove();
       updateSchedulePanel(preservedSchedule);
+    }
+    const sett = root.querySelector("[data-keep='settings']");
+    if (sett) {
+      preservedSettings = sett;
+      sett.remove();
+      updateSettingsPanel(preservedSettings);
     }
   }
 
@@ -63,6 +70,9 @@ export function renderWeekly(root, route, opts = {}) {
 
   // 1) 헤더 카드 (단독, 전체 폭, 컴팩트)
   wrap.appendChild(renderHeaderInfo(player, league, season));
+
+  // 1.5) 설정 패널 — 일시정지/배속 컨트롤. 접이식 (클릭 시 펼침/접힘).
+  wrap.appendChild(preservedSettings ?? renderSettingsPanel(route));
 
   // 2) 합쳐진 "주차 일정" 카드 — 보존된 element 가 있으면 그대로 재사용
   wrap.appendChild(preservedSchedule ?? renderSchedulePanel(route));
@@ -797,6 +807,127 @@ const SPEEDS = [
   { label: "4x",   ms: 125 },
 ];
 
+// 설정 패널 — 일시정지/배속 컨트롤. 헤더 클릭으로 펼침/접힘.
+// 펼침/접힘 상태는 모듈 변수 — 매 tick 재렌더에도 유지.
+let settingsExpanded = true;
+
+function renderSettingsPanel(route) {
+  const panel = document.createElement("section");
+  panel.className = "panel";
+  panel.dataset.keep = "settings";
+  panel.style.padding = "8px 12px";
+
+  // 헤더 — 클릭 가능. 좌측 [⚙ 라벨 + 요약], 우측 [▼/▲]
+  const header = document.createElement("div");
+  header.dataset.tb = "settings-header";
+  header.style.cssText = "display:flex; justify-content:space-between; align-items:center; cursor:pointer; user-select:none;";
+
+  const left = document.createElement("div");
+  left.style.cssText = "display:flex; align-items:center; gap:10px;";
+
+  const title = document.createElement("span");
+  title.style.cssText = "font-weight:700; font-size:13px;";
+  title.textContent = "⚙ " + t("weekly.settingsTitle");
+  left.appendChild(title);
+
+  const summary = document.createElement("span");
+  summary.dataset.tb = "settings-summary";
+  summary.className = "muted small";
+  summary.style.cssText = "font-size:11px;";
+  summary.textContent = settingsSummaryText();
+  left.appendChild(summary);
+
+  header.appendChild(left);
+
+  const toggleIcon = document.createElement("span");
+  toggleIcon.dataset.tb = "settings-toggle";
+  toggleIcon.style.cssText = "font-size:11px; color:var(--muted);";
+  toggleIcon.textContent = settingsExpanded ? "▲" : "▼";
+  header.appendChild(toggleIcon);
+
+  // 본문 — 펼침 상태일 때만 표시. display 토글로 깜빡임 없음.
+  const body = document.createElement("div");
+  body.dataset.tb = "settings-body";
+  body.style.cssText = "margin-top:10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;";
+  if (!settingsExpanded) body.style.display = "none";
+
+  // 재생/일시정지 — 큰 버튼
+  const pauseBtn = document.createElement("button");
+  pauseBtn.dataset.tb = "pause";
+  pauseBtn.className = "primary";
+  pauseBtn.textContent = state.paused ? t("weekly.btnPlay") : t("weekly.btnPause");
+  pauseBtn.style.cssText = "padding:8px 16px; font-size:13px; font-weight:700; flex-shrink:0;";
+  pauseBtn.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    e.stopPropagation();
+    state.paused = !state.paused;
+    pauseBtn.textContent = state.paused ? t("weekly.btnPlay") : t("weekly.btnPause");
+    updateSettingsSummary(panel);
+  });
+  body.appendChild(pauseBtn);
+
+  // 속도 토글
+  const speedWrap = document.createElement("div");
+  speedWrap.style.cssText = "display:flex; gap:4px; flex-shrink:0;";
+  for (const sp of SPEEDS) {
+    const b = document.createElement("button");
+    b.dataset.tbSpeed = String(sp.ms);
+    b.textContent = sp.label;
+    b.style.cssText = "width:36px; height:32px; padding:0; font-size:11px; font-weight:700; min-width:0; line-height:1;";
+    if (state.tickSpeed === sp.ms) b.classList.add("primary");
+    b.addEventListener("pointerdown", e => {
+      e.preventDefault();
+      e.stopPropagation();
+      state.tickSpeed = sp.ms;
+      // active 표시 갱신
+      for (const x of speedWrap.children) x.classList.remove("primary");
+      b.classList.add("primary");
+      updateSettingsSummary(panel);
+    });
+    speedWrap.appendChild(b);
+  }
+  body.appendChild(speedWrap);
+
+  // 헤더 클릭 — 펼침/접힘 토글. inline display 만 변경 → 재렌더 없음.
+  header.addEventListener("click", () => {
+    settingsExpanded = !settingsExpanded;
+    body.style.display = settingsExpanded ? "flex" : "none";
+    toggleIcon.textContent = settingsExpanded ? "▲" : "▼";
+  });
+
+  panel.appendChild(header);
+  panel.appendChild(body);
+  return panel;
+}
+
+// 매 tick 시 호출 — 텍스트/active 갱신만, element 자체 보존.
+function updateSettingsPanel(el) {
+  const pauseBtn = el.querySelector("[data-tb='pause']");
+  if (pauseBtn) pauseBtn.textContent = state.paused ? t("weekly.btnPlay") : t("weekly.btnPause");
+  const speedBtns = el.querySelectorAll("[data-tb-speed]");
+  for (const b of speedBtns) {
+    if (+b.dataset.tbSpeed === state.tickSpeed) b.classList.add("primary");
+    else b.classList.remove("primary");
+  }
+  updateSettingsSummary(el);
+  // 펼침/접힘 동기화 — 모듈 변수와 DOM 일치 (외부에서 토글된 경우 대비)
+  const body = el.querySelector("[data-tb='settings-body']");
+  const toggleIcon = el.querySelector("[data-tb='settings-toggle']");
+  if (body) body.style.display = settingsExpanded ? "flex" : "none";
+  if (toggleIcon) toggleIcon.textContent = settingsExpanded ? "▲" : "▼";
+}
+
+function updateSettingsSummary(panel) {
+  const summary = panel.querySelector("[data-tb='settings-summary']");
+  if (summary) summary.textContent = settingsSummaryText();
+}
+
+function settingsSummaryText() {
+  const speed = SPEEDS.find(s => s.ms === state.tickSpeed)?.label ?? "1x";
+  const stateLabel = state.paused ? "⏸" : "▶";
+  return `${stateLabel} ${speed}`;
+}
+
 function renderSchedulePanel(route) {
   const panel = document.createElement("section");
   panel.className = "panel";
@@ -830,53 +961,9 @@ function renderSchedulePanel(route) {
   tourInline.style.fontWeight = "500";
   tourInline.textContent = formatInlineTournaments();
 
-  // 재생/일시정지 (제목과 충분히 떨어져 우측)
-  const pauseBtn = document.createElement("button");
-  pauseBtn.dataset.tb = "pause";
-  pauseBtn.className = "primary";
-  pauseBtn.textContent = state.paused ? t("weekly.btnPlay") : t("weekly.btnPause");
-  pauseBtn.style.padding = "6px 10px";
-  pauseBtn.style.fontSize = "12px";
-  pauseBtn.style.fontWeight = "700";
-  pauseBtn.style.flex = "0 0 auto";
-  pauseBtn.style.whiteSpace = "nowrap";
-  // pointerdown 으로 빠르게 잡음 (click 보다 일찍 발화하여 tick 재렌더 영향 최소화)
-  pauseBtn.addEventListener("pointerdown", e => {
-    e.preventDefault();
-    state.paused = !state.paused;
-    route("weekly");
-  });
-
-  // 속도 토글 — 4개 정사각형(aspect-ratio 1) 카드, 우측 정렬
-  const speedWrap = document.createElement("div");
-  speedWrap.style.display = "flex";
-  speedWrap.style.gap = "3px";
-  speedWrap.style.flex = "0 0 auto";
-  for (const sp of SPEEDS) {
-    const b = document.createElement("button");
-    b.dataset.tbSpeed = String(sp.ms);
-    b.textContent = sp.label;
-    b.style.width = "30px";
-    b.style.height = "30px";
-    b.style.aspectRatio = "1";
-    b.style.padding = "0";
-    b.style.fontSize = "10px";
-    b.style.fontWeight = "700";
-    b.style.minWidth = "0";
-    b.style.lineHeight = "1";
-    if (state.tickSpeed === sp.ms) b.classList.add("primary");
-    b.addEventListener("pointerdown", e => {
-      e.preventDefault();
-      state.tickSpeed = sp.ms;
-      route("weekly");
-    });
-    speedWrap.appendChild(b);
-  }
-
+  // pause/speed 컨트롤은 별도 settings panel 로 분리됨. 여기는 제목 + 대회 inline 만.
   topLine.appendChild(h);
   topLine.appendChild(tourInline);
-  topLine.appendChild(pauseBtn);
-  topLine.appendChild(speedWrap);
   panel.appendChild(topLine);
 
   // 현재 활성 자동 프리셋 표시 (한 줄, 작게)

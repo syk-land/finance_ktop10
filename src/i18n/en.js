@@ -762,6 +762,7 @@ export const en = {
 
   weekly: {
     scheduleTitle: "Week {week}",
+    settingsTitle: "Settings",
     yearLabel: "{year}",
     todayChoice: "Today's Choice — Day {day}",
     trainingDirection: "Training Direction — Day {day}",

@@ -766,6 +766,7 @@ export const ko = {
 
   weekly: {
     scheduleTitle: "{week}주차 일정",
+    settingsTitle: "설정",
     yearLabel: "{year}년",
     todayChoice: "오늘의 선택 — {day}일차",
     trainingDirection: "훈련 방향 — {day}일차",
