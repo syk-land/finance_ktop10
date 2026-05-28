@@ -10,7 +10,7 @@
 //
 // 표시 텍스트는 모두 i18n: offseason.<cat>, offseason.event.<key>.{label,desc,great,ok,bad}.
 
-import { BATTER_STATS, PITCHER_STATS, applyInjury, overallScore } from "./player.js";
+import { BATTER_STATS, PITCHER_STATS, applyInjury, overallScore, addFame } from "./player.js";
 import { state } from "../state.js";
 
 const STAT_CAP = 150;
@@ -40,8 +40,8 @@ function randStat(group, rng = Math.random) {
   return arr[Math.floor(rng() * arr.length)];
 }
 function fameBump(player, delta) {
-  player.fame = (player.fame ?? 0) + delta;
-  return { group: "meta", stat: "fame", delta };
+  const actual = addFame(player, delta);
+  return { group: "meta", stat: "fame", delta: actual };
 }
 
 // ─── 카테고리 ─────────────────────────────────────────────────────

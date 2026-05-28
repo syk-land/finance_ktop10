@@ -7,7 +7,8 @@ import { createSeason } from "./week.js";
 import { getTeamPool } from "../data/teams.js";
 import { t, getLocale } from "../i18n/index.js";
 import { resetGameDateForNewSeason } from "./tick.js";
-import { overallScore } from "./player.js";
+import { overallScore, addFame } from "./player.js";
+import { effectAdd } from "./traitEffects.js";
 
 export function startHighSchoolCareer(playerName, talent, schoolName) {
   // 학교가 명시 안되면 현재 locale의 고교 풀에서 무작위 배정
@@ -122,6 +123,9 @@ export function determineMLBStartStage(score) {
 
 // KBO 드래프트 결과 — 점수 기반 1군 / 2군 / 미지명 분기.
 // round / signingBonus 는 라이브 모달용. signingBonus 단위는 만원.
+//
+// 회귀 효과 draftRound (calling_card 유물): round 가 N 칸 좋아짐 (숫자 감소). 1라운드 미만은 없으니 1 이 하한.
+// 2군 round 도 동일하게 좋아져 1군 진입 가능 (round 1~2 면 자동 1군 승격).
 export function kboDraft(player) {
   const score = compositeScore(player);
   let stage = null, round = null, signingBonus = 0;
@@ -130,6 +134,18 @@ export function kboDraft(player) {
   else if (score >= 80) { stage = "pro1"; round = 3; signingBonus = 18000; }
   else if (score >= 70) { stage = "pro1"; round = 4 + Math.floor(Math.random() * 2); signingBonus = 10000; }
   else if (score >= 55) { stage = "pro2"; round = 6 + Math.floor(Math.random() * 3); signingBonus = 5000; }
+
+  // calling_card: round 가 좋아짐 (N 칸 감소). 1 라운드가 하한.
+  const roundBoost = effectAdd(player, "draftRound", "boost");
+  if (stage && round !== null && roundBoost > 0) {
+    round = Math.max(1, round - roundBoost);
+    // 2군이 round 1~2 로 들어오면 1군 진입 — 명함의 "한 단계 위" 의미
+    if (stage === "pro2" && round <= 3) {
+      stage = "pro1";
+      signingBonus = Math.max(signingBonus, 10000);
+    }
+  }
+
   return {
     picked: stage != null,
     stage,
@@ -242,13 +258,13 @@ export function checkFreeAgency(player) {
 export function applyFreeAgencyDecision(player, decision, newTeamName = null) {
   if (decision === "stay") {
     player.contract = { yearsLeft: 4 };
-    player.fame = (player.fame ?? 0) + 5;  // 잔류 — 작은 명성 보너스
+    addFame(player, 5);  // 잔류 — 작은 명성 보너스
     return { stayed: true, teamName: player.teamName };
   }
   // leave — 새 팀 이적
   player.teamName = newTeamName ?? player.teamName;
   player.contract = { yearsLeft: 4 };
-  player.fame = (player.fame ?? 0) + 12;  // 이적 — 큰 명성 보너스
+  addFame(player, 12);  // 이적 — 큰 명성 보너스
   // 새 팀으로 league 재구성. 메인 stage 동일.
   state.league = createLeague(player.stage, player.teamName);
   return { stayed: false, teamName: player.teamName };
@@ -279,7 +295,7 @@ export function applyTradeAccept(player, newTeamName) {
   player.teamName = newTeamName;
   // contract.yearsLeft 그대로 유지 — 계약 인수
   state.league = createLeague(player.stage, player.teamName);
-  player.fame = (player.fame ?? 0) + 5;
+  addFame(player, 5);
 }
 
 // 콜업 사다리 — 시즌 종료 시 능력치가 임계 넘으면 다음 단계로 자동 승격

@@ -13,6 +13,7 @@
 
 import { pushToast } from "../state.js";
 import { t } from "../i18n/index.js";
+import { addFame } from "./player.js";
 
 const CAREER_THRESHOLDS = {
   h:  [100, 500, 1000, 2000, 3000],
@@ -112,7 +113,7 @@ function award(player, key, bonuses, gameDate, opts = {}) {
   const params = opts.params ?? {};
   pushToast(t(labelKey, params), "good");
 
-  if (bonuses.fame)   player.fame = (player.fame ?? 0) + bonuses.fame;
+  if (bonuses.fame)   addFame(player, bonuses.fame);
   if (bonuses.mental && player.pitcher) {
     player.pitcher.mental = Math.min(300, (player.pitcher.mental ?? 0) + bonuses.mental);
   }

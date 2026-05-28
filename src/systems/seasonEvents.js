@@ -18,7 +18,7 @@
 
 import { state, pushToast } from "../state.js";
 import { t } from "../i18n/index.js";
-import { BATTER_STATS, PITCHER_STATS, getPlayerStatCap } from "./player.js";
+import { BATTER_STATS, PITCHER_STATS, getPlayerStatCap, addFame } from "./player.js";
 import { simulateGame } from "./simulator.js";
 import { createRoster } from "./npc.js";
 import { getPlayerTeam } from "./league.js";
@@ -42,7 +42,7 @@ function bump(player, group, stat, delta) {
   player[group][stat] = +Math.max(STAT_MIN, Math.min(cap, player[group][stat] + delta)).toFixed(1);
 }
 function fameUp(player, delta) {
-  player.fame = (player.fame ?? 0) + delta;
+  addFame(player, delta);
 }
 
 // 프로 단계 (KBO 1군/MLB) — 대표팀 선출 조건 공통

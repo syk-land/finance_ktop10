@@ -5,6 +5,7 @@
 import { state } from "../state.js";
 import { doDailyAction } from "./week.js";
 import { TRAININGS } from "./player.js";
+import { effectMultiplier } from "./traitEffects.js";
 
 // focusStats: 가장 부족한 stat 타게팅 시 대상 stat 화이트리스트 (null=모든 stat)
 // 라벨/설명은 i18n 의 preset.<key>.{label,desc} 에서 조회. 여기엔 가중치 같은 데이터만.
@@ -128,11 +129,13 @@ export function pickAutoAction(presetKey, player) {
     if (target) return { action: "train", detail: target };
   }
 
-  // 2) 부족도 보정된 가중치 추첨
+  // 2) 부족도 보정된 가중치 추첨.
+  // mentor_letter 유물: autoTrainDeficitBoost ×1.5 → DEFICIT_SCALE 곱셈.
+  const localScale = DEFICIT_SCALE * effectMultiplier(player, "autoTrainDeficitBoost");
   const entries = Object.entries(preset.weights);
   const adjusted = entries.map(([k, w]) => {
     const d = deficitFor(k, player);
-    return [k, w * (1 + d * DEFICIT_SCALE)];
+    return [k, w * (1 + d * localScale)];
   });
   const total = adjusted.reduce((a, [, w]) => a + w, 0);
   let r = Math.random() * total;

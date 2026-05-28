@@ -17,7 +17,8 @@ import { getPlayerTeam, standings } from "./league.js";
 import { simulateGame } from "./simulator.js";
 import { createRoster } from "./npc.js";
 import { getTeamPool } from "../data/teams.js";
-import { BATTER_STATS, PITCHER_STATS, getPlayerStatCap } from "./player.js";
+import { BATTER_STATS, PITCHER_STATS, getPlayerStatCap, addFame } from "./player.js";
+import { effectMultiplier } from "./traitEffects.js";
 
 const STAT_MIN = 20;
 
@@ -184,8 +185,10 @@ export function pushPostseasonRecord(player, stage, finalRound, wonChampionship)
 // 라운드 승/패 보상 — 우승만 보상 부여. ks/ws 는 큰 보상.
 export function applyRoundReward(player, round, won) {
   if (!won) return [];
-  const baseFame = { wc: 5, spo: 8, po: 12, ks: 30, ds: 8, cs: 15, ws: 35 }[round] ?? 5;
-  const baseStat = { wc: 1, spo: 2, po: 2, ks: 4, ds: 2, cs: 3, ws: 5 }[round] ?? 1;
+  // big_game trait — finalsReward ×1.5 (PO 도 동일 kind 적용).
+  const rewardMult = effectMultiplier(player, "finalsReward");
+  const baseFame = Math.round(({ wc: 5, spo: 8, po: 12, ks: 30, ds: 8, cs: 15, ws: 35 }[round] ?? 5) * rewardMult);
+  const baseStat = +(({ wc: 1, spo: 2, po: 2, ks: 4, ds: 2, cs: 3, ws: 5 }[round] ?? 1) * rewardMult).toFixed(1);
 
   const cap = getPlayerStatCap(player);
   const changes = [];
@@ -199,8 +202,8 @@ export function applyRoundReward(player, round, won) {
 
   for (const s of BATTER_STATS)  bump("batter",  s, baseStat);
   for (const s of PITCHER_STATS) bump("pitcher", s, baseStat);
-  player.fame = (player.fame ?? 0) + baseFame;
-  changes.push({ group: "meta", stat: "fame", delta: baseFame });
+  const fameDelta = addFame(player, baseFame);
+  changes.push({ group: "meta", stat: "fame", delta: fameDelta });
 
   // 챔피언십(ks/ws) 우승 — 우승 기록 누적 (player.championships)
   if (round === "ks" || round === "ws") {

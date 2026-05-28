@@ -14,7 +14,8 @@ import { getTeamPool } from "../data/teams.js";
 import { getPlayerTeam } from "./league.js";
 import { createRoster, stageAgeRange } from "./npc.js";
 import { simulateGame } from "./simulator.js";
-import { overallScore, BATTER_STATS, PITCHER_STATS, getPlayerStatCap } from "./player.js";
+import { overallScore, BATTER_STATS, PITCHER_STATS, getPlayerStatCap, addFame } from "./player.js";
+import { effectMultiplier } from "./traitEffects.js";
 import { state, pushToast } from "../state.js";
 import { t } from "../i18n/index.js";
 
@@ -192,6 +193,8 @@ export function applyFinalReward(player, result, tournamentKey = null) {
 
   const changes = [];
   const cap = getPlayerStatCap(player);
+  // big_game trait — finalsReward ×1.5. stat 가산과 fame 양쪽에 적용.
+  const rewardMult = effectMultiplier(player, "finalsReward");
   function bump(group, stat, delta) {
     if (player[group]?.[stat] === undefined) return;
     const before = player[group][stat];
@@ -204,21 +207,22 @@ export function applyFinalReward(player, result, tournamentKey = null) {
     for (const s of PITCHER_STATS) bump("pitcher", s, delta);
   }
   function fameUp(delta) {
-    player.fame = (player.fame ?? 0) + delta;
-    changes.push({ group: "meta", stat: "fame", delta });
+    // addFame 이 stardom 의 fameGain multiplier 자동 적용. 여기 finalsReward 도 같이 곱.
+    const actual = addFame(player, delta);
+    changes.push({ group: "meta", stat: "fame", delta: actual });
   }
 
   if (won) {
-    bumpAll(+(3 * perfMult).toFixed(1));
-    fameUp(Math.round(25 * perfMult));
+    bumpAll(+(3 * perfMult * rewardMult).toFixed(1));
+    fameUp(Math.round(25 * perfMult * rewardMult));
     if (mvp) {
       // MVP 추가 보너스 — perfMult 영향 받지 않음 (MVP 조건 자체가 호조 보증)
       bump("pitcher", "mental", +5);
-      fameUp(+10);
+      fameUp(Math.round(10 * rewardMult));
     }
   } else {
     bump("pitcher", "mental", +(5 * perfMult).toFixed(1));
-    fameUp(Math.round(10 * perfMult));
+    fameUp(Math.round(10 * perfMult * rewardMult));
   }
 
   // 대회 기록 누적

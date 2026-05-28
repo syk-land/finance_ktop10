@@ -31,8 +31,11 @@ const {
   consumeLoadoutForCharacter, resetRegressionMeta,
 } = await import("./src/systems/regression.js");
 const { capBonusForStage } = await import("./src/data/shopCatalog.js");
-const { createPlayer, combinedTalentBoost, getPlayerStatCap, applyTraining, applyRest, ageUp } = await import("./src/systems/player.js");
+const { createPlayer, combinedTalentBoost, getPlayerStatCap, applyTraining, applyRest, ageUp, addFame } = await import("./src/systems/player.js");
 const { effectMultiplier, effectAdd, hasTraitFlag } = await import("./src/systems/traitEffects.js");
+const { applyFinalReward } = await import("./src/systems/finals.js");
+const { applyRoundReward } = await import("./src/systems/postseason.js");
+const { kboDraft } = await import("./src/systems/career.js");
 
 function section(t) {
   console.log("\n" + "=".repeat(60));
@@ -365,5 +368,77 @@ ok(ratio > 0.8 && ratio < 1.3, `learner grade=2 일 때 boost 비활성 — rati
 // 10.7 multi-effect 합산 — past_life_notes + learner 동시 보유 → firstSeasonTrainBoost ×2 × ×2 = ×4
 const multiBoost = createPlayer({ name: "M", talent: "contact", traits: ["learner"], relics: ["past_life_notes"] });
 ok(effectMultiplier(multiBoost, "firstSeasonTrainBoost") === 4, `learner+past_life_notes firstSeasonTrainBoost = ${effectMultiplier(multiBoost, "firstSeasonTrainBoost")} (expected 4)`);
+
+// ── 11. 특성/유물 효과 wiring (P4b-1) ───────────────────────
+section("11. 특성/유물 효과 wiring (P4b-1)");
+
+// 11.1 addFame — stardom ×1.5 양수만 적용
+const star = createPlayer({ name: "St", talent: "contact", traits: ["stardom"] });
+star.fame = 0;
+const fameDelta = addFame(star, 10);
+ok(fameDelta === 15 && star.fame === 15, `stardom: addFame(10) → +${fameDelta}, fame=${star.fame} (expected +15)`);
+// 음수 가산은 ×1.5 미적용 (그대로 깎임)
+const negDelta = addFame(star, -10);
+ok(negDelta === -10 && star.fame === 5, `stardom: 음수 가산 그대로 -${-negDelta}, fame=${star.fame}`);
+// trait 없으면 그대로
+const noStar = createPlayer({ name: "Ns", talent: "contact" });
+ok(addFame(noStar, 10) === 10 && noStar.fame === 10, "no stardom: addFame(10) → +10");
+
+// 11.2 calling_card — draftRound +1 (round 숫자 감소)
+const draftPlayer = (relics, score) => {
+  const p = createPlayer({ name: "D", talent: "contact", relics });
+  // compositeScore 시뮬을 위해 stat 강제 설정 (점수가 score 근처가 되도록)
+  for (const s of ["contact","power","eye","speed","defense"]) p.batter[s] = score;
+  for (const s of ["velocity","control","breaking","stamina","mental"]) p.pitcher[s] = score;
+  p.fame = 0;
+  return p;
+};
+// score 85 → 원래 round 3, calling_card 보유 시 round 2
+const d1 = draftPlayer([], 85);
+const d2 = draftPlayer(["calling_card"], 85);
+const r1 = kboDraft(d1);
+const r2 = kboDraft(d2);
+ok(r1.picked && r1.round === 3, `baseline score 85 → round ${r1.round} (expected 3)`);
+ok(r2.picked && r2.round === 2, `calling_card score 85 → round ${r2.round} (expected 2)`);
+// 1라운드 하한
+const d3 = draftPlayer(["calling_card"], 105);
+const r3 = kboDraft(d3);
+ok(r3.picked && r3.round === 1, `calling_card score 105 → round ${r3.round} (1 하한)`);
+// 2군 → 1군 승격 시나리오 (score 60 → 원래 pro2 round 6+, calling_card 로 round 5+, 그래도 pro2 유지)
+// score 60 (pro2 round 6~8) + calling_card → round 5~7. 명함 only -1 이라 1군 승격은 만족 안 됨 (round<=3 필요)
+const d4 = draftPlayer([], 60);
+const r4 = kboDraft(d4);
+ok(r4.stage === "pro2", `baseline score 60 → ${r4.stage}`);
+
+// 11.3 big_game — finalsReward ×1.5
+const big = createPlayer({ name: "B", talent: "contact", traits: ["big_game"] });
+big.fame = 0; big.stage = "pro1";
+big.tournamentHistory = [];
+const changesBig = applyRoundReward(big, "ks", true);
+// baseline ks: baseFame 30, baseStat 4. big_game ×1.5 → fame 45, stat 6.
+const bigFameChange = changesBig.find(c => c.stat === "fame");
+ok(bigFameChange && bigFameChange.delta === 45, `big_game KS 우승 fame ${bigFameChange?.delta} (expected 45 = 30×1.5)`);
+
+const reg = createPlayer({ name: "R", talent: "contact" });
+reg.fame = 0; reg.stage = "pro1"; reg.tournamentHistory = [];
+const changesReg = applyRoundReward(reg, "ks", true);
+const regFameChange = changesReg.find(c => c.stat === "fame");
+ok(regFameChange && regFameChange.delta === 30, `baseline KS 우승 fame ${regFameChange?.delta} (expected 30)`);
+
+// 11.4 mentor_letter — autoTrainDeficitBoost ×1.5 (deficit 가중 곱셈)
+// 직접 검증 어려움 — effectMultiplier 단위 검증만.
+const mentor = createPlayer({ name: "Me", talent: "contact", relics: ["mentor_letter"] });
+ok(effectMultiplier(mentor, "autoTrainDeficitBoost") === 1.5,
+   `mentor_letter autoTrainDeficitBoost = ${effectMultiplier(mentor, "autoTrainDeficitBoost")}`);
+
+// 11.5 stardom + big_game 동시 — applyRoundReward fame 에 양쪽 적용
+//   big_game 곱: ks baseFame 30 → 45
+//   stardom 곱: addFame 내부에서 45 → 67.5 → round 68
+const combo = createPlayer({ name: "C", talent: "contact", traits: ["big_game", "stardom"] });
+combo.fame = 0; combo.stage = "pro1"; combo.tournamentHistory = [];
+const changesCombo = applyRoundReward(combo, "ks", true);
+const comboFameChange = changesCombo.find(c => c.stat === "fame");
+ok(comboFameChange && comboFameChange.delta === 68,
+   `big_game+stardom KS fame ${comboFameChange?.delta} (expected 68 = round(30×1.5×1.5))`);
 
 console.log("\n" + (process.exitCode ? "❌ 일부 실패" : "✅ 전체 통과"));

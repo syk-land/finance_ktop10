@@ -11,7 +11,7 @@
 
 import { state, pushLog, pushToast } from "../state.js";
 import { t } from "../i18n/index.js";
-import { BATTER_STATS, PITCHER_STATS, getPlayerStatCap } from "./player.js";
+import { BATTER_STATS, PITCHER_STATS, getPlayerStatCap, addFame } from "./player.js";
 
 const MILITARY_AGE = 27;
 const MILITARY_SEASONS = 2;
@@ -73,7 +73,7 @@ export function applyMilitaryService(player, optionKey) {
     const after = Math.max(STAT_MIN, Math.min(cap, player.pitcher[s] * opt.statMult));
     player.pitcher[s] = +after.toFixed(1);
   }
-  player.fame = (player.fame ?? 0) + opt.fameDelta;
+  addFame(player, opt.fameDelta);
   if (player.pitcher.mental !== undefined) {
     player.pitcher.mental = Math.min(cap, +(player.pitcher.mental + opt.mentalDelta).toFixed(1));
   }

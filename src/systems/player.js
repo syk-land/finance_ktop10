@@ -138,6 +138,16 @@ function pickStartingFame(traitKeys, relicKeys) {
   return add;
 }
 
+// 명성 가산 헬퍼 — stardom 의 fameGain ×1.5 자동 반영.
+// 양수일 때만 multiplier 적용 (군 입대 등 음수 패널티는 그대로 깎임).
+export function addFame(player, amount) {
+  if (!player || !Number.isFinite(amount) || amount === 0) return 0;
+  const m = amount > 0 ? effectMultiplier(player, "fameGain") : 1;
+  const delta = Math.round(amount * m);
+  player.fame = (player.fame ?? 0) + delta;
+  return delta;
+}
+
 // 다중 재능 boost 합산 (곱연산). 옛 코드의 TALENTS[player.talent].boost 를 대체.
 export function combinedTalentBoost(player) {
   const out = {};
