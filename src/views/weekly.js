@@ -13,7 +13,7 @@ import { getPlayerTeam, standings } from "../systems/league.js";
 import { createFaceSVG } from "../render/avatars.js";
 import { AUTO_PRESETS, autoFillWeek } from "../systems/autoTrain.js";
 import { CATEGORY_KEYS, applyCategoryAndPickEvent, applyEventChoice, getAvailableCategories } from "../systems/offseason.js";
-import { appearanceChance, batterOVR, pitcherOVR } from "../systems/simulator.js";
+import { appearanceChance, batterOVR, pitcherOVR, decideRolesForGame } from "../systems/simulator.js";
 import { createRadarSVG } from "../render/radar.js";
 import { formatGameDate, t, getLocale } from "../i18n/index.js";
 import { getActiveTournaments } from "../data/tournaments.js";
@@ -164,9 +164,15 @@ function buildFinalAnnounce(dialog, final, rerender) {
   desc.textContent = t("weekly.finalAdvanceDesc", { opponent: final.opponent.name });
   dialog.appendChild(desc);
 
-  // 메인 출장 여부 — 코치판단 결과를 boolean 으로 표시 (확률 > 0 이면 출전).
+  // 출전 여부 — 진입 시점에 한 번 굴려서 stash. 이후 시뮬에 그대로 forcedRoles 로 전달.
+  // 1) 투수 출전 굴림 → 출전이면 표시 = "투수"
+  // 2) 미출전이면 player.position 으로 출전 + "투수 미출전" 부가 표시
   const myTeam = getPlayerTeam(state.league);
-  const ch = appearanceChance(state.player, myTeam);
+  if (!final.rolesPreroll) {
+    final.rolesPreroll = decideRolesForGame(state.player, myTeam);
+    saveGame();
+  }
+  const roles = final.rolesPreroll;
   const lineup = document.createElement("div");
   lineup.className = "small";
   lineup.style.margin = "0 0 14px";
@@ -175,19 +181,7 @@ function buildFinalAnnounce(dialog, final, rerender) {
   lineup.style.background = "var(--panel-2)";
   lineup.style.border = "1px solid var(--border)";
   lineup.style.borderRadius = "6px";
-  const onOff = v => (v > 0 ? t("weekly.finalAppearOn") : t("weekly.finalAppearOff"));
-  lineup.innerHTML = t("weekly.finalAppearance", {
-    bat: onOff(ch.bat),
-    pit: onOff(ch.pitch),
-  });
-  // 메인 포지션 한 줄 추가 (Phase 2 Stage 2/3).
-  if (state.player.position) {
-    const posLine = document.createElement("div");
-    posLine.className = "muted small";
-    posLine.style.cssText = "margin-top:4px; font-size:11px;";
-    posLine.textContent = t("position." + state.player.position);
-    lineup.appendChild(posLine);
-  }
+  lineup.appendChild(renderRoleLine(state.player, roles));
   dialog.appendChild(lineup);
 
   const btn = document.createElement("button");
@@ -198,13 +192,36 @@ function buildFinalAnnounce(dialog, final, rerender) {
   btn.style.fontWeight = "700";
   btn.addEventListener("pointerdown", e => {
     e.preventDefault();
-    // 시뮬레이션 실행 + status="playing" 으로 전환
-    final.result = simulateFinal(state.player, state.league, final.opponent);
+    // 미리 굴린 roles 를 시뮬에 전달 — UI 표시와 실제 결과 일치 보장.
+    final.result = simulateFinal(state.player, state.league, final.opponent, final.rolesPreroll);
     final.status = "playing";
     saveGame();
     rerender();
   });
   dialog.appendChild(btn);
+}
+
+// 결승/PO 출전 라인 — roles 에 따라 표시 분기.
+// 투수 등판   → "포지션: 투수"
+// 야수 출전   → "포지션: {player.position} · 투수 미출전"
+// 결장        → "결장"
+function renderRoleLine(player, roles) {
+  const box = document.createElement("div");
+  if (!roles?.bat && !roles?.pitch) {
+    box.textContent = t("weekly.finalRoleAbsent");
+    box.style.fontWeight = "700";
+    return box;
+  }
+  if (roles.pitch) {
+    box.textContent = t("weekly.finalRolePitch");
+    box.style.fontWeight = "700";
+    return box;
+  }
+  // 타자만 — position 라벨 표시
+  const posLabel = player.position ? t("position." + player.position) : "";
+  box.textContent = t("weekly.finalRoleBat", { pos: posLabel });
+  box.style.fontWeight = "700";
+  return box;
 }
 
 // phase 2 — 라이브 진행: 다이아몬드 SVG + 라인 스코어 + 이닝별 점수 라이브 + 메인 이벤트 로그
@@ -2851,10 +2868,12 @@ function openMLBOfferModal(offers, onChoose) {
 function autoRunPostseason(ps) {
   const player = state.player;
   const league = state.league;
+  const myTeam = getPlayerTeam(league);
   let safety = 50;  // 무한 루프 가드
   while (ps && safety-- > 0) {
-    // 한 게임 시뮬레이션
-    const result = simulatePostseasonGame(player, league, ps.opponent, ps.stage);
+    // 매 게임마다 roles 새로 굴림 (수동 모달과 일관)
+    const roles = decideRolesForGame(player, myTeam);
+    const result = simulatePostseasonGame(player, league, ps.opponent, ps.stage, roles);
     if (result?.mainPlayer && (result.mainPlayer.roles?.bat || result.mainPlayer.roles?.pitch)) {
       mergeSeasonStats(player, result.mainPlayer);
       applyGameExperience(player, result.mainPlayer);
@@ -2926,9 +2945,9 @@ function showPostseasonModalIfNeeded(route) {
   dialog.style.maxWidth = "360px";
 
   // 시리즈의 다음 게임 시뮬레이션 + status="playing" 으로 전환.
-  // 시즌 통계 누적도 같이 처리.
+  // 시즌 통계 누적도 같이 처리. 진입 시 미리 굴린 ps.rolesPreroll 를 시뮬에 전달.
   function playNextSeriesGame(ps) {
-    ps.result = simulatePostseasonGame(state.player, state.league, ps.opponent, ps.stage);
+    ps.result = simulatePostseasonGame(state.player, state.league, ps.opponent, ps.stage, ps.rolesPreroll);
     if (ps.result?.mainPlayer && (ps.result.mainPlayer.roles?.bat || ps.result.mainPlayer.roles?.pitch)) {
       mergeSeasonStats(state.player, ps.result.mainPlayer);
       applyGameExperience(state.player, ps.result.mainPlayer);
@@ -2957,6 +2976,15 @@ function showPostseasonModalIfNeeded(route) {
         : t("postseason.singleGame");
       desc.innerHTML = `${t("postseason.announceDesc", { opponent: ps.opponent.name })}<br>${lengthLabel}`;
       dialog.appendChild(desc);
+
+      // 다음 게임 출전 굴림 — 매 게임마다 새로 (휴식일수/컨디션 반영).
+      const myTeam = getPlayerTeam(state.league);
+      ps.rolesPreroll = decideRolesForGame(state.player, myTeam);
+      const roleBox = document.createElement("div");
+      roleBox.className = "small";
+      roleBox.style.cssText = "margin:0 0 12px; padding:6px 10px; background:var(--panel-2); border:1px solid var(--border); border-radius:6px; line-height:1.5;";
+      roleBox.appendChild(renderRoleLine(state.player, ps.rolesPreroll));
+      dialog.appendChild(roleBox);
 
       // 지난 라운드 누적 결과
       if (ps.completedRounds && ps.completedRounds.length > 0) {

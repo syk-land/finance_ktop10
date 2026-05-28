@@ -152,8 +152,9 @@ function makeOpponentForRound(myStrength, round, stage) {
   };
 }
 
-// 라운드 단판 시뮬레이션
-export function simulatePostseasonGame(player, league, opponent, stage) {
+// 라운드 단판 시뮬레이션.
+// forcedRoles 가 주어지면 진입 모달에서 미리 굴린 결과 그대로 사용.
+export function simulatePostseasonGame(player, league, opponent, stage, forcedRoles = null) {
   const myTeam = getPlayerTeam(league);
   if (!myTeam) return null;
   const seriesStage = (stage === "pro1") ? "pro1_final" : "mlb_final";
@@ -165,7 +166,7 @@ export function simulatePostseasonGame(player, league, opponent, stage) {
     gamesPerWeek: 1,
   };
   const gameDef = { home: myTeam.id, away: opponent.id };
-  return simulateGame(tempLeague, gameDef, player);
+  return simulateGame(tempLeague, gameDef, player, { forcedRoles });
 }
 
 // 포스트시즌 종료 시 player.tournamentHistory 에 한 줄 push.

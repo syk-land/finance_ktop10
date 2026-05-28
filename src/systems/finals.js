@@ -135,8 +135,9 @@ function pushTournamentRecord(player, tournamentKey, result, mvp) {
   }
 }
 
-// 결승전 9이닝 시뮬레이션
-export function simulateFinal(player, league, opponent) {
+// 결승전 9이닝 시뮬레이션.
+// forcedRoles 가 주어지면 진입 모달에서 미리 굴린 결과 그대로 사용 (UI 표시와 일치 보장).
+export function simulateFinal(player, league, opponent, forcedRoles = null) {
   const myTeam = getPlayerTeam(league);
   if (!myTeam) return null;
 
@@ -152,7 +153,7 @@ export function simulateFinal(player, league, opponent) {
     gamesPerWeek: 1,
   };
   const gameDef = { home: myTeam.id, away: opponent.id };
-  return simulateGame(finalLeague, gameDef, player);
+  return simulateGame(finalLeague, gameDef, player, { forcedRoles });
 }
 
 // 메인 결승 성적 → 보상 배율 (0.3~1.0).

@@ -180,14 +180,17 @@ function makeRunner(batter) {
 }
 
 // 한 경기 전체 시뮬레이션
-// 양방향 선수: 부상 아니면 매 경기 타자로 라인업 + 선발 투수로 등판
-export function simulateGame(league, gameDef, mainPlayer) {
+// 양방향 선수: 부상 아니면 매 경기 타자로 라인업 + 선발 투수로 등판.
+// opts.forcedRoles 가 주어지면 그대로 사용 (결승/PO 진입 모달에서 미리 굴린 결과 전달용).
+export function simulateGame(league, gameDef, mainPlayer, opts = {}) {
   const home = getTeamById(league, gameDef.home);
   const away = getTeamById(league, gameDef.away);
 
   const playerTeam = mainPlayer && (home.isPlayerTeam ? home : away.isPlayerTeam ? away : null);
   const mainTeamSide = playerTeam === home ? "home" : (playerTeam === away ? "away" : null);
-  const roles = mainPlayer && playerTeam ? decideRolesForGame(mainPlayer, playerTeam) : { bat: false, pitch: false };
+  const roles = opts.forcedRoles
+    ? { bat: !!opts.forcedRoles.bat, pitch: !!opts.forcedRoles.pitch }
+    : (mainPlayer && playerTeam ? decideRolesForGame(mainPlayer, playerTeam) : { bat: false, pitch: false });
 
   const homeBuilt = buildLineup(home, playerTeam === home && roles.bat ? mainPlayer : null);
   const awayBuilt = buildLineup(away, playerTeam === away && roles.bat ? mainPlayer : null);
@@ -418,7 +421,7 @@ export function appearanceChance(player, team = null) {
   return { bat: 1, pitch: pitcherChanceByRest(restGames) * judgment };
 }
 
-function decideRolesForGame(player, team) {
+export function decideRolesForGame(player, team) {
   if (player.injury) return { bat: false, pitch: false };
   const restGames = player.gamesSinceLastPitch ?? 99;
   const restChance = pitcherChanceByRest(restGames);
