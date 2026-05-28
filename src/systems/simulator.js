@@ -5,6 +5,7 @@
 import { getTeamById } from "./league.js";
 import { npcOverall } from "./npc.js";
 import { getEffectiveBatter, getEffectivePitcher, BATTER_STATS, PITCHER_STATS, emptyStats, MAIN_INJURY_LUCK } from "./player.js";
+import { effectMultiplier, effectAdd } from "./traitEffects.js";
 
 // HBP 부상 — 실제 야구에서 사구로 부상 가는 비율은 매우 낮음(<<1% per HBP).
 // 게임은 박진감을 위해 5% 베이스, 단 주인공은 MAIN_INJURY_LUCK(0.4x) 적용해 실효 2%.
@@ -67,7 +68,11 @@ function getStageRule(stage) {
 //   상황 분기:   E(실책 출루), DP(병살), SF(희생플라이) — OUT 의 변형
 //   이닝 페이즈: SB(도루 성공), CS(도루 실패) — 타석과 무관, 베이스 주자 액션
 // type 키만 반환. 표시용 라벨은 UI 에서 i18n 의 event.<type> 로 조회.
-function simulateAtBat(batter, pitcher) {
+// opts.walkoffMult / opts.walkoffAddPct: 9회+ home bottom + 메인 batter 시 inPlayHitChance 부스트.
+//   - walkoffMult: 곱연산 (clutch trait ×2)
+//   - walkoffAddPct: %p 가산 (lucky_bat relic +5%p)
+function simulateAtBat(batter, pitcher, opts = {}) {
+  const { walkoffMult = 1, walkoffAddPct = 0 } = opts;
   const b = batter;
   const p = pitcher;
   const contact = b.contact ?? 50;
@@ -100,7 +105,11 @@ function simulateAtBat(batter, pitcher) {
   if (r < kChance + bbChance) return { type: "BB" };
   if (r < kChance + bbChance + hbpChance) return { type: "HBP" };
 
-  const inPlayHitChance = clamp(30 + contactDiff * 0.24, 20, 52);
+  // 끝내기 부스트 — clutch ×2 (multiplier) + lucky_bat +5%p (flat). 9회+ 메인 home batter 한정.
+  let inPlayHitChance = clamp(30 + contactDiff * 0.24, 20, 52);
+  if (walkoffMult !== 1 || walkoffAddPct !== 0) {
+    inPlayHitChance = clamp(inPlayHitChance * walkoffMult + walkoffAddPct, 20, 95);
+  }
   const r2 = Math.random() * 100;
   if (r2 < inPlayHitChance) {
     const r3 = Math.random() * 100;
@@ -118,13 +127,15 @@ function simulateAtBat(batter, pitcher) {
 
 // OUT 을 상황별로 분기 — E(실책) / SF(희생플라이) / DP(병살) / OUT(범타) 중 하나로.
 // outs: 현재 이닝 아웃수, defenseRating: 수비팀 평균 defense
-function classifyOut(batter, bases, outs, defenseRating) {
+// opts.errorMult: 실책 확률 곱셈 (메인이 수비 측이고 golden_glove relic 보유 시 0.5).
+function classifyOut(batter, bases, outs, defenseRating, opts = {}) {
+  const { errorMult = 1 } = opts;
   const contact = batter.contact ?? 50;
   const power   = batter.power ?? 50;
   const speed   = batter.speed ?? 50;
 
   // 실책 출루(E) — 수비 낮을수록 + 컨택 높을수록 (강한 타구). 베이스라인 ~1.5%.
-  const eChance = clamp((contact - defenseRating) * 0.08 + 1.5, 0.3, 7);
+  const eChance = clamp(((contact - defenseRating) * 0.08 + 1.5) * errorMult, 0.1, 7);
   if (Math.random() * 100 < eChance) return "E";
 
   // 희생플라이(SF) — 3루 주자 + <2아웃 + 파워(타구 깊이) 영향
@@ -173,6 +184,7 @@ export function simulateGame(league, gameDef, mainPlayer) {
   const away = getTeamById(league, gameDef.away);
 
   const playerTeam = mainPlayer && (home.isPlayerTeam ? home : away.isPlayerTeam ? away : null);
+  const mainTeamSide = playerTeam === home ? "home" : (playerTeam === away ? "away" : null);
   const roles = mainPlayer && playerTeam ? decideRolesForGame(mainPlayer, playerTeam) : { bat: false, pitch: false };
 
   const homeLineup = buildLineup(home, playerTeam === home && roles.bat ? mainPlayer : null);
@@ -215,7 +227,8 @@ export function simulateGame(league, gameDef, mainPlayer) {
       const b = awayLineup[awayBatterIdx % awayLineup.length];
       awayBatterIdx++;
       return b;
-    }, inning, [...initialBases], homeDefense, "home", () => ({ home: homeScore, away: awayScore }));
+    }, inning, [...initialBases], homeDefense, "home", () => ({ home: homeScore, away: awayScore }),
+       mainTeamSide, mainPlayer, rule);
     awayScore += awayRuns;
     awayInnings.push(awayRuns);
     recordLead(leadHistory, inning, homeScore, awayScore, homeMound, awayMound);
@@ -231,7 +244,8 @@ export function simulateGame(league, gameDef, mainPlayer) {
       const b = homeLineup[homeBatterIdx % homeLineup.length];
       homeBatterIdx++;
       return b;
-    }, inning, [...initialBases], awayDefense, "away", () => ({ home: homeScore, away: awayScore }));
+    }, inning, [...initialBases], awayDefense, "away", () => ({ home: homeScore, away: awayScore }),
+       mainTeamSide, mainPlayer, rule);
     const homeScoreBeforeBottom = homeScore;
     homeScore += homeRuns;
     homeInnings.push(homeRuns);
@@ -548,7 +562,8 @@ function tryReplace(mound, inning, leadDiff, isWinning, trigger, events) {
 }
 
 function playHalfInning(battingLineup, mound, myBox, myPbox, events, nextBatter,
-                       inning, initialBases, defenseRating, defSide, getScores) {
+                       inning, initialBases, defenseRating, defSide, getScores,
+                       mainTeamSide = null, mainPlayer = null, rule = null) {
   let outs = 0;
   let runs = 0;
   let bases = initialBases ? [...initialBases] : [null, null, null];
@@ -589,9 +604,22 @@ function playHalfInning(battingLineup, mound, myBox, myPbox, events, nextBatter,
     const isMainBat = batter.isMain;
     const bStats = batter.batter ?? batter;
 
-    const raw = simulateAtBat(bStats, pStats);
+    // 회귀 효과 wiring:
+    // - walkoff: 메인 batter + 9회+ + home bottom (defSide === "away") 시 inPlayHitChance 부스트.
+    // - error:   메인 수비측 (defSide === mainTeamSide) 시 errorChance 감쇄.
+    let walkoffMult = 1, walkoffAddPct = 0;
+    if (isMainBat && mainPlayer && rule && inning >= rule.regulation && defSide === "away") {
+      walkoffMult = effectMultiplier(mainPlayer, "walkoffChance");
+      walkoffAddPct = effectAdd(mainPlayer, "walkoffChance", "flatAddPct");
+    }
+    let errorMult = 1;
+    if (mainPlayer && mainTeamSide && defSide === mainTeamSide) {
+      errorMult = effectMultiplier(mainPlayer, "errorChance");
+    }
+
+    const raw = simulateAtBat(bStats, pStats, { walkoffMult, walkoffAddPct });
     const resolvedType = raw.type === "OUT"
-      ? classifyOut(bStats, bases, outs, defenseRating)
+      ? classifyOut(bStats, bases, outs, defenseRating, { errorMult })
       : raw.type;
 
     // 만루 여부 — 만루 홈런 검출용. applyResult 호출 전 캡처.
