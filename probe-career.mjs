@@ -20,8 +20,10 @@ const { autoFillWeek } = await import("./src/systems/autoTrain.js");
 const { startHighSchoolCareer, transitionAfterSeason, transitionToStage, eligibleCareerPaths, compositeScore, kboDraft, determineMLBStartStage } = await import("./src/systems/career.js");
 const { checkPostseasonAdvance, simulatePostseasonGame, applyRoundReward, advanceToNextRound, pushPostseasonRecord } = await import("./src/systems/postseason.js");
 const { overallScore } = await import("./src/systems/player.js");
-const { resetGameDateForNewSeason } = await import("./src/systems/tick.js");
+const { resetGameDateForNewSeason, advanceDate } = await import("./src/systems/tick.js");
 const { getTeamPool } = await import("./src/data/teams.js");
+const { checkFreeAgency, maybeTradeOffer, applyFreeAgencyDecision } = await import("./src/systems/career.js");
+const { checkMilitaryTrigger } = await import("./src/systems/military.js");
 
 setLocale("ko");
 
@@ -58,6 +60,70 @@ const peakStats = {
   batter:  { contact: 0, power: 0, eye: 0, speed: 0, defense: 0 },
   pitcher: { velocity: 0, control: 0, breaking: 0, stamina: 0, mental: 0 },
 };
+
+// ─── 이벤트 발화 카운터 ────────────────────────────────────────
+const eventCounter = {
+  finalsAdvanced: 0,      // 토너먼트 결승 진출 (pendingFinal set)
+  postseasonAdvanced: 0,  // PO 진출 (pendingPostseason set)
+  all_star: 0,
+  wbc: 0,
+  olympics: 0,
+  asian_games: 0,
+  premier12: 0,
+  faOffered: 0,           // FA 자격 발생 (yearsLeft===0)
+  tradeOffered: 0,        // 트레이드 제안 (8% 굴림 성공)
+  militaryEntered: 0,     // 군 입대 trigger
+};
+const eventLog = [];      // [year-stage-key 발생 시점 누적]
+const fameTrack = [];     // 시즌별 fame trajectory
+
+// 시즌 끝에 호출 — pendingFinal / pendingEvents / FA / 트레이드 / 군 입대 카운트 + 큐 정리.
+function captureSeasonEvents(yearLabel) {
+  // 1) pendingEvents 큐 (시즌 중 + 비시즌 국제대회 모두)
+  if (state.pendingEvents) {
+    for (const ev of state.pendingEvents) {
+      if (eventCounter[ev.key] !== undefined) {
+        eventCounter[ev.key]++;
+        eventLog.push(`${yearLabel} ${ev.key}`);
+      }
+    }
+    state.pendingEvents.length = 0;
+  }
+  // 2) 결승 진출
+  if (state.pendingFinal) {
+    eventCounter.finalsAdvanced++;
+    eventLog.push(`${yearLabel} finals(${state.pendingFinal.tournamentKey})`);
+    state.pendingFinal = null;
+  }
+  // 3) PO 진출 (probe 가 별도 처리하지만 카운트만)
+  if (state.pendingPostseason) {
+    eventCounter.postseasonAdvanced++;
+    // pendingPostseason 은 probe 의 시즌 루프 안에서 직접 처리 — 여기선 비우지 않음
+  }
+  // 4) FA / 트레이드 — checkFreeAgency / maybeTradeOffer 직접 호출.
+  //    probe 가 모달 처리 안 하므로 FA 발화 후 자동 stay 처리 (yearsLeft 4 재설정) — 다음 4년 후 다시 FA 가능.
+  const fa = checkFreeAgency(state.player);
+  if (fa) {
+    eventCounter.faOffered++;
+    eventLog.push(`${yearLabel} FA`);
+    applyFreeAgencyDecision(state.player, "stay");
+  } else if (maybeTradeOffer(state.player)) {
+    eventCounter.tradeOffered++;
+    eventLog.push(`${yearLabel} trade`);
+  }
+  // 5) 군 입대 trigger — 만 27세 도달 첫 시즌만 카운트.
+  //    probe 가 입대 모달 처리 안 하므로 첫 발화 후 militaryExempt 임시 설정 (반복 검출 차단).
+  if (!state.player.militaryExempt && !state.player._probeMilDone) {
+    const mil = checkMilitaryTrigger(state.player);
+    if (mil) {
+      eventCounter.militaryEntered++;
+      eventLog.push(`${yearLabel} military`);
+      state.player._probeMilDone = true;
+    }
+  }
+  // 6) fame trajectory 기록 (시즌별 최대치).
+  fameTrack.push({ label: yearLabel, fame: state.player.fame ?? 0 });
+}
 function updatePeak() {
   for (const k in peakStats.batter)  peakStats.batter[k]  = Math.max(peakStats.batter[k],  state.player.batter[k]);
   for (const k in peakStats.pitcher) peakStats.pitcher[k] = Math.max(peakStats.pitcher[k], state.player.pitcher[k]);
@@ -70,11 +136,13 @@ function runOneSeason(stage) {
   for (let w = 0; w < weeks; w++) {
     if (state.player.injury) injuredWeeks++;
     autoFillWeek("balanced");
-    const res = endWeek();
-    if (res?.ok) {
-      // 한 주 평균 1~3게임. 메인 출장만 카운트.
-      totalGames = state.player.seasonStats.games ?? 0;
+    // 한 주 = 7일 캘린더 진행 (tick.js 의 advanceOneDay 우회). endWeek 의 checkScheduledEvents 가
+    // 이 시점의 gameDate.month/day 로 trigger 검사하므로 advance 가 endWeek 보다 *먼저* 일어나야 함.
+    if (state.gameDate) {
+      for (let d = 0; d < 7; d++) advanceDate(state.gameDate);
     }
+    const res = endWeek();
+    if (res?.ok) totalGames = state.player.seasonStats.games ?? 0;
     if (state.season.finished) break;
   }
   updatePeak();
@@ -109,6 +177,7 @@ console.log("\n┌─ 고교 3년 ───────────────�
 for (let yr = 1; yr <= 3; yr++) {
   const r = runOneSeason("high");
   summarize(`고교 ${yr}학년`, state.player);
+  captureSeasonEvents(`high-${yr}`);
   seasonReports.push({ stage: "high", year: yr, stats: fmtStats(state.player), ovr: overallScore(state.player), injuredWeeks: r.injuredWeeks });
   advanceToNextSeason();
   const tr = transitionAfterSeason();
@@ -133,6 +202,7 @@ if (draft.picked) {
     state.player.seasonStats = emptyStats();
     const r = runOneSeason("univ");
     summarize(`대학 ${yr}학년`, state.player);
+    captureSeasonEvents(`univ-${yr}`);
     seasonReports.push({ stage: "univ", year: yr, stats: fmtStats(state.player), ovr: overallScore(state.player) });
     advanceToNextSeason();
     const tr = transitionAfterSeason();
@@ -168,6 +238,8 @@ while (state.player.age < 39 && proSeasons < 20) {
   // 포스트시즌 진출 굴림
   const ps = checkPostseasonAdvance(state.player, state.league);
   if (ps) {
+    eventCounter.postseasonAdvanced++;
+    eventLog.push(`${state.player.stage}-${state.player.age} PO`);
     let currentPs = ps;
     let stillAlive = true;
     while (stillAlive) {
@@ -191,6 +263,7 @@ while (state.player.age < 39 && proSeasons < 20) {
     console.log(`  └─ PO: ${currentPs.completedRounds.map(r => r.round + (r.won?"W":"L")).join(" → ")}`);
   }
 
+  captureSeasonEvents(`${state.player.stage}-${state.player.age}`);
   proSeasons++;
   advanceToNextSeason();
   const tr = transitionAfterSeason();
@@ -255,3 +328,47 @@ if (proSeasonSamples.length > 0) {
 
 const milYears = (state.player.careerHistory ?? []).filter(h => h.stage === "military").length;
 console.log(`군 입대: ${milYears > 0 ? `${milYears}시즌 복무` : "면제 또는 미해당"}`);
+
+// ─── 이벤트 발화 빈도 ───────────────────────────────────────
+console.log("\n┌─ 시즌별 이벤트 발화 빈도 (22+ 시즌 누적) ─────────────");
+const totalSeasons = seasonReports.length;
+console.log(`총 시뮬 시즌: ${totalSeasons}`);
+console.log("");
+console.log(`  결승 진출 (토너먼트)     : ${eventCounter.finalsAdvanced} 회`);
+console.log(`  포스트시즌 진출          : ${eventCounter.postseasonAdvanced} 회`);
+console.log(`  올스타전                 : ${eventCounter.all_star} 회 (KBO/MLB 진입 후 매년 가능, fame 50+)`);
+console.log(`  WBC (4년 주기, year%4==2): ${eventCounter.wbc} 회`);
+console.log(`  올림픽 (4년, year%4==0)  : ${eventCounter.olympics} 회`);
+console.log(`  아시안게임 (4년, %4==2)  : ${eventCounter.asian_games} 회`);
+console.log(`  프리미어12 (4년, %4==3)  : ${eventCounter.premier12} 회`);
+console.log(`  FA 자격 발생             : ${eventCounter.faOffered} 회 (계약 4년 만료마다)`);
+console.log(`  트레이드 제안 (8%)       : ${eventCounter.tradeOffered} 회`);
+console.log(`  군 입대 trigger          : ${eventCounter.militaryEntered} 회`);
+
+// 의도된 빈도 (대략): 22 프로 시즌 + 명성 50+ 가정
+console.log("\n┌─ 의도된 발화 빈도 vs 실제 ───────────────────────────");
+const wbcExpected = Math.floor(proSeasons / 4) + (proSeasons >= 1 ? 1 : 0);
+const olyExpected = Math.floor(proSeasons / 4);
+const agExpected  = Math.floor(proSeasons / 4);
+const p12Expected = Math.floor(proSeasons / 4);
+const faExpected  = Math.floor(proSeasons / 4);  // 4년 마다
+console.log(`  WBC          : 실제 ${eventCounter.wbc} / 기대 ~${wbcExpected} (4년 주기)`);
+console.log(`  올림픽       : 실제 ${eventCounter.olympics} / 기대 ~${olyExpected}`);
+console.log(`  아시안게임   : 실제 ${eventCounter.asian_games} / 기대 ~${agExpected}`);
+console.log(`  프리미어12   : 실제 ${eventCounter.premier12} / 기대 ~${p12Expected} ${eventCounter.premier12 >= p12Expected/2 ? "✓ 개선 OK" : "⚠ 부족"}`);
+console.log(`  FA           : 실제 ${eventCounter.faOffered} / 기대 ~${faExpected} (4년 계약 만료)`);
+
+if (eventLog.length > 0) {
+  console.log("\n┌─ 발생 시점 로그 (시간순) ─────────────────────────────");
+  for (const e of eventLog) console.log(`  ${e}`);
+}
+
+// fame trajectory — 올림픽(70+) / 아시안게임(50+) / 올스타(50+) fame 임계 충족 여부.
+if (fameTrack.length > 0) {
+  const maxFame = Math.max(...fameTrack.map(f => f.fame));
+  console.log(`\n┌─ Fame 추이 (이벤트 임계: 올스타/AG/P12 50+, WBC 60+, 올림픽 70+) ─`);
+  console.log(`  최대 fame: ${maxFame}`);
+  const samples = fameTrack.filter((_, i) => i % 3 === 0 || i === fameTrack.length - 1);
+  for (const f of samples) console.log(`  ${f.label.padEnd(15)} fame=${f.fame}`);
+  console.log(`  fame 50+ 시즌: ${fameTrack.filter(f => f.fame >= 50).length} / 60+ : ${fameTrack.filter(f => f.fame >= 60).length} / 70+ : ${fameTrack.filter(f => f.fame >= 70).length}`);
+}

@@ -39,7 +39,7 @@ export function resetGameDateForNewSeason(d) {
 // 날짜 포맷은 i18n/index.js 의 formatGameDate 로 이동. 호환을 위해 재수출.
 export { formatGameDate } from "../i18n/index.js";
 
-function advanceDate(d) {
+export function advanceDate(d) {
   d.day += 1;
   d.dayOfWeek = (d.dayOfWeek + 1) % DAYS_PER_WEEK;
   d.dayOfMonth += 1;
