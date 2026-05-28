@@ -31,7 +31,8 @@ const {
   consumeLoadoutForCharacter, resetRegressionMeta,
 } = await import("./src/systems/regression.js");
 const { capBonusForStage } = await import("./src/data/shopCatalog.js");
-const { createPlayer, combinedTalentBoost, getPlayerStatCap } = await import("./src/systems/player.js");
+const { createPlayer, combinedTalentBoost, getPlayerStatCap, applyTraining, applyRest, ageUp } = await import("./src/systems/player.js");
+const { effectMultiplier, effectAdd, hasTraitFlag } = await import("./src/systems/traitEffects.js");
 
 function section(t) {
   console.log("\n" + "=".repeat(60));
@@ -270,5 +271,99 @@ ok(snap.relics.length === 1 && snap.relics[0] === "lucky_bat", `snapshot.relics 
 ok(state.regression.loadout.startingStat === null, "consume 후 loadout.startingStat 리셋");
 ok(state.regression.loadout.traits.length === 0, "consume 후 loadout.traits 리셋");
 ok(state.regression.loadout.relics.length === 0, "consume 후 loadout.relics 리셋");
+
+// ── 10. 특성/유물 효과 wiring (P4a) ─────────────────────────
+section("10. 특성/유물 효과 wiring (P4a)");
+
+// 10.1 startingFame (legend_heir)
+const legend = createPlayer({ name: "L", talent: "contact", traits: ["legend_heir"] });
+ok(legend.fame === 50, `legend_heir 시작 fame = ${legend.fame} (expected 50)`);
+const noLegend = createPlayer({ name: "N", talent: "contact" });
+ok(noLegend.fame === 0, `noLegend 시작 fame = 0`);
+
+// 10.2 effectMultiplier — injuryChance ×0.5
+const steel = createPlayer({ name: "S", talent: "contact", traits: ["steel_mental"] });
+ok(effectMultiplier(steel, "injuryChance") === 0.5, `steel_mental injuryChance multiplier = ${effectMultiplier(steel, "injuryChance")}`);
+ok(effectMultiplier(noLegend, "injuryChance") === 1, `noTrait injuryChance multiplier = 1`);
+
+// 10.3 hasTraitFlag — tjsBlock
+const iron = createPlayer({ name: "I", talent: "fireball", traits: ["iron_arm"] });
+ok(hasTraitFlag(iron, "tjsBlock") === true, "iron_arm hasTraitFlag(tjsBlock) = true");
+ok(hasTraitFlag(noLegend, "tjsBlock") === false, "noTrait tjsBlock = false");
+
+// 10.4 effectAdd — agingDelay years
+const prime = createPlayer({ name: "P", talent: "contact", traits: ["prime_extend"] });
+ok(effectAdd(prime, "agingDelay", "years") === 3, `prime_extend agingDelay = ${effectAdd(prime, "agingDelay", "years")}`);
+// ageUp 시뮬 — prime 보유자는 30+3=33 세부터 노화 시작
+const primeAged = createPlayer({ name: "PA", talent: "contact", traits: ["prime_extend"] });
+primeAged.age = 31;  // ageUp 후 32 → 30+3=33 미만이라 변화 없음
+const beforeStat = JSON.stringify(primeAged.batter);
+for (let i = 0; i < 100; i++) {  // 1회 ageUp 만으로는 random 통과해도 변화 없음
+  // 더 강한 검증: age 32 시점에서 ageUp 호출 → age 33 → 33 + 0 (delay 미적용 기준) ~ 33+3 (적용)
+}
+// 직접 검증: prime_extend 캐릭터의 age 32→33 ageUp 결과 stat 감쇄 분포
+const trials = 200;
+let primeDecays = 0, normalDecays = 0;
+for (let i = 0; i < trials; i++) {
+  const a = createPlayer({ name: "a", talent: "contact", traits: ["prime_extend"] });
+  a.age = 32; a.grade = 18;
+  const before = a.batter.contact;
+  ageUp(a);  // age 33 — prime delay 적용 시 30+3=33 임계 진입, declineChance 0.10 만
+  if (a.batter.contact < before) primeDecays++;
+  const b = createPlayer({ name: "b", talent: "contact" });
+  b.age = 32; b.grade = 18;
+  const before2 = b.batter.contact;
+  ageUp(b);  // age 33 — 33 임계, declineChance 0.30
+  if (b.batter.contact < before2) normalDecays++;
+}
+ok(primeDecays < normalDecays, `age 32→33 ageUp: prime decay ${primeDecays}/${trials} < normal ${normalDecays}/${trials} (prime_extend delay)`);
+
+// 10.5 effectMultiplier — injuryRecoverySpeed ×2
+const prosth = createPlayer({ name: "Pr", talent: "contact", relics: ["prosthetic"] });
+ok(effectMultiplier(prosth, "injuryRecoverySpeed") === 2, `prosthetic injuryRecoverySpeed = ${effectMultiplier(prosth, "injuryRecoverySpeed")}`);
+prosth.injury = { severity: "moderate", bodyPart: "wrist", weeksLeft: 4, surgery: false, aftereffect: null };
+applyRest(prosth);
+ok(prosth.injury && Math.abs(prosth.injury.weeksLeft - 3.6) < 0.001, `applyRest 후 weeksLeft ${prosth.injury?.weeksLeft} (4 - 0.2×2 = 3.6 기대)`);
+
+const noRelic = createPlayer({ name: "NR", talent: "contact" });
+noRelic.injury = { severity: "moderate", bodyPart: "wrist", weeksLeft: 4, surgery: false, aftereffect: null };
+applyRest(noRelic);
+ok(noRelic.injury && Math.abs(noRelic.injury.weeksLeft - 3.8) < 0.001, `noRelic applyRest 후 weeksLeft ${noRelic.injury?.weeksLeft} (4 - 0.2 = 3.8 기대)`);
+
+// 10.6 firstSeasonTrainBoost — learner ×2
+// stage="high", grade=1, careerHistory=[] 면 첫 시즌 부스트 적용.
+// applyTraining 결과를 분포로 비교 — boosted vs no.
+let learnerSum = 0, normalSum = 0;
+for (let i = 0; i < 200; i++) {
+  const l = createPlayer({ name: "l", talent: "contact", traits: ["learner"] });
+  const r = applyTraining(l, "batting");
+  if (r.ok) learnerSum += (r.gained.contact ?? 0) + (r.gained.power ?? 0);
+  const n = createPlayer({ name: "n", talent: "contact" });
+  const r2 = applyTraining(n, "batting");
+  if (r2.ok) normalSum += (r2.gained.contact ?? 0) + (r2.gained.power ?? 0);
+}
+ok(learnerSum > normalSum * 1.5, `learner 첫시즌 boost: learner sum ${learnerSum.toFixed(1)} > normal ${normalSum.toFixed(1)} × 1.5 (×2 기대)`);
+
+// 첫 시즌 아닐 때 — grade=2 면 boost 미적용
+const learnerOld = createPlayer({ name: "lo", talent: "contact", traits: ["learner"] });
+learnerOld.grade = 2;  // 이제 첫 시즌 아님
+let oldSum = 0, oldNormalSum = 0;
+for (let i = 0; i < 200; i++) {
+  const l = createPlayer({ name: "l", talent: "contact", traits: ["learner"] });
+  l.grade = 2;
+  const r = applyTraining(l, "batting");
+  if (r.ok) oldSum += (r.gained.contact ?? 0) + (r.gained.power ?? 0);
+  const n = createPlayer({ name: "n", talent: "contact" });
+  n.grade = 2;
+  const r2 = applyTraining(n, "batting");
+  if (r2.ok) oldNormalSum += (r2.gained.contact ?? 0) + (r2.gained.power ?? 0);
+}
+// 첫 시즌 아니면 learner boost 미적용 → 두 합계가 비슷해야 함 (±20% 내).
+const ratio = oldSum / (oldNormalSum || 1);
+ok(ratio > 0.8 && ratio < 1.3, `learner grade=2 일 때 boost 비활성 — ratio ${ratio.toFixed(2)} (0.8~1.3 기대)`);
+
+// 10.7 multi-effect 합산 — past_life_notes + learner 동시 보유 → firstSeasonTrainBoost ×2 × ×2 = ×4
+const multiBoost = createPlayer({ name: "M", talent: "contact", traits: ["learner"], relics: ["past_life_notes"] });
+ok(effectMultiplier(multiBoost, "firstSeasonTrainBoost") === 4, `learner+past_life_notes firstSeasonTrainBoost = ${effectMultiplier(multiBoost, "firstSeasonTrainBoost")} (expected 4)`);
 
 console.log("\n" + (process.exitCode ? "❌ 일부 실패" : "✅ 전체 통과"));

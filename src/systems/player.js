@@ -6,7 +6,8 @@
 
 import { pushLog, state } from "../state.js";
 import { t } from "../i18n/index.js";
-import { capBonusForStage, STARTING_STAT_PRESETS } from "../data/shopCatalog.js";
+import { capBonusForStage, STARTING_STAT_PRESETS, TRAITS as REGRESSION_TRAITS, RELICS as REGRESSION_RELICS } from "../data/shopCatalog.js";
+import { effectMultiplier, effectAdd, hasTraitFlag } from "./traitEffects.js";
 
 export const BATTER_STATS = ["contact", "power", "eye", "speed", "defense"];
 export const PITCHER_STATS = ["velocity", "control", "breaking", "stamina", "mental"];
@@ -87,10 +88,13 @@ export function createPlayer({
       if (pitcher[stat] !== undefined) pitcher[stat] += v;
     }
   }
+  const traitList = Array.isArray(traits) ? [...traits] : [];
+  const relicList = Array.isArray(relics) ? [...relics] : [];
+
   return {
     name,
-    talent: talentList[0],   // 호환용: 옛 코드의 player.talent (단일) 참조 유지.
-    talents: talentList,     // 신규: 다중 재능 — combinedTalentBoost / applyTraining 이 참조.
+    talent: talentList[0],
+    talents: talentList,
     hand,
     faceId,
     age: 16,
@@ -105,18 +109,33 @@ export function createPlayer({
     conditionTrend: 0,
     injury: null,
     gamesSinceLastPitch: 99,
-    fame: 0,
+    // legend_heir / startingFame add — 합산
+    fame: pickStartingFame(traitList, relicList),
     money: 0,
     contract: null,
     careerHistory: [],
     seasonStats: emptyStats(),
     careerStats: emptyStats(),
     awards: [],
-    // 회귀 로드아웃 — 효과 wiring 은 P4. 일단 attach 만.
     startingStat: startingStat ?? null,
-    traits: Array.isArray(traits) ? [...traits] : [],
-    relics: Array.isArray(relics) ? [...relics] : [],
+    traits: traitList,
+    relics: relicList,
   };
+}
+
+// createPlayer 진입 시점에는 player 가 아직 없어 effectAdd 못 부른다.
+// traits/relics 키 목록만으로 startingFame add 합산.
+function pickStartingFame(traitKeys, relicKeys) {
+  let add = 0;
+  for (const k of traitKeys ?? []) {
+    const e = REGRESSION_TRAITS[k]?.effect;
+    if (e?.kind === "startingFame" && typeof e.add === "number") add += e.add;
+  }
+  for (const k of relicKeys ?? []) {
+    const e = REGRESSION_RELICS[k]?.effect;
+    if (e?.kind === "startingFame" && typeof e.add === "number") add += e.add;
+  }
+  return add;
 }
 
 // 다중 재능 boost 합산 (곱연산). 옛 코드의 TALENTS[player.talent].boost 를 대체.
@@ -190,6 +209,14 @@ export const STAT_CAP = 150;
 // 훈련은 prelim risk(0.002~0.012)이 매우 작으므로 0.4x 곱해도 체감 차이는 적음.
 export const MAIN_INJURY_LUCK = 0.4;
 
+// 첫 시즌 여부 — learner / past_life_notes 의 firstSeasonTrainBoost 적용 조건.
+// HS 1학년 (age === 16, grade === 1, stage === "high", careerHistory 비어있음) 동안만.
+function isFirstSeason(player) {
+  return player.stage === "high"
+      && player.grade === 1
+      && (player.careerHistory?.length ?? 0) === 0;
+}
+
 // 단일 훈련 적용 (하루치)
 export function applyTraining(player, trainingKey) {
   if (player.injury) return { ok: false, reason: "injured" };
@@ -200,11 +227,13 @@ export function applyTraining(player, trainingKey) {
   const talentBoost = combinedTalentBoost(player);
   const critical = Math.random() < 0.10;
   const critMult = critical ? 2.0 : 1.0;
+  // 회귀 효과: 첫 시즌 훈련 효율 — learner / past_life_notes 합산 곱연산.
+  const firstSeasonBoost = isFirstSeason(player)
+    ? effectMultiplier(player, "firstSeasonTrainBoost")
+    : 1;
   const gained = {};
   for (const stat of tr.stats) {
-    // 훈련 효율 축소 — 옛 base ×2.0 은 HS 졸업 시 OVR 130+ 까지 끌어올려 비현실.
-    // ×0.8 로 낮춰 22~25시즌 커리어 곡선이 실제 야구에 가깝게 (피크 OVR 130~140).
-    const base = (0.5 + Math.random() * 0.9) * 0.8;
+    const base = (0.5 + Math.random() * 0.9) * 0.8 * firstSeasonBoost;
     const boost = talentBoost[stat] ?? 1.0;
     const cap = getPlayerStatCap(player);
     const target = player.batter[stat] !== undefined ? player.batter : player.pitcher;
@@ -216,9 +245,10 @@ export function applyTraining(player, trainingKey) {
     gained[stat] = delta;
   }
   player.stamina = Math.max(0, player.stamina + tr.stamina);
-  // 부상 체크 — 주인공은 MAIN_INJURY_LUCK(0.4x) 적용해 후하게.
+  // 부상 체크 — 주인공은 MAIN_INJURY_LUCK(0.4x) + injuryChance 효과(steel_mental ×0.5) 적용.
   const lowStamina = player.stamina < 25 ? 0.02 : 0;
-  if (Math.random() < (tr.injuryRisk + lowStamina) * MAIN_INJURY_LUCK) {
+  const injuryMult = effectMultiplier(player, "injuryChance");  // 기본 1, steel_mental 0.5
+  if (Math.random() < (tr.injuryRisk + lowStamina) * MAIN_INJURY_LUCK * injuryMult) {
     applyInjury(player);
   }
   if (critical) {
@@ -244,7 +274,9 @@ export function applyRest(player) {
   const recover = 30 + Math.floor(Math.random() * 10);
   player.stamina = Math.min(player.maxStamina, player.stamina + recover);
   if (player.injury) {
-    player.injury.weeksLeft = Math.max(0, player.injury.weeksLeft - 0.2);
+    // 회귀 효과: prosthetic 의 injuryRecoverySpeed ×2 — 회복 가속.
+    const recoverMult = effectMultiplier(player, "injuryRecoverySpeed");
+    player.injury.weeksLeft = Math.max(0, player.injury.weeksLeft - 0.2 * recoverMult);
     if (player.injury.weeksLeft <= 0) {
       pushLog({
         msg: t("injury.recovered", { type: t("injury." + player.injury.severity) }),
@@ -296,12 +328,16 @@ export function applyInjury(player, forceSeverity = null, opts = {}) {
 
   const bodyPart = opts.bodyPart ?? pickBodyPart();
 
-  // 토미존 / 큰 수술 — severe + (어깨|팔꿈치) + 30%
+  // 토미존 / 큰 수술 — severe + (어깨|팔꿈치) + 30%.
+  // iron_arm trait 보유 시 토미존 확률 0 (severe 자체는 발생, 다만 수술 단계로 진행 안 함).
   let surgery = false;
   let weeksLeft = baseWeeks;
-  if (severity === "severe" && (bodyPart === "shoulder" || bodyPart === "elbow") && Math.random() < 0.30) {
+  if (severity === "severe"
+      && (bodyPart === "shoulder" || bodyPart === "elbow")
+      && !hasTraitFlag(player, "tjsBlock")
+      && Math.random() < 0.30) {
     surgery = true;
-    weeksLeft = 30; // 사실상 시즌 아웃 (25주 시즌)
+    weeksLeft = 30;
   }
 
   // 영구 후유증 (aftereffect) 굴림
@@ -370,9 +406,10 @@ export function tickConditionWeekly(player) {
       player.conditionTrend = Math.random() < 0.5 ? rndInt(1, 3) : -rndInt(1, 3);
     }
   }
-  // 부상 회복 (주 단위)
+  // 부상 회복 (주 단위). prosthetic 의 injuryRecoverySpeed ×2 적용.
   if (player.injury) {
-    player.injury.weeksLeft = Math.max(0, player.injury.weeksLeft - 1);
+    const recoverMult = effectMultiplier(player, "injuryRecoverySpeed");
+    player.injury.weeksLeft = Math.max(0, player.injury.weeksLeft - 1 * recoverMult);
     if (player.injury.weeksLeft <= 0) {
       pushLog({
         msg: t("injury.returned", { type: t("injury." + player.injury.severity) }),
@@ -468,15 +505,17 @@ export function ageUp(player) {
   player.age += 1;
   player.grade += 1;
   const age = player.age;
-  if (age < 30) return;  // 29세까지 자연 감소 없음
+  // 회귀 효과: prime_extend 의 agingDelay — 노화 시작 +N년 시프트.
+  const delay = effectAdd(player, "agingDelay", "years");
+  if (age < 30 + delay) return;
 
-  // 구간별 (확률, 최대 감쇄폭). 감쇄가 발생하면 rndInt(1, max).
+  // 구간별 (확률, 최대 감쇄폭). delay 적용 시 임계 자체가 시프트.
   let declineChance, declineMax;
-  if (age >= 40)      { declineChance = 0.85; declineMax = 6; }
-  else if (age >= 38) { declineChance = 0.70; declineMax = 5; }
-  else if (age >= 36) { declineChance = 0.50; declineMax = 4; }
-  else if (age >= 33) { declineChance = 0.30; declineMax = 3; }
-  else                { declineChance = 0.10; declineMax = 2; }  // 30-32
+  if (age >= 40 + delay)      { declineChance = 0.85; declineMax = 6; }
+  else if (age >= 38 + delay) { declineChance = 0.70; declineMax = 5; }
+  else if (age >= 36 + delay) { declineChance = 0.50; declineMax = 4; }
+  else if (age >= 33 + delay) { declineChance = 0.30; declineMax = 3; }
+  else                        { declineChance = 0.10; declineMax = 2; }  // 30-32 + delay
 
   for (const stat of BATTER_STATS) {
     if (Math.random() < declineChance) {
