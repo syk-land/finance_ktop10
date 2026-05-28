@@ -297,16 +297,17 @@ function playLiveGame(dialog, result, opts) {
   lineScore.dataset.live = "lineScore";
   dialog.appendChild(lineScore);
 
-  // 5) 메인 캐릭터 이벤트 로그
+  // 5) 메인 캐릭터 이벤트 로그 — 5줄 고정 (그 이상은 스크롤).
+  //    line-height 18px × 5줄 + padding(8+8) + border(1+1) = 106px.
   const logBox = document.createElement("div");
   logBox.style.background = "var(--panel-2)";
   logBox.style.border = "1px solid var(--border)";
   logBox.style.borderRadius = "6px";
   logBox.style.padding = "8px 10px";
-  logBox.style.maxHeight = "120px";
+  logBox.style.height = "108px";
   logBox.style.overflowY = "auto";
   logBox.style.fontSize = "11px";
-  logBox.style.lineHeight = "1.5";
+  logBox.style.lineHeight = "18px";
   logBox.style.margin = "8px 0";
   dialog.appendChild(logBox);
 
@@ -545,12 +546,14 @@ function playLiveGame(dialog, result, opts) {
 
   (async function runGame() {
     for (let i = 0; i < totalInnings; i++) {
-      if (cancelled) return;
+      if (cancelled) break;
       await playHalf(i, "top");
+      if (cancelled) break;
       const skipBottom = i === totalInnings - 1 && (myInns[i] === null || oppInns[i] === null);
       if (!skipBottom) {
         await playHalf(i, "bottom");
       }
+      if (cancelled) break;
       // 콜드게임 이벤트가 있으면 그 이닝 마지막 후 게임 종료
       const cold = allEvents.find(e => e.type === "COLD_GAME" && e.inning === i + 1);
       if (cold) {
@@ -558,7 +561,7 @@ function playLiveGame(dialog, result, opts) {
         break;
       }
     }
-    if (cancelled) return;
+    // cancelled 든 정상 종료든 onComplete 호출 — result phase 로 전환.
     opts.onComplete?.();
   })();
 }
