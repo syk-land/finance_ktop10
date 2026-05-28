@@ -9,10 +9,10 @@
 // 결승 진출 확률: 사용자 팀 strength + 메인 캐릭터 OVR + 토너먼트 난이도 보정.
 // 토너먼트별로 시즌당 한 번만 굴림 (state.pendingFinal.processedWeek 로 중복 방지).
 
-import { HIGH_SCHOOL_TOURNAMENTS } from "../data/tournaments.js";
+import { getTournamentPool } from "../data/tournaments.js";
 import { getTeamPool } from "../data/teams.js";
 import { getPlayerTeam } from "./league.js";
-import { createRoster } from "./npc.js";
+import { createRoster, stageAgeRange } from "./npc.js";
 import { simulateGame } from "./simulator.js";
 import { overallScore, BATTER_STATS, PITCHER_STATS, getPlayerStatCap } from "./player.js";
 import { state, pushToast } from "../state.js";
@@ -22,13 +22,14 @@ const STAT_CAP = 150;
 const STAT_MIN = 20;
 
 // 그 주 (3월의 N번째 주 ~) 에 end 가 포함된 토너먼트 — 결승전 시점
-function tournamentsEndingThisWeek(gameDate, weeksPerSeason, weekIndex) {
+function tournamentsEndingThisWeek(stage, gameDate, weeksPerSeason, weekIndex) {
   // 게임 캘린더는 시즌 시작 = 3월 1일. 매 tick 마다 dayOfMonth/month 갱신.
   // weekIndex 가 진행 중인 주차. endWeek 직후 호출되는 시점이라 gameDate 는
   // 다음 주 시작 직전 ~ 약간 후. 안전하게 현재 month/dayOfMonth 의 +- 7일 범위에 대회 end 가 있는지 본다.
   if (!gameDate) return [];
+  const pool = getTournamentPool(stage);
   const today = gameDate.month * 100 + gameDate.dayOfMonth;
-  return HIGH_SCHOOL_TOURNAMENTS.filter(tn => {
+  return pool.filter(tn => {
     if (tn.type !== "tournament") return false; // 결승은 토너먼트만 (주말리그는 제외)
     const e = tn.end[0] * 100 + tn.end[1];
     // end 가 지난 7일 ~ 향후 0일 범위 = 이번 주에 종료
@@ -47,9 +48,9 @@ function advanceProbability(player, league) {
 }
 
 // 가상의 결승전 상대 팀 생성 — 팀 풀에서 리그에 없는 강팀 하나 선택
-function makeOpponentTeam(myTeamStrength, league) {
+function makeOpponentTeam(myTeamStrength, league, stage) {
   const locale = state?.locale ?? "ko";
-  const pool = getTeamPool("high", locale);
+  const pool = getTeamPool(stage, locale);
   const existingNames = new Set((league?.teams ?? []).map(t => t.name));
   const candidates = pool.filter(t => !existingNames.has(t.name));
   const usable = candidates.length > 0 ? candidates : pool;
@@ -65,7 +66,7 @@ function makeOpponentTeam(myTeamStrength, league) {
     strength: finalStrength,
     // stage 옵션 필수 — 누락 시 getNpcStatCap 가 default 150 폴백해서
     // 결승 상대 NPC 가 일반 리그 NPC(cap 100) 보다 1.5배 강하게 생성됨 (압살 게임 원인).
-    roster: createRoster(finalStrength, [16, 18], { stage: "high", teamName: pick.name }),
+    roster: createRoster(finalStrength, stageAgeRange(stage), { stage, teamName: pick.name }),
     record: { w: 0, l: 0, t: 0 },
     isPlayerTeam: false,
   };
@@ -75,13 +76,11 @@ function makeOpponentTeam(myTeamStrength, league) {
 // player.lastFinalCheckWeek 로 중복 방지.
 export function checkFinalAdvance(player, league, season, gameDate) {
   if (!player || !league || !season || !gameDate) return null;
-  // 한국 고교 토너먼트는 stage="high" 한정. 진로 분기 후 stage 가 univ/pro1/mlb
-  // 등이면 HS 결승 진출 굴림 안 함 (이전엔 stage 무관하게 굴림이라 MLB 메인이
-  // 광주일고 주작기 결승 진출하는 incorrectstate 가 나옴).
-  if (player.stage !== "high") return null;
+  // 학원 토너먼트(고교/대학)만 결승 굴림. 프로/MLB 는 postseason.js 가 처리.
+  if (player.stage !== "high" && player.stage !== "univ") return null;
   player.processedFinals = player.processedFinals ?? {};
 
-  const list = tournamentsEndingThisWeek(gameDate, league.weeksPerSeason, season.weekIndex);
+  const list = tournamentsEndingThisWeek(player.stage, gameDate, league.weeksPerSeason, season.weekIndex);
   for (const tn of list) {
     const seasonId = `${gameDate.year}-${tn.key}`;
     if (player.processedFinals[seasonId]) continue;       // 이미 처리한 시즌×대회
@@ -90,7 +89,7 @@ export function checkFinalAdvance(player, league, season, gameDate) {
     if (Math.random() < advanceProbability(player, league)) {
       // 결승 진출!
       const myStrength = getPlayerTeam(league)?.strength ?? 60;
-      const opponent = makeOpponentTeam(myStrength, league);
+      const opponent = makeOpponentTeam(myStrength, league, player.stage);
       return {
         tournamentKey: tn.key,
         opponent,
@@ -140,9 +139,12 @@ export function simulateFinal(player, league, opponent) {
   const myTeam = getPlayerTeam(league);
   if (!myTeam) return null;
 
+  // simulator.js 에 정의된 stage 별 결승 규정(연장/승부치기/콜드게임) 적용
+  const finalStage = player.stage === "univ" ? "univ_final" : "high_final";
+
   // 임시 league-like 객체로 simulateGame 호출
   const finalLeague = {
-    stage: "high_final",
+    stage: finalStage,
     teams: [myTeam, opponent],
     schedule: [],
     weeksPerSeason: 1,

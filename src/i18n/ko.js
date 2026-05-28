@@ -313,7 +313,7 @@ export const ko = {
     },
   },
 
-  // 한국 고교야구 대회 (tournaments.js) + 프로 포스트시즌 (postseason.js)
+  // 한국 고교/대학 야구 대회 (tournaments.js) + 프로 포스트시즌 (postseason.js)
   tournament: {
     weekly_first:  "전반기 주말리그",
     emart_cup:     "현무기",
@@ -322,6 +322,11 @@ export const ko = {
     blue_dragon:   "청룡기",
     president_cup: "대통령배",
     phoenix_cup:   "주작기",
+    // 대학
+    univ_uleague_first: "U-리그 (권역리그)",
+    president_cup_univ: "대통령기 대학야구",
+    chairman_cup_univ:  "회장기 대학야구선수권",
+    autumn_champ_univ:  "추계 대학야구 선수권",
     // KBO 포스트시즌
     kbo_wc:  "와일드카드 결정전",
     kbo_spo: "준플레이오프",

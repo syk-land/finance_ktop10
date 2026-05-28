@@ -309,7 +309,7 @@ export const en = {
     },
   },
 
-  // Korean high school baseball tournaments (tournaments.js) + pro postseason (postseason.js)
+  // Korean high school / university baseball tournaments (tournaments.js) + pro postseason (postseason.js)
   tournament: {
     weekly_first:  "Spring Weekend League",
     emart_cup:     "Black Tortoise Cup",
@@ -318,6 +318,11 @@ export const en = {
     blue_dragon:   "Azure Dragon Cup",
     president_cup: "President's Cup",
     phoenix_cup:   "Vermilion Bird Cup",
+    // University
+    univ_uleague_first: "U-League (Regional)",
+    president_cup_univ: "President's Cup (Univ)",
+    chairman_cup_univ:  "KBSA Chairman's Cup",
+    autumn_champ_univ:  "Autumn Univ Championship",
     // KBO postseason
     kbo_wc:  "Wild Card Round",
     kbo_spo: "Semi-Playoff",
