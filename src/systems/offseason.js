@@ -10,18 +10,18 @@
 //
 // 표시 텍스트는 모두 i18n: offseason.<cat>, offseason.event.<key>.{label,desc,great,ok,bad}.
 
-import { BATTER_STATS, PITCHER_STATS, applyInjury, overallScore, addFame } from "./player.js";
+import { BATTER_STATS, PITCHER_STATS, applyInjury, overallScore, addFame, getPlayerStatCap } from "./player.js";
 import { state } from "../state.js";
 
-const STAT_CAP = 150;
 const STAT_MIN = 20;
 const OUTCOME_WEIGHTS = { great: 0.20, ok: 0.70, bad: 0.10 };
 
 // ─── 헬퍼 ─────────────────────────────────────────────────────────
 function bump(player, group, stat, delta) {
   if (player[group] == null || player[group][stat] === undefined) return null;
+  const cap = getPlayerStatCap(player);
   const before = player[group][stat];
-  const after = Math.max(STAT_MIN, Math.min(STAT_CAP, before + delta));
+  const after = Math.max(STAT_MIN, Math.min(cap, before + delta));
   player[group][stat] = +after.toFixed(1);
   return { group, stat, delta: +(after - before).toFixed(1) };
 }
