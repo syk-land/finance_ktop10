@@ -450,16 +450,40 @@ function playLiveGame(dialog, result, opts) {
     logBox.scrollTop = logBox.scrollHeight;
   }
   // 결승 모달 딜레이를 state.tickSpeed (1x=500ms) 에 비례. 4x면 모달도 0.25배 속도.
-  // pauseState.paused 가 true 이면 토글될 때까지 hold (50ms 폴링).
+  // 50ms 폴링으로 cancelled / paused 즉시 감지 — 스킵 버튼 누르면 곧바로 빠짐.
   function waitMs(ms) {
     const mult = (state.tickSpeed ?? 500) / 500;
-    return new Promise(async r => {
-      await new Promise(rr => setTimeout(rr, ms * mult));
-      while (pauseState.paused && !cancelled) {
-        await new Promise(rr => setTimeout(rr, 50));
+    const total = ms * mult;
+    return new Promise(r => {
+      let elapsed = 0;
+      function step() {
+        if (cancelled) return r();
+        if (pauseState.paused) {
+          // 일시정지 중엔 elapsed 안 증가
+          setTimeout(step, 50);
+          return;
+        }
+        if (elapsed >= total) return r();
+        const delta = Math.min(50, total - elapsed);
+        elapsed += delta;
+        setTimeout(step, delta);
       }
-      r();
+      step();
     });
+  }
+
+  // scene.playPitch 진행 도중에도 cancelled 시 즉시 빠짐. race 패턴.
+  function playPitchCancellable(scene, opts) {
+    return Promise.race([
+      scene.playPitch(opts),
+      new Promise(r => {
+        function check() {
+          if (cancelled) return r();
+          setTimeout(check, 50);
+        }
+        check();
+      }),
+    ]);
   }
 
   async function playHalf(inning, half) {
@@ -483,7 +507,8 @@ function playLiveGame(dialog, result, opts) {
           await waitMs(360);
           continue;
         }
-        await scene.playPitch(ev);
+        await playPitchCancellable(scene, ev);
+        if (cancelled) return;
         appendEventLog(ev);
         // 메인 PA 의 점수 즉시 반영
         if (ev.runsScored > 0) {
