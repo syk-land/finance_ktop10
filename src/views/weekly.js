@@ -208,12 +208,26 @@ function playLiveGame(dialog, result, opts) {
   const opp = my === home ? away : home;
   const isHome = my === home;
 
-  // 1) 제목
+  // 1) 제목 + 우측 [스킵] 버튼 — 라이브 진행 즉시 종료 (cancelled = true → onComplete).
+  const titleRow = document.createElement("div");
+  titleRow.style.cssText = "display:flex; justify-content:space-between; align-items:center; gap:8px; margin:0 0 8px;";
   const h = document.createElement("h2");
-  h.style.margin = "0 0 8px";
-  h.style.fontSize = "15px";
+  h.style.cssText = "margin:0; font-size:15px;";
   h.textContent = opts.titleText;
-  dialog.appendChild(h);
+  titleRow.appendChild(h);
+
+  const skipBtn = document.createElement("button");
+  skipBtn.type = "button";
+  skipBtn.textContent = t("weekly.btnSkipLive");
+  skipBtn.style.cssText = "padding:6px 10px; font-size:11px; flex-shrink:0;";
+  skipBtn.addEventListener("click", () => {
+    cancelled = true;       // playHalf 다음 cancelled 체크에서 빠짐 → onComplete 호출.
+    skipBtn.disabled = true;
+    skipBtn.textContent = t("weekly.btnSkippedLive");
+  });
+  titleRow.appendChild(skipBtn);
+
+  dialog.appendChild(titleRow);
 
   // 2) 시각화 영역 — 평소 다이아몬드, 메인 캐릭터 타석/등판 시 POV 씬으로 swap
   const fieldWrap = document.createElement("div");
@@ -480,6 +494,11 @@ function playLiveGame(dialog, result, opts) {
         await waitMs(180);
       }
       swapField(createDiamondSVG());
+      // 이 half 의 마지막 메인 batter 결과로 다이아몬드 베이스 표시 (Phase 2 — 주자 위치).
+      const lastBat = [...evs].reverse().find(e => e.role === "batter");
+      if (lastBat) {
+        updateDiamondBases(diamondNode, basesAfterMainPA(lastBat.type));
+      }
     } else {
       await waitMs(360);
     }
@@ -525,12 +544,37 @@ function createDiamondSVG() {
   svg.innerHTML = `
     <polygon points="50,12 88,50 50,88 12,50" fill="#1a2a3d" stroke="var(--accent)" stroke-width="1.5"/>
     <polygon points="50,38 62,50 50,62 38,50" fill="none" stroke="#2c4565" stroke-width="1"/>
-    <circle cx="88" cy="50" r="4" fill="var(--accent-2)" /> <!-- 1루 -->
-    <circle cx="50" cy="12" r="4" fill="var(--accent-2)" /> <!-- 2루 -->
-    <circle cx="12" cy="50" r="4" fill="var(--accent-2)" /> <!-- 3루 -->
-    <circle cx="50" cy="88" r="4" fill="white" /> <!-- 홈 -->
+    <circle data-base="1" cx="88" cy="50" r="4" fill="var(--accent-2)" />
+    <circle data-base="2" cx="50" cy="12" r="4" fill="var(--accent-2)" />
+    <circle data-base="3" cx="12" cy="50" r="4" fill="var(--accent-2)" />
+    <circle cx="50" cy="88" r="4" fill="white" />
   `;
   return svg;
+}
+
+// 다이아몬드에 메인 출루 위치 표시 — bases: [b1, b2, b3] boolean.
+function updateDiamondBases(svg, bases) {
+  if (!svg) return;
+  for (let i = 0; i < 3; i++) {
+    const base = svg.querySelector(`[data-base="${i + 1}"]`);
+    if (!base) continue;
+    if (bases[i]) {
+      base.setAttribute("fill", "var(--good)");
+      base.setAttribute("r", "5.5");
+    } else {
+      base.setAttribute("fill", "var(--accent-2)");
+      base.setAttribute("r", "4");
+    }
+  }
+}
+
+// 메인 PA 결과 type → 메인의 베이스 위치. 부정확 단순화 (NPC 주자 추적 X).
+function basesAfterMainPA(type) {
+  if (type === "BB" || type === "HBP" || type === "1B" || type === "E") return [true, false, false];
+  if (type === "2B") return [false, true, false];
+  if (type === "3B") return [false, false, true];
+  // HR / OUT / K / DP / SF — 베이스 비움
+  return [false, false, false];
 }
 
 // 라인 스코어 테이블 — 정규 9칸 + 연장 칸 동적 추가 + R

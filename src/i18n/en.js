@@ -839,6 +839,8 @@ export const en = {
     finalAdvance: "Made the {tournament} Final!",
     finalAdvanceDesc: "Opponent: {opponent}. Start the game?",
     btnStartFinal: "Start the game",
+    btnSkipLive:    "Skip",
+    btnSkippedLive: "Skipping…",
     btnAcceptReward: "Claim reward",
     finalLiveTitle: "{tournament} Final",
     finalChampion: "{tournament} — Champion!",

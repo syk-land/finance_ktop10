@@ -843,6 +843,8 @@ export const ko = {
     finalAdvance: "{tournament} 결승 진출!",
     finalAdvanceDesc: "상대팀: {opponent}. 경기를 진행할까요?",
     btnStartFinal: "경기 시작",
+    btnSkipLive:    "건너뛰기",
+    btnSkippedLive: "건너뛰는 중…",
     btnAcceptReward: "보너스 수령",
     finalLiveTitle: "{tournament} 결승전",
     finalChampion: "{tournament} 우승!",
