@@ -4,7 +4,7 @@
 
 import { state } from "../state.js";
 import { doDailyAction } from "./week.js";
-import { TRAININGS } from "./player.js";
+import { TRAININGS, getPlayerStatCap } from "./player.js";
 import { effectMultiplier } from "./traitEffects.js";
 
 // focusStats: 가장 부족한 stat 타게팅 시 대상 stat 화이트리스트 (null=모든 stat)
@@ -54,25 +54,37 @@ function statValue(player, stat) {
   return null;
 }
 
-// 훈련이 영향을 주는 stat들 중 가장 낮은 값 — 부족도 계산용
-function trainingStatMin(trainingKey, player) {
-  const t = TRAININGS[trainingKey];
-  if (!t) return 95;
-  let min = 95;
-  for (const s of t.stats) {
-    const v = statValue(player, s);
-    if (v !== null && v < min) min = v;
-  }
-  return min;
-}
-
-// 부족도 (0~1) — 100을 기준점으로
+// 훈련 부족도 (0~1) — stage cap 기준 평균 잔여 비율.
+// cap=251, stat=199 → 잔여 = (251-199)/251 ≈ 0.207.
+// training 의 stats 가 여러 개면 평균 사용 — 한 stat 만 cap 도달하면 다른 stat 잔여만 반영.
+// 전부 cap 도달이면 0 → 가중치 추첨에서 자동 제외.
 function deficitFor(trainingKey, player) {
-  const minV = trainingStatMin(trainingKey, player);
-  return Math.max(0, (100 - minV) / 100);
+  const tr = TRAININGS[trainingKey];
+  if (!tr) return 0;
+  const cap = getPlayerStatCap(player);
+  if (!isFinite(cap) || cap <= 0) return 0;
+  let sum = 0;
+  let count = 0;
+  for (const s of tr.stats) {
+    const v = statValue(player, s);
+    if (v === null) continue;
+    sum += Math.max(0, (cap - v) / cap);
+    count++;
+  }
+  if (count === 0) return 0;
+  return sum / count;
 }
 
-// 프리셋의 focusStats(없으면 전 stat) 중 가장 낮은 stat의 훈련 반환
+// cap 에 거의 닿은 stat — findLowestStatTraining 에서 제외.
+function isStatNearCap(stat, player) {
+  const v = statValue(player, stat);
+  if (v === null) return true;
+  const cap = getPlayerStatCap(player);
+  return v >= cap - 0.5;
+}
+
+// 프리셋의 focusStats(없으면 전 stat) 중 가장 낮은 stat 의 훈련 반환.
+// cap 도달 stat 은 제외 — "캡에 닿으면 다른 훈련" 보장.
 function findLowestStatTraining(presetKey, player) {
   const preset = AUTO_PRESETS[presetKey];
   if (!preset) return null;
@@ -86,6 +98,7 @@ function findLowestStatTraining(presetKey, player) {
     for (const s of t.stats) {
       if (statValue(player, s) === null) continue;
       if (focus && !focus.includes(s)) continue;
+      if (isStatNearCap(s, player)) continue;  // cap 도달은 제외
       if (!statToTrainings[s]) statToTrainings[s] = [];
       statToTrainings[s].push(trKey);
     }
@@ -103,9 +116,9 @@ function findLowestStatTraining(presetKey, player) {
 }
 
 // 다음 한 칸의 행동 결정
-//   1) 50% 확률로 focus 내 최저 stat 직접 타게팅
-//   2) 나머지 50%는 부족도 보정된 가중치 추첨
-const DEFICIT_SCALE = 3.0;
+//   1) 50% 확률로 focus 내 최저 stat 직접 타게팅 (cap 도달 stat 자동 제외)
+//   2) 나머지 50%는 deficit 곱셈 가중치 추첨 — cap 도달 training 은 weight 0
+// mentor_letter 유물의 autoTrainDeficitBoost 는 deficit 자체에 곱셈 (효과 증폭).
 const TARGET_LOWEST_PROB = 0.5;
 
 export function pickAutoAction(presetKey, player) {
@@ -123,27 +136,32 @@ export function pickAutoAction(presetKey, player) {
     return { action: "rest" };
   }
 
-  // 1) 가장 부족한 stat 타게팅
+  // 1) 가장 부족한 stat 타게팅 (cap 도달 stat 제외)
   if (Math.random() < TARGET_LOWEST_PROB) {
     const target = findLowestStatTraining(presetKey, player);
     if (target) return { action: "train", detail: target };
   }
 
-  // 2) 부족도 보정된 가중치 추첨.
-  // mentor_letter 유물: autoTrainDeficitBoost ×1.5 → DEFICIT_SCALE 곱셈.
-  const localScale = DEFICIT_SCALE * effectMultiplier(player, "autoTrainDeficitBoost");
+  // 2) deficit 곱셈 가중치 추첨. cap 도달이면 weight 0 → 절대 안 뽑힘.
+  // mentor_letter: deficit 자체에 곱하면 부족도가 더 강조됨 (기존 가산 → 곱셈으로 단순화).
+  const boost = effectMultiplier(player, "autoTrainDeficitBoost");
   const entries = Object.entries(preset.weights);
   const adjusted = entries.map(([k, w]) => {
-    const d = deficitFor(k, player);
-    return [k, w * (1 + d * localScale)];
+    const d = deficitFor(k, player) * boost;
+    return [k, w * d];
   });
   const total = adjusted.reduce((a, [, w]) => a + w, 0);
+  // 모든 training 의 stat 이 cap 도달 — 더 훈련할 게 없음. 휴식.
+  if (total <= 0.001) return { action: "rest" };
   let r = Math.random() * total;
   for (const [k, w] of adjusted) {
     r -= w;
     if (r <= 0) return { action: "train", detail: k };
   }
-  return { action: "train", detail: adjusted[0][0] };
+  // 폴백 — 가중치 가장 높은 것
+  let best = adjusted[0];
+  for (const e of adjusted) if (e[1] > best[1]) best = e;
+  return { action: "train", detail: best[0] };
 }
 
 // 남은 평일 자동 진행
