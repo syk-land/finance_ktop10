@@ -60,9 +60,26 @@ export function saveGame() {
       pendingEvents: state.pendingEvents,
     };
     const serialized = JSON.stringify(payload);
-    // 진단 로그 — 1 MB 넘으면 경고. 5 MB 한도 도달 전 미리 알림.
+    // 진단 로그 — 1 MB 넘으면 필드별 사이즈 breakdown 출력. 사용자가 큰 필드 식별 가능.
     if (serialized.length > 1_000_000) {
-      console.warn(`[save] payload ${(serialized.length / 1024).toFixed(0)} KB (1 MB 초과). 큰 필드 점검 권장.`);
+      console.warn(`[save] payload ${(serialized.length / 1024).toFixed(0)} KB (1 MB 초과)`);
+      const breakdown = {};
+      for (const k of Object.keys(payload)) {
+        try {
+          const s = JSON.stringify(payload[k]);
+          breakdown[k] = s == null ? 0 : (s.length / 1024);
+        } catch (_) { breakdown[k] = -1; }
+      }
+      console.table(breakdown);
+      // league.teams 가 가장 크면 팀별 + roster 별 추가 breakdown
+      if (payload.league?.teams && (breakdown.league ?? 0) > 200) {
+        console.log("[save] league.teams 상세:");
+        for (const tm of payload.league.teams) {
+          const teamSize = JSON.stringify(tm).length / 1024;
+          const rosterSize = JSON.stringify(tm.roster ?? []).length / 1024;
+          console.log(`  ${tm.name}: ${teamSize.toFixed(1)} KB (roster ${rosterSize.toFixed(1)} KB, ${(tm.roster ?? []).length} 명)`);
+        }
+      }
     }
     localStorage.setItem(SAVE_KEY, serialized);
     return true;
