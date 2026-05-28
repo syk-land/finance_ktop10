@@ -2276,6 +2276,20 @@ function buildOffseasonProposalPhase(dialog, rerender) {
   const off = state.offseason;
   const evKey = off.eventKey;
 
+  // 국제대회 자동 진행 — 시즌 중 라이브 모달에서 이미 참가 결정.
+  // yes/no 선택 단계를 건너뛰고 바로 결과 굴림 (great/ok/bad).
+  // 이미 시즌 중에 "참가" 했는데 휴식기에 "참가 여부 물어봄" 으로 보이는 모순 해소.
+  if (off.selectedCategory === "intl_tournament") {
+    const { outcomeKind, changes } = applyEventChoice(state.player, evKey);
+    off.decided = true;
+    off.outcomeKind = outcomeKind;
+    off.eventChanges = changes;
+    saveGame();
+    // rerender 즉시 호출 — result phase 로 이동.
+    rerender();
+    return;
+  }
+
   const h = document.createElement("h2");
   h.textContent = t("offseason.proposalTitle");
   dialog.appendChild(h);
