@@ -8,7 +8,7 @@ import { createPlayer, TALENTS } from "../systems/player.js";
 import { startHighSchoolCareer } from "../systems/career.js";
 import { consumeLoadoutForCharacter, loadRegressionMeta } from "../systems/regression.js";
 import { loadFromCloud, getCloudSaveMeta } from "../cloud/cloudSave.js";
-import { isSignedIn, isAnonymousUser, linkAnonToGoogle, signInWithGoogle, signOutCloud } from "../cloud/auth.js";
+import { isSignedIn, isAnonymousUser, linkAnonToGoogle, signOutCloud } from "../cloud/auth.js";
 import { FACES, createFaceSVG } from "../render/avatars.js";
 import { createCharacterSVG } from "../render/character.js";
 import { createGameDate } from "../systems/tick.js";
@@ -125,22 +125,14 @@ function renderAuthPanel(route) {
     linkBtn.addEventListener("click", async () => {
       linkBtn.disabled = true;
       linkBtn.textContent = t("auth.linking");
+      // redirect 방식 — 정상이면 페이지 전체 리로드. 결과 분기는 initAuth/getRedirectResult 에서.
+      // credential-already-in-use 폴백도 initAuth 안에서 자동 처리.
       const result = await linkAnonToGoogle();
-      if (result.ok) {
+      if (result.ok && result.alreadyLinked) {
         location.reload();
         return;
       }
-      // credential-already-in-use: 그 Google 계정이 이미 다른 익명 uid 와 연결됨.
-      // 사용자에게 옵션 제공 — 기존 Google 계정 로그인 (익명 진행은 잃음).
-      if (result.code === "auth/credential-already-in-use" || result.code === "auth/email-already-in-use") {
-        if (confirm(t("auth.confirmSwitchAccount"))) {
-          const r2 = await signInWithGoogle();
-          if (r2.ok) {
-            location.reload();
-            return;
-          }
-        }
-      }
+      // redirect 성공이면 여기 도달 안 함. 실패 시에만.
       linkBtn.disabled = false;
       linkBtn.textContent = t("auth.linkGoogle");
       alert(t("auth.linkFailed"));
