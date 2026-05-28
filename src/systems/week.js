@@ -21,9 +21,25 @@ export function createSeason(stage) {
     weekIndex: 0,
     dayIndex: 0,        // 0..4 (월~금)
     weekActions: [],    // [{day, action, detail}]
-    weekResults: [],    // 주말 경기 결과
-    seasonResults: [],  // 시즌 전체 경기 결과
+    weekResults: [],    // 주말 경기 결과 (슬림 — UI 표시용 필드만)
+    // seasonResults 제거됨 — read 하는 곳이 없는 데드 코드였고 매주 push 로 NPC roster 가 누적되어 3+ MB 폭증 원인.
     finished: false,
+  };
+}
+
+// 한 게임 result 에서 UI 가 실제 쓰는 필드만 추려 저장 — team.roster / 옛 lineup 등 큰 객체 제외.
+// renderLastWeekBody 가 사용하는 필드: team.name/isPlayerTeam, score, mainPlayer.{roles,batterBox,pitcherBox,events,lineupSlot}.
+function slimGameResult(r) {
+  return {
+    home: { team: { name: r.home?.team?.name, isPlayerTeam: !!r.home?.team?.isPlayerTeam }, score: r.home?.score ?? 0 },
+    away: { team: { name: r.away?.team?.name, isPlayerTeam: !!r.away?.team?.isPlayerTeam }, score: r.away?.score ?? 0 },
+    mainPlayer: r.mainPlayer ? {
+      roles: r.mainPlayer.roles,
+      batterBox: r.mainPlayer.batterBox,
+      pitcherBox: r.mainPlayer.pitcherBox,
+      events: r.mainPlayer.events,
+      lineupSlot: r.mainPlayer.lineupSlot,
+    } : null,
   };
 }
 
@@ -123,8 +139,8 @@ export function endWeek() {
       }
     }
   }
-  season.weekResults = results;
-  season.seasonResults.push(...results);
+  // 슬림화된 결과만 저장 — team.roster / 큰 객체 제외. seasonResults 누적은 제거 (read 없음).
+  season.weekResults = results.map(slimGameResult);
   season.weekIndex++;
   season.dayIndex = 0;
   season.weekActions = [];
