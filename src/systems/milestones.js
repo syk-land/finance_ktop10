@@ -14,6 +14,14 @@
 import { pushToast } from "../state.js";
 import { t } from "../i18n/index.js";
 import { addFame } from "./player.js";
+import { unlockItem } from "./regression.js";
+
+// 도전과제 해금 — 중복 방지 + 신규 해금 시 토스트.
+function tryUnlock(key) {
+  if (unlockItem(key)) {
+    pushToast(t("regression.unlocked", { name: t("unlock." + key) }), "good");
+  }
+}
 
 const CAREER_THRESHOLDS = {
   h:  [100, 500, 1000, 2000, 3000],
@@ -56,7 +64,7 @@ function detectGameBattingMilestones(player, main, gameDate) {
     award(player, "grandSlam", { fame: 5 }, gameDate, { stack: true });
   }
   // 끝내기 — simulator 가 결승점 PA 이벤트에 walkoff:true 부착.
-  // walkoff HR 은 더 큰 보상.
+  // walkoff HR 은 더 큰 보상. 첫 끝내기 시 회귀 도전과제 walkoff_one 해금.
   for (const ev of events) {
     if (!ev.walkoff) continue;
     if (ev.type === "HR") {
@@ -64,6 +72,7 @@ function detectGameBattingMilestones(player, main, gameDate) {
     } else {
       award(player, "walkoff", { fame: 10, mental: 1 }, gameDate, { stack: true });
     }
+    tryUnlock("walkoff_one");
   }
 }
 

@@ -431,6 +431,7 @@ export const en = {
     runBalance:   "Total balance: {balance}",
     menuBalance:  "{balance} pts · {runs} runs",
     enterShop:    "Open Shop",
+    unlocked:     "{name} unlocked! Available in regression shop",
   },
 
   shop: {

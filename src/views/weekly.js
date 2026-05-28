@@ -25,7 +25,7 @@ import { checkMilitaryTrigger, applyMilitaryService, MILITARY_OPTIONS } from "..
 import { simulatePostseasonGame, applyRoundReward, advanceToNextRound, pushPostseasonRecord, recordSeriesGame, isSeriesClinched, seriesWinner, winsToClinch } from "../systems/postseason.js";
 import { nextPendingEvent, clearPendingEvent, simulateAllStarGame, applyAllStarReward, simulateIntlTournamentGame, applyIntlTournamentReward } from "../systems/seasonEvents.js";
 import { computeHallOfFameScore, hofRank } from "../systems/hallOfFame.js";
-import { recordRun, loadRegressionMeta } from "../systems/regression.js";
+import { recordRun, loadRegressionMeta, unlockItem } from "../systems/regression.js";
 
 export function renderWeekly(root, route, opts = {}) {
   const { player, league, season } = state;
@@ -2288,6 +2288,12 @@ function renderCareerEndedPanel(route) {
   if (!state.player.regressionScored) {
     recordRun(hof.total);
     state.player.regressionScored = true;
+    // 명예의 전당 헌액 시 회귀 도전과제 해금. rank === "hof" 만 (300+ 점수).
+    if (rank === "hof") {
+      if (unlockItem("hof_inducted")) {
+        pushToast(t("regression.unlocked", { name: t("unlock.hof_inducted") }), "good");
+      }
+    }
   }
 
   const title = document.createElement("h3");

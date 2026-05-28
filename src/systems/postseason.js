@@ -12,13 +12,15 @@
 // MLB: wc → ds → cs → ws
 //   순위 1·2=ds, 3·4·5·6=wc
 
-import { state } from "../state.js";
+import { state, pushToast } from "../state.js";
+import { t } from "../i18n/index.js";
 import { getPlayerTeam, standings } from "./league.js";
 import { simulateGame } from "./simulator.js";
 import { createRoster } from "./npc.js";
 import { getTeamPool } from "../data/teams.js";
 import { BATTER_STATS, PITCHER_STATS, getPlayerStatCap, addFame } from "./player.js";
 import { effectMultiplier } from "./traitEffects.js";
+import { unlockItem } from "./regression.js";
 
 const STAT_MIN = 20;
 
@@ -205,7 +207,7 @@ export function applyRoundReward(player, round, won) {
   const fameDelta = addFame(player, baseFame);
   changes.push({ group: "meta", stat: "fame", delta: fameDelta });
 
-  // 챔피언십(ks/ws) 우승 — 우승 기록 누적 (player.championships)
+  // 챔피언십(ks/ws) 우승 — 우승 기록 누적 (player.championships) + 회귀 도전과제.
   if (round === "ks" || round === "ws") {
     player.championships = player.championships ?? [];
     player.championships.push({
@@ -213,6 +215,9 @@ export function applyRoundReward(player, round, won) {
       year: state.gameDate?.year ?? null,
       stage: player.stage,
     });
+    if (unlockItem("championship_one")) {
+      pushToast(t("regression.unlocked", { name: t("unlock.championship_one") }), "good");
+    }
   }
 
   return changes;

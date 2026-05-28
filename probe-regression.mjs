@@ -498,4 +498,73 @@ if (foundGame) {
   ok(true, "schedule 비어있음 (skip — main 팀 식별 실패)");
 }
 
+// ── 13. 도전과제 해금 트리거 (P5) ──────────────────────────────
+section("13. 도전과제 해금 트리거 (P5)");
+
+// 13.1 walkoff_one — milestones.detectMilestones 의 walkoff/walkoffHR 이벤트
+const { detectMilestones } = await import("./src/systems/milestones.js");
+resetRegressionMeta();
+const wp = createPlayer({ name: "Wp", talent: "contact" });
+wp.fame = 0; wp.milestones = [];
+const fakeResult = {
+  mainPlayer: {
+    roles: { bat: true, pitch: false },
+    batterBox: { pa: 4, ab: 4, h: 3, hr: 1, bb: 0, k: 0, tb: 6, gs: 0 },
+    pitcherBox: null,
+    events: [{ type: "1B", role: "batter", inning: 9, walkoff: true }],
+  },
+};
+detectMilestones(wp, fakeResult, { year: 2027, month: 5, dayOfMonth: 1 });
+ok(state.regression.unlockedItems.includes("walkoff_one"), `walkoff_one 해금됨 (unlockedItems=${state.regression.unlockedItems})`);
+
+// 중복 방지 — 다시 호출해도 해금 1건만
+const before = state.regression.unlockedItems.length;
+detectMilestones(wp, fakeResult, { year: 2027, month: 6, dayOfMonth: 1 });
+ok(state.regression.unlockedItems.length === before, `walkoff_one 중복 해금 없음 (length ${before} 유지)`);
+
+// 13.2 championship_one — postseason.applyRoundReward ks/ws 우승
+resetRegressionMeta();
+const cp = createPlayer({ name: "Cp", talent: "contact" });
+cp.fame = 0; cp.stage = "pro1"; cp.tournamentHistory = [];
+applyRoundReward(cp, "ks", true);
+ok(state.regression.unlockedItems.includes("championship_one"), `championship_one 해금됨 (ks 우승)`);
+
+resetRegressionMeta();
+const cp2 = createPlayer({ name: "Cp2", talent: "contact" });
+cp2.fame = 0; cp2.stage = "mlb"; cp2.tournamentHistory = [];
+applyRoundReward(cp2, "ws", true);
+ok(state.regression.unlockedItems.includes("championship_one"), `championship_one 해금됨 (ws 우승)`);
+
+// 패배 시 미해금
+resetRegressionMeta();
+const cp3 = createPlayer({ name: "Cp3", talent: "contact" });
+cp3.fame = 0; cp3.stage = "pro1"; cp3.tournamentHistory = [];
+applyRoundReward(cp3, "ks", false);
+ok(!state.regression.unlockedItems.includes("championship_one"), `ks 패배 시 미해금`);
+
+// 13.3 severe_recovered — applyRest 가 severe 부상 회복할 때
+resetRegressionMeta();
+const sp = createPlayer({ name: "Sp", talent: "contact" });
+sp.injury = { severity: "severe", bodyPart: "knee", weeksLeft: 0.1, surgery: false, aftereffect: null };
+applyRest(sp);
+ok(sp.injury === null, "severe 부상 회복됨");
+ok(state.regression.unlockedItems.includes("severe_recovered"), `severe_recovered 해금됨 (unlockedItems=${state.regression.unlockedItems})`);
+
+// minor 회복은 해금 안 됨
+resetRegressionMeta();
+const mp = createPlayer({ name: "Mp", talent: "contact" });
+mp.injury = { severity: "minor", bodyPart: "knee", weeksLeft: 0.1, surgery: false, aftereffect: null };
+applyRest(mp);
+ok(mp.injury === null, "minor 부상 회복됨");
+ok(!state.regression.unlockedItems.includes("severe_recovered"), `minor 회복은 미해금`);
+
+// 13.4 hof_inducted — renderCareerEndedPanel 은 UI 라 단위 검증 어려움. 대신 unlockItem 직접.
+//   설계: 은퇴 패널 진입 + rank === "hof" 이면 unlockItem("hof_inducted"). hofRank 자체는 hallOfFame.js 함수.
+const { hofRank } = await import("./src/systems/hallOfFame.js");
+ok(hofRank(350) === "hof", `hofRank(350) = ${hofRank(350)}`);
+resetRegressionMeta();
+// 직접 unlockItem 호출로 시뮬레이션 (UI 흐름 대체)
+unlockItem("hof_inducted");
+ok(state.regression.unlockedItems.includes("hof_inducted"), "hof_inducted 해금 가능");
+
 console.log("\n" + (process.exitCode ? "❌ 일부 실패" : "✅ 전체 통과"));

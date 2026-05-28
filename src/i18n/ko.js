@@ -434,6 +434,7 @@ export const ko = {
     runBalance:   "누적 잔액 {balance}점",
     menuBalance:  "잔액 {balance}점 · 회귀 {runs}회",
     enterShop:    "상점 보기",
+    unlocked:     "{name} 해금! 회귀 상점에서 사용 가능",
   },
 
   shop: {

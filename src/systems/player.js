@@ -4,10 +4,20 @@
 //
 // i18n: 라벨/메시지는 모두 i18n 키로만 보유. 사람이 읽는 텍스트는 t() 호출로 UI에서 조회.
 
-import { pushLog, state } from "../state.js";
+import { pushLog, pushToast, state } from "../state.js";
 import { t } from "../i18n/index.js";
 import { capBonusForStage, STARTING_STAT_PRESETS, TRAITS as REGRESSION_TRAITS, RELICS as REGRESSION_RELICS } from "../data/shopCatalog.js";
 import { effectMultiplier, effectAdd, hasTraitFlag } from "./traitEffects.js";
+import { unlockItem } from "./regression.js";
+
+// severe 부상 회복 시 회귀 도전과제 해금 (severe_recovered).
+function unlockSevereRecoveredIf(player, justHealedSeverity) {
+  if (justHealedSeverity === "severe") {
+    if (unlockItem("severe_recovered")) {
+      pushToast(t("regression.unlocked", { name: t("unlock.severe_recovered") }), "good");
+    }
+  }
+}
 
 export const BATTER_STATS = ["contact", "power", "eye", "speed", "defense"];
 export const PITCHER_STATS = ["velocity", "control", "breaking", "stamina", "mental"];
@@ -288,11 +298,13 @@ export function applyRest(player) {
     const recoverMult = effectMultiplier(player, "injuryRecoverySpeed");
     player.injury.weeksLeft = Math.max(0, player.injury.weeksLeft - 0.2 * recoverMult);
     if (player.injury.weeksLeft <= 0) {
+      const healedSeverity = player.injury.severity;
       pushLog({
-        msg: t("injury.recovered", { type: t("injury." + player.injury.severity) }),
+        msg: t("injury.recovered", { type: t("injury." + healedSeverity) }),
         kind: "good",
       });
       player.injury = null;
+      unlockSevereRecoveredIf(player, healedSeverity);
     }
   }
   return { ok: true, recover };
@@ -421,11 +433,13 @@ export function tickConditionWeekly(player) {
     const recoverMult = effectMultiplier(player, "injuryRecoverySpeed");
     player.injury.weeksLeft = Math.max(0, player.injury.weeksLeft - 1 * recoverMult);
     if (player.injury.weeksLeft <= 0) {
+      const healedSeverity = player.injury.severity;
       pushLog({
-        msg: t("injury.returned", { type: t("injury." + player.injury.severity) }),
+        msg: t("injury.returned", { type: t("injury." + healedSeverity) }),
         kind: "good",
       });
       player.injury = null;
+      unlockSevereRecoveredIf(player, healedSeverity);
     }
   }
 }
