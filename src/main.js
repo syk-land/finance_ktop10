@@ -9,6 +9,8 @@ import { renderWeekly } from "./views/weekly.js";
 import { renderShop } from "./views/shop.js";
 import { advanceOneDay } from "./systems/tick.js";
 import { loadRegressionMeta } from "./systems/regression.js";
+import { initFirebase } from "./cloud/firebase.js";
+import { initAuth } from "./cloud/auth.js";
 import {
   t, loadLocaleFromStorage, toggleLocale, localeToggleLabel,
 } from "./i18n/index.js";
@@ -172,6 +174,10 @@ function setupScrollTopButton() {
 function init() {
   loadLocaleFromStorage();
   loadRegressionMeta();
+  // Firebase Auth/Firestore 부팅 — firebaseConfig 비어있으면 silently 스킵.
+  if (initFirebase()) {
+    initAuth();
+  }
   updateChrome();
   wireLocaleToggle();
   setupScrollTopButton();
