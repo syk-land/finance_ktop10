@@ -7,6 +7,7 @@ import { state, loadGame, hasSave, saveGame } from "./state.js";
 import { renderMenu } from "./views/menu.js";
 import { renderWeekly } from "./views/weekly.js";
 import { advanceOneDay } from "./systems/tick.js";
+import { loadRegressionMeta } from "./systems/regression.js";
 import {
   t, loadLocaleFromStorage, toggleLocale, localeToggleLabel,
 } from "./i18n/index.js";
@@ -168,6 +169,7 @@ function setupScrollTopButton() {
 // 초기 진입
 function init() {
   loadLocaleFromStorage();
+  loadRegressionMeta();
   updateChrome();
   wireLocaleToggle();
   setupScrollTopButton();

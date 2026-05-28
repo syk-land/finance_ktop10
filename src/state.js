@@ -18,6 +18,7 @@ export const state = {
   pendingPostseason: null, // null | { bracket, round, opponent, status, completedRounds[] } — 포스트시즌(pro1/mlb)
   pendingToasts: [],     // [{msg, kind}] — UI 매 렌더에서 꺼내 표시
   pendingEvents: [],     // [{key, type, handlerKey, year}] — 시즌 중 이벤트 큐 (seasonEvents.js)
+  regression: null,      // 회귀(NewGame+) 메타 — systems/regression.js 가 별도 localStorage 키로 영속화
 };
 
 export function setState(patch) {
