@@ -52,6 +52,9 @@ export function saveGame() {
       offseason: state.offseason,
       pendingFinal: state.pendingFinal,
       pendingPostseason: state.pendingPostseason,
+      // 시즌 중 이벤트 모달 대기 큐 (올스타·WBC·올림픽·AG·프리미어12).
+      // 트리거된 뒤 처리 전 새로고침되면 모달이 사라져 보상 누락이라 반드시 저장.
+      pendingEvents: state.pendingEvents,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
     return true;
