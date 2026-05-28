@@ -409,6 +409,17 @@ function playLiveGame(dialog, result, opts) {
     logBox.appendChild(row);
     logBox.scrollTop = logBox.scrollHeight;
   }
+  // 이닝/공수 전환 시 시각적 구분선 — 로그가 비어있을 때(첫 half) 는 생략.
+  function appendDivider() {
+    if (!logBox.firstChild) return;
+    const row = document.createElement("div");
+    row.style.color = "var(--muted)";
+    row.style.opacity = "0.5";
+    row.style.letterSpacing = "1px";
+    row.textContent = "-----------------------";
+    logBox.appendChild(row);
+    logBox.scrollTop = logBox.scrollHeight;
+  }
   // 결승 모달 딜레이를 state.tickSpeed (1x=500ms) 에 비례. 4x면 모달도 0.25배 속도.
   // pauseState.paused 가 true 이면 토글될 때까지 hold (50ms 폴링).
   function waitMs(ms) {
@@ -424,6 +435,7 @@ function playLiveGame(dialog, result, opts) {
 
   async function playHalf(inning, half) {
     if (cancelled) return;
+    appendDivider();
     inningTag.textContent = `${inning + 1}${half === "top" ? "회초" : "회말"}`;
     const evs = eventsForHalf(inning, half);
     // 이 half 의 메인 이벤트들이 만든 점수의 합 — half 끝 일괄 반영분에서 빼야 함.
