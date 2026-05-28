@@ -6,10 +6,10 @@
 // 이 파일의 값들은 *공개*되어도 안전합니다 (client-side 노출 전제).
 // 실제 보호는 Firestore 보안 규칙으로 — 다른 사용자의 데이터 read/write 차단.
 export const firebaseConfig = {
-  apiKey:            "",
-  authDomain:        "",
-  projectId:         "",
-  storageBucket:     "",
-  messagingSenderId: "",
-  appId:             "",
+  apiKey:            "AIzaSyDvNBgr4Q_gYvHeQpmWl4U2EluG9-PaKfA",
+  authDomain:        "baseball-alone.firebaseapp.com",
+  projectId:         "baseball-alone",
+  storageBucket:     "baseball-alone.firebasestorage.app",
+  messagingSenderId: "126672611400",
+  appId:             "1:126672611400:web:4ff9ed49e1134f5abe107d",
 };
