@@ -455,6 +455,14 @@ export const ko = {
     confirmOverwriteCloud: "클라우드 세이브가 더 최근입니다 (다른 기기에서 저장됨). 그래도 덮어쓰시겠습니까?",
   },
 
+  // 전역 설정 모달 (settingsModal.js)
+  settingsModal: {
+    title:             "⚙ 설정",
+    gameControl:       "게임 진행",
+    language:          "언어",
+    gameInactiveHint:  "캐릭터를 생성하면 게임 진행을 제어할 수 있습니다.",
+  },
+
   // Firebase Authentication
   auth: {
     anonymousTitle: "익명 사용자",

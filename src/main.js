@@ -12,8 +12,9 @@ import { loadRegressionMeta } from "./systems/regression.js";
 import { initFirebase } from "./cloud/firebase.js";
 import { initAuth } from "./cloud/auth.js";
 import {
-  t, loadLocaleFromStorage, toggleLocale, localeToggleLabel,
+  t, loadLocaleFromStorage,
 } from "./i18n/index.js";
+import { openSettingsModal } from "./views/settingsModal.js";
 
 const VIEWS = {
   menu: renderMenu,
@@ -33,8 +34,8 @@ function updateChrome() {
   if (version) version.textContent = t("app.version");
   const toggle = document.getElementById("locale-toggle");
   if (toggle) {
-    toggle.textContent = localeToggleLabel();
-    toggle.setAttribute("aria-label", localeToggleLabel());
+    toggle.textContent = "⚙";
+    toggle.setAttribute("aria-label", t("settingsModal.title"));
   }
   document.title = t("app.title");
 }
@@ -131,14 +132,10 @@ function runTick() {
   scheduleTick();
 }
 
-function wireLocaleToggle() {
+function wireSettingsButton() {
   const btn = document.getElementById("locale-toggle");
   if (!btn) return;
-  btn.addEventListener("click", () => {
-    toggleLocale();
-    // 현재 뷰 재렌더 + chrome 갱신
-    route(state.view ?? "menu");
-  });
+  btn.addEventListener("click", () => openSettingsModal(route));
 }
 
 // "맨 위로" floating 버튼 — 스크롤이 일정 임계 이상이면 표시.
@@ -179,7 +176,7 @@ function init() {
     initAuth();
   }
   updateChrome();
-  wireLocaleToggle();
+  wireSettingsButton();
   setupScrollTopButton();
   route("menu");
   scheduleTick();

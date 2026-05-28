@@ -452,6 +452,14 @@ export const en = {
     confirmOverwriteCloud: "Cloud save is newer (saved from another device). Overwrite anyway?",
   },
 
+  // Global settings modal (settingsModal.js)
+  settingsModal: {
+    title:             "⚙ Settings",
+    gameControl:       "Game control",
+    language:          "Language",
+    gameInactiveHint:  "Create a character to enable game controls.",
+  },
+
   // Firebase Authentication
   auth: {
     anonymousTitle: "Anonymous user",
