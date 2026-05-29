@@ -196,10 +196,10 @@ export function applyRoundReward(player, round, won) {
   const baseFame = Math.round(({ wc: 5, spo: 8, po: 12, ks: 30, ds: 8, cs: 15, ws: 35 }[round] ?? 5) * rewardMult);
   const baseStat = +(({ wc: 1, spo: 2, po: 2, ks: 4, ds: 2, cs: 3, ws: 5 }[round] ?? 1) * rewardMult).toFixed(1);
 
-  const cap = getPlayerStatCap(player);
   const changes = [];
   function bump(group, stat, delta) {
     if (player[group]?.[stat] === undefined) return;
+    const cap = getPlayerStatCap(player, stat);
     const before = player[group][stat];
     const after = Math.max(STAT_MIN, Math.min(cap, before + delta));
     player[group][stat] = +after.toFixed(1);

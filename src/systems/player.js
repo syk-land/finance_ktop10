@@ -6,7 +6,7 @@
 
 import { pushLog, pushToast, state } from "../state.js";
 import { t } from "../i18n/index.js";
-import { capBonusForStage, STARTING_STAT_PRESETS, TRAITS as REGRESSION_TRAITS, RELICS as REGRESSION_RELICS } from "../data/shopCatalog.js";
+import { capBonusForStat, maxCapBonus, STARTING_STAT_PRESETS, TRAITS as REGRESSION_TRAITS, RELICS as REGRESSION_RELICS } from "../data/shopCatalog.js";
 import { effectMultiplier, effectAdd, hasTraitFlag } from "./traitEffects.js";
 import { assignPitches, decodeMainHand } from "./pitches.js";
 import { unlockItem } from "./regression.js";
@@ -239,11 +239,17 @@ const PLAYER_STAT_CAP_BY_STAGE = {
   mlb_aaa: 275,
   mlb:     300,
 };
-export function getPlayerStatCap(player) {
+// stat 을 주면 해당 스탯의 캡(= stage base + 스탯별 영구 +5 보너스), 생략하면 stage base 만.
+export function getPlayerStatCap(player, stat = null) {
   const base = PLAYER_STAT_CAP_BY_STAGE[player?.stage] ?? 150;
-  // 회귀 영구 cap 보너스 — state.regression.permanentPurchases.capBoosts 에서 stage 별 누적 보너스 합산.
-  const bonus = capBonusForStage(player?.stage, state?.regression?.permanentPurchases?.capBoosts);
+  const bonus = stat ? capBonusForStat(stat, state?.regression?.permanentPurchases?.statCaps) : 0;
   return base + bonus;
+}
+// 레이다/막대 그래프 공통 max — stage base + 전 스탯 중 최대 보너스.
+// 캡이 큰 스탯에 맞춰 그래프 전체가 함께 커지도록 (한 축이라도 넘치지 않게).
+export function getPlayerMaxStatCap(player) {
+  const base = PLAYER_STAT_CAP_BY_STAGE[player?.stage] ?? 150;
+  return base + maxCapBonus(state?.regression?.permanentPurchases?.statCaps);
 }
 // 호환용 (옛 코드/세이브) — 의미는 "기본 cap"
 export const STAT_CAP = 150;
@@ -288,7 +294,7 @@ export function applyTraining(player, trainingKey) {
   for (const stat of tr.stats) {
     const base = (0.5 + Math.random() * 0.9) * TRAIN_GAIN_COEFF * firstSeasonBoost;
     const boost = talentBoost[stat] ?? 1.0;
-    const cap = getPlayerStatCap(player);
+    const cap = getPlayerStatCap(player, stat);
     const target = player.batter[stat] !== undefined ? player.batter : player.pitcher;
     if (target[stat] === undefined) continue;
     const curr = target[stat];
@@ -503,7 +509,7 @@ export function applyGameExperience(player, mainPlayerResult) {
     // 경기 경험치 효율 축소 — 옛 ×1.5 는 매 시즌 stat +10~20 으로 노화 감쇄를 압도.
     // ×0.7 로 낮춰 30대 후반에 노화 감쇄가 우세해지도록 (실제 야구 곡선).
     const adj = amount * ageMult * 0.7;
-    const cap = getPlayerStatCap(player);
+    const cap = getPlayerStatCap(player, stat);
     const curr = player[group][stat];
     const diminish = Math.max(0.15, (cap - curr) / cap);
     const delta = +(adj * diminish).toFixed(3);

@@ -19,7 +19,7 @@ const OUTCOME_WEIGHTS = { great: 0.20, ok: 0.70, bad: 0.10 };
 // ─── 헬퍼 ─────────────────────────────────────────────────────────
 function bump(player, group, stat, delta) {
   if (player[group] == null || player[group][stat] === undefined) return null;
-  const cap = getPlayerStatCap(player);
+  const cap = getPlayerStatCap(player, stat);
   const before = player[group][stat];
   const after = Math.max(STAT_MIN, Math.min(cap, before + delta));
   player[group][stat] = +after.toFixed(1);

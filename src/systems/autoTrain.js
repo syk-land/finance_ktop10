@@ -61,13 +61,13 @@ function statValue(player, stat) {
 function deficitFor(trainingKey, player) {
   const tr = TRAININGS[trainingKey];
   if (!tr) return 0;
-  const cap = getPlayerStatCap(player);
-  if (!isFinite(cap) || cap <= 0) return 0;
   let sum = 0;
   let count = 0;
   for (const s of tr.stats) {
     const v = statValue(player, s);
     if (v === null) continue;
+    const cap = getPlayerStatCap(player, s);
+    if (!isFinite(cap) || cap <= 0) continue;
     sum += Math.max(0, (cap - v) / cap);
     count++;
   }
@@ -79,7 +79,7 @@ function deficitFor(trainingKey, player) {
 function isStatNearCap(stat, player) {
   const v = statValue(player, stat);
   if (v === null) return true;
-  const cap = getPlayerStatCap(player);
+  const cap = getPlayerStatCap(player, stat);
   return v >= cap - 0.5;
 }
 

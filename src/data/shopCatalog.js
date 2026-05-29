@@ -15,50 +15,33 @@ export const TALENT_SLOTS_TIERS = [
   { tier: 2, cost: 1500, totalSlots: 3 },
 ];
 
-// ── 2. stage cap 보너스 (영구·누적) ────────────────────────────────
-// 그룹별 각 tier 가 누적되어 적용된다. 예: amateur tier 2 까지 구매 = +30 cap.
-// 그룹 → 적용 stage:
-//   amateur: high, univ
-//   kbo:     pro1, pro2
-//   mlb:     mlb_a, mlb_aa, mlb_aaa, mlb
-export const CAP_BOOST_GROUPS = ["amateur", "kbo", "mlb"];
+// ── 2. 스탯별 cap 보너스 (영구·누적·전 stage 공통) ──────────────────
+// 스탯 하나당 1회 구매 = 캡 +5. 상한 없음, 구매할수록 가격 점증.
+// permanentPurchases.statCaps[stat] = 구매 횟수 (0,1,2,...). 보너스 = 횟수 × STAT_CAP_STEP.
+// 전 stage 공통으로 적용 (stage base cap 위에 가산).
+export const STAT_KEYS = [
+  "contact", "power", "eye", "speed", "defense",
+  "velocity", "control", "breaking", "stamina", "mental",
+];
+export const STAT_CAP_STEP = 5;
 
-export const CAP_BOOST_STAGE_MAP = {
-  amateur: ["high", "univ"],
-  kbo:     ["pro1", "pro2"],
-  mlb:     ["mlb_a", "mlb_aa", "mlb_aaa", "mlb"],
-};
+// 해당 스탯의 다음 +5 구매 비용 — owned(기구매 횟수)에 따라 점증.
+export function statCapCost(owned) {
+  return 150 + 50 * (owned ?? 0);
+}
 
-export const CAP_BOOST_TIERS = {
-  amateur: [
-    { tier: 1, cost:  200, add: 10 },
-    { tier: 2, cost:  400, add: 20 },
-    { tier: 3, cost:  700, add: 30 },
-  ],
-  kbo: [
-    { tier: 1, cost:  500, add: 10 },
-    { tier: 2, cost: 1000, add: 20 },
-    { tier: 3, cost: 1700, add: 30 },
-  ],
-  mlb: [
-    { tier: 1, cost:  800, add: 10 },
-    { tier: 2, cost: 1500, add: 20 },
-    { tier: 3, cost: 2500, add: 30 },
-  ],
-};
+// 특정 스탯의 누적 캡 보너스 (구매 횟수 × 5).
+export function capBonusForStat(stat, statCaps) {
+  if (!stat || !statCaps) return 0;
+  return (statCaps[stat] ?? 0) * STAT_CAP_STEP;
+}
 
-// 현재 누적 보너스 (player stage 기준) — getPlayerStatCap 가 호출.
-// permanentPurchases.capBoosts[group] = 0~3 (구매한 tier 개수).
-export function capBonusForStage(stage, capBoosts) {
-  if (!stage || !capBoosts) return 0;
-  for (const group of CAP_BOOST_GROUPS) {
-    if (!CAP_BOOST_STAGE_MAP[group].includes(stage)) continue;
-    const owned = capBoosts[group] ?? 0;
-    let sum = 0;
-    for (let i = 0; i < owned; i++) sum += CAP_BOOST_TIERS[group][i].add;
-    return sum;
-  }
-  return 0;
+// 전 스탯 중 최대 캡 보너스 — 레이다/그래프 공통 max 산정용.
+export function maxCapBonus(statCaps) {
+  if (!statCaps) return 0;
+  let mx = 0;
+  for (const k of STAT_KEYS) mx = Math.max(mx, (statCaps[k] ?? 0) * STAT_CAP_STEP);
+  return mx;
 }
 
 // ── 3. 시작 능력치 프리셋 (재구매·캐릭터당 1) ────────────────────────
@@ -115,9 +98,6 @@ export const RELICS = {
 // 다음 tier (구매 가능한) — 이미 max tier 면 null
 export function nextTalentSlotTier(currentTotal) {
   return TALENT_SLOTS_TIERS.find(t => t.totalSlots > currentTotal) ?? null;
-}
-export function nextCapBoostTier(group, ownedCount) {
-  return CAP_BOOST_TIERS[group]?.[ownedCount] ?? null;
 }
 
 // 특성 해금 여부 — unlock === "default" 거나 unlockedItems 가 가지고 있으면 true

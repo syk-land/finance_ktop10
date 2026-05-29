@@ -14,7 +14,7 @@
 
 import { state } from "../state.js";
 import {
-  TALENT_SLOTS_TIERS, CAP_BOOST_TIERS, CAP_BOOST_GROUPS,
+  TALENT_SLOTS_TIERS, STAT_KEYS, STAT_CAP_STEP, statCapCost,
   STARTING_STAT_PRESETS, TRAITS, RELICS, isTraitUnlocked,
 } from "../data/shopCatalog.js";
 
@@ -28,7 +28,7 @@ export function defaultRegressionMeta() {
     runs: 0,
     permanentPurchases: {
       talentSlots: 0,                              // 0~2 (추가 슬롯 수. 총 1+N 재능)
-      capBoosts: { amateur: 0, kbo: 0, mlb: 0 },   // 각 0~3
+      statCaps: {},                                // 스탯별 +5 캡 구매 횟수 { contact:N, ... } — 전 stage 공통
       ownedTraits: [],                              // 영구 소유 trait 키 — 장착/해제와 무관, 한 번 사면 보존
       ownedRelics: [],                              // 영구 소유 relic 키
     },
@@ -46,10 +46,9 @@ function migrateMeta(data) {
   const base = defaultRegressionMeta();
   const out = { ...base, ...(data ?? {}) };
   out.permanentPurchases = { ...base.permanentPurchases, ...(data?.permanentPurchases ?? {}) };
-  out.permanentPurchases.capBoosts = {
-    ...base.permanentPurchases.capBoosts,
-    ...(data?.permanentPurchases?.capBoosts ?? {}),
-  };
+  // 스탯별 캡 — 옛 그룹형(capBoosts {amateur,kbo,mlb})은 스키마가 달라 폐기, statCaps 만 승계.
+  out.permanentPurchases.statCaps = { ...(data?.permanentPurchases?.statCaps ?? {}) };
+  delete out.permanentPurchases.capBoosts;
   out.permanentPurchases.ownedTraits = Array.isArray(data?.permanentPurchases?.ownedTraits)
     ? [...data.permanentPurchases.ownedTraits] : [];
   out.permanentPurchases.ownedRelics = Array.isArray(data?.permanentPurchases?.ownedRelics)
@@ -135,7 +134,7 @@ export function recordRun(score) {
 // ── 영구 구매 ──────────────────────────────────────────────────────
 // kind: "talentSlots" | "capBoost"
 // talentSlots: payload 없음 — 다음 tier 자동 구매
-// capBoost:    payload = { group: "amateur"|"kbo"|"mlb" }
+// capBoost:    payload = { stat: "contact"|...|"mental" } — 해당 스탯 캡 +5 (상한 없음, 가격 점증)
 // 성공 시 { ok: true, ... }, 실패 시 { ok: false, reason: "..." }.
 export function purchasePermanent(kind, payload = {}) {
   const m = ensureMeta();
@@ -150,16 +149,16 @@ export function purchasePermanent(kind, payload = {}) {
     return { ok: true, kind, tier: next.tier, cost: next.cost, totalSlots: next.totalSlots };
   }
   if (kind === "capBoost") {
-    const group = payload.group;
-    if (!CAP_BOOST_GROUPS.includes(group)) return { ok: false, reason: "invalid_group" };
-    const owned = m.permanentPurchases.capBoosts[group] ?? 0;
-    const next = CAP_BOOST_TIERS[group]?.[owned];
-    if (!next) return { ok: false, reason: "max_tier" };
-    if (m.balance < next.cost) return { ok: false, reason: "insufficient_balance" };
-    m.balance -= next.cost;
-    m.permanentPurchases.capBoosts[group] = owned + 1;
+    const stat = payload.stat;
+    if (!STAT_KEYS.includes(stat)) return { ok: false, reason: "invalid_stat" };
+    if (!m.permanentPurchases.statCaps) m.permanentPurchases.statCaps = {};
+    const owned = m.permanentPurchases.statCaps[stat] ?? 0;
+    const cost = statCapCost(owned);
+    if (m.balance < cost) return { ok: false, reason: "insufficient_balance" };
+    m.balance -= cost;
+    m.permanentPurchases.statCaps[stat] = owned + 1;
     saveRegressionMeta();
-    return { ok: true, kind, group, tier: next.tier, cost: next.cost, add: next.add };
+    return { ok: true, kind, stat, cost, add: STAT_CAP_STEP, owned: owned + 1 };
   }
   return { ok: false, reason: "unknown_kind" };
 }

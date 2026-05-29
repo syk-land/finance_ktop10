@@ -193,11 +193,11 @@ export function applyFinalReward(player, result, tournamentKey = null) {
   const perfMult = performanceMultiplier(result);
 
   const changes = [];
-  const cap = getPlayerStatCap(player);
   // big_game trait — finalsReward ×1.5. stat 가산과 fame 양쪽에 적용.
   const rewardMult = effectMultiplier(player, "finalsReward");
   function bump(group, stat, delta) {
     if (player[group]?.[stat] === undefined) return;
+    const cap = getPlayerStatCap(player, stat);
     const before = player[group][stat];
     const after = Math.max(STAT_MIN, Math.min(cap, before + delta));
     player[group][stat] = +after.toFixed(1);

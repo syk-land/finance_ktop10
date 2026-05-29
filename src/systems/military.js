@@ -61,21 +61,22 @@ export function applyMilitaryService(player, optionKey) {
   const opt = MILITARY_OPTIONS[optionKey];
   if (!opt) return null;
 
-  const cap = getPlayerStatCap(player);
   const STAT_MIN = 20;
   for (const s of BATTER_STATS) {
     if (player.batter[s] === undefined) continue;
+    const cap = getPlayerStatCap(player, s);
     const after = Math.max(STAT_MIN, Math.min(cap, player.batter[s] * opt.statMult));
     player.batter[s] = +after.toFixed(1);
   }
   for (const s of PITCHER_STATS) {
     if (player.pitcher[s] === undefined) continue;
+    const cap = getPlayerStatCap(player, s);
     const after = Math.max(STAT_MIN, Math.min(cap, player.pitcher[s] * opt.statMult));
     player.pitcher[s] = +after.toFixed(1);
   }
   addFame(player, opt.fameDelta);
   if (player.pitcher.mental !== undefined) {
-    player.pitcher.mental = Math.min(cap, +(player.pitcher.mental + opt.mentalDelta).toFixed(1));
+    player.pitcher.mental = Math.min(getPlayerStatCap(player, "mental"), +(player.pitcher.mental + opt.mentalDelta).toFixed(1));
   }
 
   // careerHistory 에 군 복무 시즌 2개 push (통계는 비어있음)

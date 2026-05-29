@@ -22,7 +22,7 @@ import {
   purchaseTrait, purchaseRelic,
 } from "../systems/regression.js";
 import {
-  TALENT_SLOTS_TIERS, CAP_BOOST_TIERS, CAP_BOOST_GROUPS,
+  TALENT_SLOTS_TIERS, STAT_KEYS, STAT_CAP_STEP, statCapCost,
   STARTING_STAT_PRESETS, TRAITS, RELICS, isTraitUnlocked,
 } from "../data/shopCatalog.js";
 
@@ -173,25 +173,29 @@ function renderCapTab() {
   desc.textContent = t("shop.capDesc");
   panel.appendChild(desc);
 
-  for (const group of CAP_BOOST_GROUPS) {
+  const statCaps = m.permanentPurchases.statCaps ?? {};
+  const groups = [
+    { label: t("shop.capGroupBatter"),  stats: ["contact", "power", "eye", "speed", "defense"] },
+    { label: t("shop.capGroupPitcher"), stats: ["velocity", "control", "breaking", "stamina", "mental"] },
+  ];
+  for (const g of groups) {
     const header = document.createElement("div");
     header.style.cssText = "font-weight:700; font-size:12px; color:var(--accent-2); margin:8px 0 4px;";
-    header.textContent = t("shop.capGroup." + group);
+    header.textContent = g.label;
     panel.appendChild(header);
 
-    const owned = m.permanentPurchases.capBoosts[group] ?? 0;
-    const tiers = CAP_BOOST_TIERS[group];
-    for (let i = 0; i < tiers.length; i++) {
-      const tier = tiers[i];
-      const isOwned = owned >= i + 1;
-      const canBuy = !isOwned && (i === owned) && m.balance >= tier.cost;
+    for (const stat of g.stats) {
+      const owned = statCaps[stat] ?? 0;
+      const bonus = owned * STAT_CAP_STEP;
+      const cost = statCapCost(owned);
+      const canBuy = m.balance >= cost;
       panel.appendChild(makeShopCard({
-        title: t("shop.capTierTitle", { tier: tier.tier, add: tier.add }),
-        desc: "",
-        cost: tier.cost,
-        state: isOwned ? "owned" : (i > owned ? "locked" : (canBuy ? "buyable" : "insufficient")),
+        title: t("shop.capStatTitle", { stat: t("stat." + stat), step: STAT_CAP_STEP }),
+        desc: t("shop.capStatOwned", { bonus, count: owned }),
+        cost,
+        state: canBuy ? "buyable" : "insufficient",
         onClick: () => {
-          const r = purchasePermanent("capBoost", { group });
+          const r = purchasePermanent("capBoost", { stat });
           if (r.ok) renderShop(document.getElementById("view-root"), routeRef);
         },
       }));

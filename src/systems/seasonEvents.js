@@ -43,18 +43,19 @@ const ALLSTAR_RATING_MIN = 120;  // 올스타 실력 하한 (리그 상위)
 const ALLSTAR_FAME_MIN = 200;    // 올스타 명성 하한 (인지도 — 인기 투표 성격)
 
 function bumpAll(player, delta) {
-  const cap = getPlayerStatCap(player);
   for (const s of BATTER_STATS) {
     if (player.batter[s] === undefined) continue;
+    const cap = getPlayerStatCap(player, s);
     player.batter[s] = +Math.max(STAT_MIN, Math.min(cap, player.batter[s] + delta)).toFixed(1);
   }
   for (const s of PITCHER_STATS) {
     if (player.pitcher[s] === undefined) continue;
+    const cap = getPlayerStatCap(player, s);
     player.pitcher[s] = +Math.max(STAT_MIN, Math.min(cap, player.pitcher[s] + delta)).toFixed(1);
   }
 }
 function bump(player, group, stat, delta) {
-  const cap = getPlayerStatCap(player);
+  const cap = getPlayerStatCap(player, stat);
   if (player[group]?.[stat] === undefined) return;
   player[group][stat] = +Math.max(STAT_MIN, Math.min(cap, player[group][stat] + delta)).toFixed(1);
 }

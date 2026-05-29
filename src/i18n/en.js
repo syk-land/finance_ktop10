@@ -506,13 +506,11 @@ export const en = {
     talentTierTitle: "Talent tier {n} ({total} talents)",
     talentTierDesc:  "Adds 1 talent slot. All owned talent boosts stack.",
 
-    capDesc:         "Permanently raise stage stat caps. Each group stacks tier 1 → 2 → 3.",
-    capGroup: {
-      amateur: "Amateur (HS · Univ)",
-      kbo:     "KBO (1st · 2nd)",
-      mlb:     "MLB (Minor · Major)",
-    },
-    capTierTitle:    "Tier {tier} — cap +{add}",
+    capDesc:         "Permanently raise each stat's cap by +5. Applies across all stages, no limit (price rises per purchase).",
+    capGroupBatter:  "Batting stats",
+    capGroupPitcher: "Pitching stats",
+    capStatTitle:    "{stat} cap +{step}",
+    capStatOwned:    "Current +{bonus} (bought {count}×)",
 
     startDesc:       "Bonus starting stats for your next character. Consumed once on creation.",
     start: {

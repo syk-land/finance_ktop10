@@ -5,7 +5,7 @@
 
 import { state, saveGame, pushToast } from "../state.js";
 import {
-  BATTER_STATS, PITCHER_STATS, TALENTS, overallScore, getStatLabels, getPlayerStatCap, applyGameExperience,
+  BATTER_STATS, PITCHER_STATS, TALENTS, overallScore, getStatLabels, getPlayerStatCap, getPlayerMaxStatCap, applyGameExperience,
 } from "../systems/player.js";
 import { advanceToNextSeason, mergeSeasonStats } from "../systems/week.js";
 import { transitionAfterSeason, transitionToStage, eligibleCareerPaths, kboDraft, determineMLBStartStage, compositeScore, promotionScore, checkFreeAgency, applyFreeAgencyDecision, maybeTradeOffer, applyTradeAccept } from "../systems/career.js";
@@ -1597,10 +1597,12 @@ function renderAttributesBody(player) {
   const values = {};
   for (const s of BATTER_STATS) values[s] = player.batter[s];
   for (const s of PITCHER_STATS) values[s] = player.pitcher[s];
-  // 레이더/막대 그래프 max 는 player stage 의 stat cap 동적 적용 (HS 150 → MLB 300)
-  const cap = getPlayerStatCap(player);
+  // 그래프 max — stage base cap + 스탯별 영구 캡 보너스 반영해 동적 조정.
+  // 레이다는 전 축 공통 max 라서 가장 큰 스탯 캡(getPlayerMaxStatCap)에 맞춤 — 한 축도 안 넘치게.
+  // 막대는 각 스탯의 개별 캡으로 채움률 표시.
+  const radarMax = getPlayerMaxStatCap(player);
   radarBox.appendChild(createRadarSVG(values, labels, {
-    size: 160, min: 0, max: cap, labelMap: statLabels,
+    size: 160, min: 0, max: radarMax, labelMap: statLabels,
   }));
   row.appendChild(radarBox);
 
@@ -1611,10 +1613,10 @@ function renderAttributesBody(player) {
   barsCol.style.flexDirection = "column";
   barsCol.style.gap = "3px";
   for (const s of BATTER_STATS) {
-    barsCol.appendChild(statBarRow(statLabels[s], player.batter[s], "var(--accent)", cap));
+    barsCol.appendChild(statBarRow(statLabels[s], player.batter[s], "var(--accent)", getPlayerStatCap(player, s)));
   }
   for (const s of PITCHER_STATS) {
-    barsCol.appendChild(statBarRow(statLabels[s], player.pitcher[s], "var(--accent-2)", cap));
+    barsCol.appendChild(statBarRow(statLabels[s], player.pitcher[s], "var(--accent-2)", getPlayerStatCap(player, s)));
   }
   row.appendChild(barsCol);
   wrap.appendChild(row);

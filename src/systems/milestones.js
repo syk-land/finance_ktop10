@@ -124,7 +124,7 @@ function award(player, key, bonuses, gameDate, opts = {}) {
 
   if (bonuses.fame)   addFame(player, bonuses.fame);
   if (bonuses.mental && player.pitcher) {
-    const cap = getPlayerStatCap(player);
+    const cap = getPlayerStatCap(player, "mental");
     player.pitcher.mental = Math.min(cap, (player.pitcher.mental ?? 0) + bonuses.mental);
   }
 

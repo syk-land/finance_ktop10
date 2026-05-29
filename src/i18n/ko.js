@@ -509,13 +509,11 @@ export const ko = {
     talentTierTitle: "재능 슬롯 tier {n} (총 {total}재능)",
     talentTierDesc:  "추가 재능 슬롯 1칸. 보유한 재능들의 boost 가 합산 적용된다.",
 
-    capDesc:         "stage 별 능력치 cap 을 영구적으로 끌어올린다. 그룹별로 tier 1→2→3 누적.",
-    capGroup: {
-      amateur: "아마추어 (고교·대학)",
-      kbo:     "KBO (1군·2군)",
-      mlb:     "MLB (마이너·메이저)",
-    },
-    capTierTitle:    "tier {tier} — 능력치 cap +{add}",
+    capDesc:         "능력치 cap 을 스탯별로 +5 씩 영구히 끌어올린다. 전 stage 공통 적용, 상한 없음 (살수록 비싸짐).",
+    capGroupBatter:  "타자 능력치",
+    capGroupPitcher: "투수 능력치",
+    capStatTitle:    "{stat} cap +{step}",
+    capStatOwned:    "현재 +{bonus} (구매 {count}회)",
 
     startDesc:       "다음 캐릭터의 시작 능력치 보너스. 캐릭터 생성 1회 적용 후 소진.",
     start: {
