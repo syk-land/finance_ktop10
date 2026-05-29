@@ -7,7 +7,7 @@ import { createSeason } from "./week.js";
 import { getTeamPool } from "../data/teams.js";
 import { t, getLocale } from "../i18n/index.js";
 import { resetGameDateForNewSeason } from "./tick.js";
-import { overallScore, addFame } from "./player.js";
+import { overallScore, addFame, nationalTeamRating } from "./player.js";
 import { effectAdd } from "./traitEffects.js";
 
 export function startHighSchoolCareer(playerName, talent, schoolName) {
@@ -117,24 +117,27 @@ export function promotionScore(player) {
 //   100+  → 15~30위 중 랜덤 1팀
 //   < 100 → 빈 배열 (오퍼 없음)
 export function getMLBOffers(player) {
-  const score = promotionScore(player);
-  if (score < 100) return [];
+  const score = nationalTeamRating(player);
+  if (score < 110) return [];                       // 자격 — 역할기반 rating 110+
   const pool = getTeamPool("mlb", getLocale());
   if (!pool || pool.length === 0) return [];
   const sorted = [...pool].sort((a, b) => b.strength - a.strength);
-  if (score >= 180) return pickRandom(sorted.slice(0, 8), 3);
-  if (score >= 145) return pickRandom(sorted.slice(0, 12), 3);
-  if (score >= 120) return pickRandom(sorted.slice(8, 20), 2);
-  return pickRandom(sorted.slice(15, 30), 1);
+  // 풀 크기에 비례한 구간 (MLB 풀이 작아도 동작) — rating 높을수록 상위팀.
+  const n = sorted.length;
+  if (score >= 165) return pickRandom(sorted.slice(0, Math.max(1, Math.ceil(n * 0.4))), 3);  // 상위권 강팀
+  if (score >= 145) return pickRandom(sorted.slice(0, Math.max(1, Math.ceil(n * 0.6))), 3);
+  if (score >= 128) return pickRandom(sorted.slice(Math.floor(n * 0.3)), 2);                 // 중위권
+  return pickRandom(sorted.slice(Math.floor(n * 0.5)), 1);                                   // 하위권 1팀
 }
 
 // MLB 입단 시작 stage — promotionScore 에 따라 마이너 단계에서 시작.
 // determineMLBStartStage 는 호출자가 이미 점수 계산했을 수 있어 score 직접 받음.
 // 명성 영향 받지 않도록 호출지에서 promotionScore(player) 결과를 넘겨야 함.
+// score 인자 = nationalTeamRating(player) 결과를 호출지에서 넘김.
 export function determineMLBStartStage(score) {
-  if (score >= 180) return "mlb";
+  if (score >= 165) return "mlb";       // 메이저 직행 — 특출난 수준 (HS/대학 졸업으론 사실상 불가)
   if (score >= 145) return "mlb_aaa";
-  if (score >= 120) return "mlb_aa";
+  if (score >= 128) return "mlb_aa";
   return "mlb_a";
 }
 
@@ -144,15 +147,15 @@ export function determineMLBStartStage(score) {
 // 회귀 효과 draftRound (calling_card 유물): round 가 N 칸 좋아짐 (숫자 감소). 1라운드 미만은 없으니 1 이 하한.
 // 2군 round 도 동일하게 좋아져 1군 진입 가능 (round 1~2 면 자동 1군 승격).
 export function kboDraft(player) {
-  const score = promotionScore(player);
+  const score = nationalTeamRating(player);
   let stage = null, round = null, signingBonus = 0;
-  // 현실 반영: KBO 신인은 거의 전원 2군에서 시작, 즉시전력 초특급만 1군 직행.
-  // 2군 입단 후 promotionScore 가 콜업 임계(COLUP_RULES.pro2=85)를 넘으면 자동 승격.
-  if (score >= 120)      { stage = "pro1"; round = 1; signingBonus = 50000; }  // 초특급 즉시전력
-  else if (score >= 105) { stage = "pro1"; round = 2; signingBonus = 30000; }
-  else if (score >= 95)  { stage = "pro2"; round = 1; signingBonus = 18000; }  // 상위 지명 — 곧 콜업 후보
-  else if (score >= 80)  { stage = "pro2"; round = 3 + Math.floor(Math.random() * 2); signingBonus = 10000; }
-  else if (score >= 65)  { stage = "pro2"; round = 6 + Math.floor(Math.random() * 3); signingBonus = 5000; }
+  // 역할기반 rating(특출=강한쪽 / 쓸만=양방향). HS 졸업 rating: 무회귀 ~92, 풀투자 ~118.
+  // 현실 반영: 신인은 거의 전원 2군 시작, 특출난 즉시전력만 1군 직행 → 2군서 콜업(113)으로 승격.
+  if (score >= 128)      { stage = "pro1"; round = 1; signingBonus = 50000; }  // 초특급 즉시전력 (매우 드묾)
+  else if (score >= 114) { stage = "pro1"; round = 2; signingBonus = 30000; }  // 특출 — 1군 직행 (풀투자급)
+  else if (score >= 100) { stage = "pro2"; round = 1; signingBonus = 18000; }  // 상위 지명 — 곧 콜업 후보
+  else if (score >= 86)  { stage = "pro2"; round = 3 + Math.floor(Math.random() * 2); signingBonus = 10000; }
+  else if (score >= 76)  { stage = "pro2"; round = 6 + Math.floor(Math.random() * 3); signingBonus = 5000; }
 
   // calling_card: round 가 좋아짐 (N 칸 감소). 1 라운드가 하한.
   const roundBoost = effectAdd(player, "draftRound", "boost");
@@ -317,17 +320,18 @@ export function applyTradeAccept(player, newTeamName) {
   addFame(player, 5);
 }
 
-// 콜업 사다리 — 시즌 종료 시 실력 점수(promotionScore)가 임계 넘으면 다음 단계로 자동 승격.
-// 실제 야구의 마이너 → 메이저 깊이 반영. 메이저는 평균 180+ (cap 300 의 60%).
+// 콜업 사다리 — 시즌 종료 시 역할기반 rating(nationalTeamRating)이 임계 넘으면 다음 단계 승격.
+// flat 평균 대신 "강한 포지션 + 양방향 프리미엄" — 특화 선수(한쪽만 탁월)도 강점으로 승격.
+// rating 궤적: pro2 ~102-112 / pro1 115→174 / 마이너는 단계별로 더 높은 벽.
 const PROMOTION_LADDER = {
-  pro2:    { next: "pro1",    minScore: 85  },
-  mlb_a:   { next: "mlb_aa",  minScore: 110 },
+  pro2:    { next: "pro1",    minScore: 113 },  // 1군 — 쓸만한 수준이면 콜업
+  mlb_a:   { next: "mlb_aa",  minScore: 128 },
   mlb_aa:  { next: "mlb_aaa", minScore: 145 },
-  mlb_aaa: { next: "mlb",     minScore: 180 },
+  mlb_aaa: { next: "mlb",     minScore: 165 },  // 메이저 — 특출난 수준
 };
 
 export function checkPromotion(player) {
   const rule = PROMOTION_LADDER[player.stage];
   if (!rule) return null;
-  return promotionScore(player) >= rule.minScore ? rule.next : null;
+  return nationalTeamRating(player) >= rule.minScore ? rule.next : null;
 }

@@ -5,10 +5,10 @@
 
 import { state, saveGame, pushToast } from "../state.js";
 import {
-  BATTER_STATS, PITCHER_STATS, TALENTS, overallScore, getStatLabels, getPlayerStatCap, getPlayerMaxStatCap, applyGameExperience,
+  BATTER_STATS, PITCHER_STATS, TALENTS, overallScore, nationalTeamRating, getStatLabels, getPlayerStatCap, getPlayerMaxStatCap, applyGameExperience,
 } from "../systems/player.js";
 import { advanceToNextSeason, mergeSeasonStats } from "../systems/week.js";
-import { transitionAfterSeason, transitionToStage, eligibleCareerPaths, kboDraft, determineMLBStartStage, compositeScore, promotionScore, checkFreeAgency, applyFreeAgencyDecision, maybeTradeOffer, applyTradeAccept } from "../systems/career.js";
+import { transitionAfterSeason, transitionToStage, eligibleCareerPaths, kboDraft, determineMLBStartStage, compositeScore, checkFreeAgency, applyFreeAgencyDecision, maybeTradeOffer, applyTradeAccept } from "../systems/career.js";
 import { getPlayerTeam, standings } from "../systems/league.js";
 import { createFaceSVG } from "../render/avatars.js";
 import { AUTO_PRESETS, autoFillWeek } from "../systems/autoTrain.js";
@@ -2730,7 +2730,7 @@ function chooseCareerPath(key, eligible, route) {
           else               proceed(draft.stage, draft.teamName);
         });
       } else {
-        const startStage = determineMLBStartStage(promotionScore(state.player));
+        const startStage = determineMLBStartStage(nationalTeamRating(state.player));
         proceed(startStage, chosenTeam.name);
       }
     });
