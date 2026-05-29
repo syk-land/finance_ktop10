@@ -63,6 +63,26 @@ export function transitionAfterSeason() {
     return { ended: false, promoted: true };
   }
 
+  // 강등 체크 (노쇠 등으로 유지 임계 미달) — 콜업이 아닐 때만. 한 단계 하향 후 모달로 은퇴 선택 제공.
+  const demotion = checkDemotion(player);
+  if (demotion) {
+    const fromStage = player.stage;
+    const pool = getTeamPool(demotion, getLocale());
+    const pick = pickTeamForStage(pool, player);
+    player.stage = demotion;
+    player.teamName = pick.name;
+    player.gamesSinceLastPitch = 99;
+    player.injury = null;
+    resetGameDateForNewSeason(state.gameDate);
+    state.league = createLeague(demotion, player.teamName);
+    state.season = createSeason(demotion);
+    pushLog({
+      msg: t("log.demoted", { stage: t("stage." + demotion), team: player.teamName }),
+      kind: "bad",
+    });
+    return { ended: false, demoted: true, fromStage, toStage: demotion };
+  }
+
   // 다음 학년 시작 — 캘린더도 3월 1일로 리셋 (year +1)
   resetGameDateForNewSeason(state.gameDate);
   // NPC 풀 carry-over: 나이 +1, 성장/노화, 졸업/은퇴, 신인 합류
@@ -329,6 +349,23 @@ const PROMOTION_LADDER = {
   mlb_aa:  { next: "mlb_aaa", minScore: 145 },
   mlb_aaa: { next: "mlb",     minScore: 165 },  // 메이저 — 특출난 수준
 };
+
+// 강등 사다리 — 노쇠 등으로 rating 이 "유지 임계" 아래로 떨어지면 한 단계 강등.
+// 핑퐁 방지: 유지 임계(minKeep) < 콜업 임계(PROMOTION_LADDER.minScore) — 둘 사이는 정체(유지).
+//   예: 1군은 113 이상이어야 콜업되고, 95 미만으로 떨어져야 2군 강등 (113↔95 hysteresis).
+// 최하위(pro2 / mlb_a)는 강등 없음 (방출 대신 은퇴는 사용자 선택).
+const DEMOTION_LADDER = {
+  pro1:    { down: "pro2",    minKeep: 95  },
+  mlb:     { down: "mlb_aaa", minKeep: 147 },
+  mlb_aaa: { down: "mlb_aa",  minKeep: 127 },
+  mlb_aa:  { down: "mlb_a",   minKeep: 110 },
+};
+
+export function checkDemotion(player) {
+  const rule = DEMOTION_LADDER[player.stage];
+  if (!rule) return null;
+  return nationalTeamRating(player) < rule.minKeep ? rule.down : null;
+}
 
 export function checkPromotion(player) {
   const rule = PROMOTION_LADDER[player.stage];

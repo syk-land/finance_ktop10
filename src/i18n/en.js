@@ -767,6 +767,14 @@ export const en = {
     stageTransition: "Signed with {team} ({stage})!",
     retired: "Retired from baseball.",
     promoted: "Called up to {team} ({stage})!",
+    demoted: "Demoted to {team} ({stage})...",
+  },
+
+  demotion: {
+    title: "Demotion",
+    desc: "Your decline dropped you from {from} to {to}. ({team})\nYou can keep playing, or retire here.",
+    btnContinue: "Keep playing",
+    btnRetire: "Retire",
   },
 
   // Career path selection (career.js)

@@ -771,6 +771,14 @@ export const ko = {
     stageTransition: "{stage} {team} 입단!",
     retired: "야구 인생을 마감합니다.",
     promoted: "{stage} {team} 콜업!",
+    demoted: "{stage} {team}(으)로 강등...",
+  },
+
+  demotion: {
+    title: "강등",
+    desc: "기량 하락으로 {from}에서 {to}(으)로 강등되었습니다. ({team})\n계속 뛰거나, 여기서 은퇴할 수 있습니다.",
+    btnContinue: "계속 뛴다",
+    btnRetire: "은퇴한다",
   },
 
   // 진로 선택 (career.js)

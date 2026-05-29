@@ -2225,6 +2225,64 @@ function showTradeModal(trade, route, onClose) {
   document.body.appendChild(backdrop);
 }
 
+// ─── 강등 모달 ────────────────────────────────────────────────────
+// 노쇠 등으로 한 단계 강등된 직후 표시 (이미 하위 단계로 전이됨).
+// [계속] = 강등 수용하고 하위 단계에서 진행 / [은퇴] = 커리어 종료.
+function showDemotionModal(fromStage, toStage, route) {
+  state.paused = true;
+  saveGame();
+
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  const dialog = document.createElement("div");
+  dialog.className = "modal-dialog";
+  dialog.style.maxWidth = "360px";
+
+  const h = document.createElement("h2");
+  h.textContent = t("demotion.title");
+  dialog.appendChild(h);
+
+  const desc = document.createElement("p");
+  desc.className = "muted small";
+  desc.style.cssText = "margin:0 0 14px; line-height:1.5;";
+  desc.textContent = t("demotion.desc", {
+    from: t("stage." + fromStage),
+    to: t("stage." + toStage),
+    team: state.player.teamName,
+  });
+  dialog.appendChild(desc);
+
+  const continueBtn = document.createElement("button");
+  continueBtn.className = "primary";
+  continueBtn.style.cssText = "width:100%; padding:10px; margin-bottom:6px; font-weight:700;";
+  continueBtn.textContent = t("demotion.btnContinue");
+  continueBtn.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    state.paused = false;
+    saveGame();
+    backdrop.remove();
+    route("weekly");
+  });
+  dialog.appendChild(continueBtn);
+
+  const retireBtn = document.createElement("button");
+  retireBtn.className = "danger";
+  retireBtn.style.cssText = "width:100%; padding:10px; font-weight:700;";
+  retireBtn.textContent = t("demotion.btnRetire");
+  retireBtn.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    if (!confirm(t("careerPath.confirmRetire"))) return;
+    transitionToStage("retire");
+    saveGame();
+    backdrop.remove();
+    route("weekly");
+  });
+  dialog.appendChild(retireBtn);
+
+  backdrop.appendChild(dialog);
+  document.body.appendChild(backdrop);
+}
+
 // ─── 휴식기 모달 ──────────────────────────────────────────────────
 // 시즌 종료 후 "확인" 클릭 시 띄움. 내부에서 카테고리 → 이벤트 → 결과 phase 진행.
 // "다음 연차 진행하기" 클릭 시 모달 닫고 다음 시즌으로.
@@ -2264,11 +2322,13 @@ function showOffseasonModal(route) {
         // ageUp 은 transitionAfterSeason 안에서가 아니라 advanceToNextSeason 안에서 일어남.
         const needsMilitary = checkMilitaryTrigger(state.player);
         const proceedAfterMilitary = () => {
-          transitionAfterSeason();
+          const tr = transitionAfterSeason();
           state.offseason = null;
           saveGame();
           backdrop.remove();
           route("weekly");
+          // 강등 시 — 안내 + 은퇴 선택 모달 (이미 하위 단계로 전이된 상태).
+          if (tr?.demoted) showDemotionModal(tr.fromStage, tr.toStage, route);
         };
         if (needsMilitary) {
           openMilitaryModal(state.player, proceedAfterMilitary);
