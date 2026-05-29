@@ -9,6 +9,31 @@
 
 ---
 
+## 0.5 필요 도구 / 의존성 (다 적어둠)
+
+**런타임 의존성: 없음.** 프레임워크/번들러/런타임 npm 패키지 0개 (Vanilla JS ESM). `index.html` 만으로 동작.
+
+| 구분 | 항목 | 용도 / 비고 |
+|---|---|---|
+| **런타임(설치 X)** | Firebase SDK 10.13.0 | 클라우드 세이브/로그인. **CDN(gstatic) 직접 import** — 설치 없음. `firebaseConfig` 비면 자동 비활성. |
+| **서버** | Python 3 | `python3 -m http.server` 정적 서빙 (ESM은 file:// 불가) |
+| **시뮬 테스트** | Node ≥ 18 | `probe.mjs` / `probe-career.mjs` 실행 (ESM, 의존성 0) |
+| **브라우저 테스트** | Playwright `1.60.0` | `npm install --no-save` (커밋 X). 헤드리스 Chromium 구동 |
+| | Chromium 바이너리 | `npx playwright install chromium` (1회) |
+| | apt 시스템 라이브러리 | chromium 구동용 (아래 목록, sudo 1회) |
+| **이미지 가공** | Python **Pillow(PIL)** | Gemini 워터마크 제거 + WebP 축소 (`pip install pillow` 또는 시스템 PIL) |
+| **배포 상태** | GitHub CLI `gh` | `gh run list` 로 Actions 확인 (선택) |
+| **버전관리** | git | main 푸시 → 자동 배포 |
+
+**에셋 생성(외부, 본인 PC)**: 이미지=Gemini(Imagen), BGM=MusicFX/Lyria(labs.google). 효과음=코드 합성(설치 X).
+
+apt 시스템 라이브러리 (chromium):
+```
+libnspr4 libnss3 libdbus-1-3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2
+libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1
+libpango-1.0-0 libcairo2 libasound2t64
+```
+
 ## 1. 실행
 
 ```bash

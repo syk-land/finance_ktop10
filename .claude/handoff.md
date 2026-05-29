@@ -5,7 +5,9 @@
 
 ## ⏩ 현재 상태 (최신)
 - 이미지 **9장 생성·가공 완료** → `assets/img/*.webp` (title-hero + event-champion/hof/draft/intl/allstar/military/training/award). Gemini 워터마크 제거 + WebP 축소. `manifest.js` 등록 완료.
-- **title-hero 만 화면에 적용됨**(타이틀 화면). **이벤트 컷 8장은 모달 wiring 미완** ← 다음 작업.
+- **이벤트 컷 8장 wiring 완료** — 우승(buildFinalResult)/입단(드래프트 모달)/HoF(careerEnded, rank hof)/
+  군입대(openMilitaryModal)/올스타·국제대회(result 화면)/특훈(offseason intense·camp)/시상(awards 슬라이드).
+  공용 헬퍼 `eventCut(key)` (weekly.js, 파일 없으면 미표시). title-hero 는 타이틀 화면.
 - BGM 파일 아직 없음(무음). 효과음은 합성으로 동작 중.
 - 미생성 이벤트 컷: **부상/토미존, 은퇴, 강등, FA/트레이드** (+휴식기 옵션).
 - 원본 `gemini_images/`(70MB) 는 .gitignore (가공본만 커밋).
@@ -52,14 +54,11 @@
 (상세 스펙은 `assets/README.md`.)
 
 ## 다음 세션 시작 시 할 일 (우선순위)
-1. **이벤트 컷 8장 wiring** — 각 이벤트 모달에 `createImage(키)` 삽입:
-   우승→eventChampion / 드래프트→eventDraft / HoF→eventHof / 국제대회→eventIntl /
-   올스타→eventAllstar / 군입대→eventMilitary / 특훈·재활→eventTraining / 시상→eventAward.
-   (모달 위치: 우승·결승 `finals.js`+`weekly.js`, 드래프트·HoF `career.js`+`weekly.js`,
-    국제대회·올스타 `seasonEvents.js`+`weekly.js`, 군입대 `military.js`+`weekly.js`)
-2. **부족 이벤트 컷 생성** (부상/은퇴/강등/FA) — 프롬프트 시트(`assets/README.md`)에 추가 후 사용자 생성.
-3. **BGM**: MusicFX 로 `bgm-menu.mp3`/`bgm-game.mp3` 생성 → `assets/audio/`.
-4. (선택) `tools/gen-assets.mjs` — 본인 PC Playwright persistentContext 자동 생성 스크립트.
+1. **부족 이벤트 컷 생성** (부상/은퇴/강등/FA·트레이드) — 프롬프트 시트(`assets/README.md`)에 추가 후 사용자가 Gemini 로 생성 → `gemini_images/` → §에셋 가공(워터마크 제거+WebP) → manifest 키 추가 → 해당 모달에 `eventCut(키)`.
+   (강등=showDemotionModal, FA=showFreeAgencyModal, 트레이드=showTradeModal, 부상/은퇴=해당 표시 지점)
+2. **BGM**: MusicFX 로 `bgm-menu.mp3`/`bgm-game.mp3` 생성 → `assets/audio/`.
+3. (선택) `tools/gen-assets.mjs` — 본인 PC Playwright persistentContext 자동 생성 스크립트.
+4. (선택) 브라우저로 각 이벤트 컷 실제 표시 확인 (우승/드래프트 등 도달이 길어 상태 주입 필요).
 
 ## 개발 환경 메모 (브라우저 검증)
 - 이 샌드박스 브라우저는 **`ignoreHTTPSErrors:true`** 면 외부 사이트 접근 가능(인증서 가로채기 회피).

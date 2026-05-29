@@ -20,6 +20,12 @@ import { getActiveTournaments } from "../data/tournaments.js";
 import { simulateFinal, applyFinalReward } from "../systems/finals.js";
 import { createPOVScene, pulseDiamondHome } from "../render/finalAnim.js";
 import { sfx } from "../assets/audio.js";
+import { createImage } from "../assets/images.js";
+
+// 이벤트 컷 삽입 헬퍼 — 에셋 있으면 일러스트, 없으면(파일 X) 아무것도 안 그림.
+function eventCut(key) {
+  return createImage(key, { style: "max-width:300px; margin:0 auto 10px; border-radius:8px; overflow:hidden;" });
+}
 import { randomName } from "../data/names.js";
 import { getTeamPool } from "../data/teams.js";
 import { checkMilitaryTrigger, applyMilitaryService, MILITARY_OPTIONS } from "../systems/military.js";
@@ -823,6 +829,8 @@ function buildFinalResult(dialog, final, onClose) {
     tournament: t("tournament." + final.tournamentKey),
   });
   dialog.appendChild(h);
+
+  if (won) dialog.appendChild(eventCut("eventChampion"));   // 우승 컷
 
   // 점수
   const score = document.createElement("div");
@@ -1930,6 +1938,7 @@ function renderAwardsBody(player, season) {
     empty.textContent = t("weekly.noAwards");
     wrap.appendChild(empty);
   } else {
+    wrap.appendChild(eventCut("eventAward"));   // 시상 컷 (수상 있을 때)
     for (const key of seasonWon) {
       const row = document.createElement("div");
       row.style.cssText = "padding:7px 10px; background:var(--panel-2); border-left:3px solid var(--accent-2); border-radius:4px; margin-bottom:5px; font-weight:600; font-size:13px;";
@@ -2501,6 +2510,11 @@ function buildOffseasonResultPhase(dialog, rerender, onContinue) {
     + (off.eventKey ? `  ·  ${t("offseason.event." + off.eventKey + ".label")}` : "");
   dialog.appendChild(choice);
 
+  // 특훈/전지훈련 컷
+  if (off.selectedCategory === "intense" || off.selectedCategory === "camp") {
+    dialog.appendChild(eventCut("eventTraining"));
+  }
+
   if (off.decided === true && off.eventKey) {
     const out = off.outcomeKind;
     const color = out === "great" ? "var(--good)" : out === "bad" ? "var(--bad)" : "var(--muted)";
@@ -2594,6 +2608,8 @@ function renderCareerEndedPanel(route) {
   title.style.cssText = "margin:0 0 8px; font-size:15px; color:var(--accent-2);";
   title.textContent = t("hof." + rank + "Title");
   panel.appendChild(title);
+
+  if (rank === "hof") panel.appendChild(eventCut("eventHof"));   // 명예의 전당 헌액 컷
 
   const desc = document.createElement("div");
   desc.className = "muted small";
@@ -2874,6 +2890,8 @@ function openDraftLiveModal(player, onClose) {
           })
         : t("careerPath.draftUndraftedDesc");
       dialog.appendChild(desc);
+
+      if (draft.picked) dialog.appendChild(eventCut("eventDraft"));   // 입단 컷
 
       const btn = document.createElement("button");
       btn.className = "primary";
@@ -3373,6 +3391,8 @@ function showAllStarModal(route) {
       const oppEntry = myEntry === r.home ? r.away : r.home;
       const won = r.winner === myEntry.team.name;
 
+      dialog.appendChild(eventCut("eventAllstar"));   // 올스타 컷
+
       const resCard = document.createElement("div");
       resCard.style.cssText = `background:var(--panel-2); border:1px solid var(--${won ? "good" : "muted"}); border-radius:8px; padding:14px; margin-bottom:12px; text-align:center;`;
       const score = document.createElement("div");
@@ -3480,6 +3500,8 @@ function showIntlTournamentModal(ev, route) {
       const myEntry  = r.home.team.isPlayerTeam ? r.home : r.away;
       const oppEntry = myEntry === r.home ? r.away : r.home;
 
+      dialog.appendChild(eventCut("eventIntl"));   // 국제대회 컷
+
       const resCard = document.createElement("div");
       resCard.style.cssText = "background:var(--panel-2); border:1px solid var(--accent-2); border-radius:8px; padding:14px; margin-bottom:12px; text-align:center;";
       const score = document.createElement("div");
@@ -3532,6 +3554,8 @@ function openMilitaryModal(player, onClose) {
   const h = document.createElement("h2");
   h.textContent = t("military.title");
   dialog.appendChild(h);
+
+  dialog.appendChild(eventCut("eventMilitary"));   // 군 입대 컷
 
   const desc = document.createElement("p");
   desc.className = "muted small";
