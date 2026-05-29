@@ -655,6 +655,8 @@ export const en = {
     SB:  "Stolen Base",
     CS:  "Caught Stealing",
     PIT_CHANGE: "Pitching change",
+    pitOut: "Out",
+    pitIn:  "In",
     PH:  "Pinch hitter",
     PR:  "Pinch runner",
     COLD_GAME: "Game called (mercy rule)",

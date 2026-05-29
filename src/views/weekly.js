@@ -474,7 +474,9 @@ function playLiveGame(dialog, result, opts) {
   function appendEventLog(ev) {
     const row = document.createElement("div");
     if (ev.type === "PIT_CHANGE") {
-      row.innerHTML = `<span style="color:var(--muted); font-weight:700">[${ev.inning}] ${t("event.PIT_CHANGE")}</span> ${ev.from} → <span style="color:${ev.toIsMain ? "var(--accent-2)" : "inherit"}">${ev.to}</span>`;
+      const fromC = ev.fromIsMain ? "var(--accent-2)" : "inherit";
+      const toC = ev.toIsMain ? "var(--accent-2)" : "inherit";
+      row.innerHTML = `<span style="color:var(--muted); font-weight:700">[${ev.inning}] ${t("event.PIT_CHANGE")}</span> ${t("event.pitOut")} <span style="color:${fromC}">${ev.from}</span> / ${t("event.pitIn")} <span style="color:${toC}">${ev.to}</span>`;
     } else if (ev.type === "PH" || ev.type === "PR") {
       const arrow = ev.from ? `${ev.from} → ` : "";
       row.innerHTML = `<span style="color:var(--muted); font-weight:700">[${ev.inning}] ${t("event." + ev.type)}</span> ${arrow}<span style="color:${ev.toIsMain ? "var(--accent)" : "inherit"}">${ev.to}</span>`;
@@ -494,9 +496,12 @@ function playLiveGame(dialog, result, opts) {
     logBox.scrollTop = logBox.scrollHeight;
   }
   // 이닝/공수 전환 시 시각적 구분선 — 로그가 비어있을 때(첫 half) 는 생략.
+  // 직전 줄이 이미 구분선이면 중복 방지 (이벤트 없는 half 가 연속되면 -------- 가 겹침).
   function appendDivider() {
     if (!logBox.firstChild) return;
+    if (logBox.lastElementChild?.dataset.divider) return;
     const row = document.createElement("div");
+    row.dataset.divider = "1";
     row.style.color = "var(--muted)";
     row.style.opacity = "0.5";
     row.style.letterSpacing = "1px";
@@ -1519,9 +1524,14 @@ function openGameReplayModal(gameResult) {
       if (ev.role === "system") {
         const row = document.createElement("div");
         const lbl = t("event." + ev.type) || ev.type;
-        const arrow = ev.from ? `${ev.from} → ` : "";
-        const to = ev.to ? `${arrow}${ev.to}` : "";
-        row.innerHTML = `<span style="color:var(--muted); font-weight:700">[${ev.inning}] ${lbl}</span> ${to}`;
+        let detail;
+        if (ev.type === "PIT_CHANGE") {
+          detail = `${t("event.pitOut")} ${ev.from} / ${t("event.pitIn")} ${ev.to}`;
+        } else {
+          const arrow = ev.from ? `${ev.from} → ` : "";
+          detail = ev.to ? `${arrow}${ev.to}` : "";
+        }
+        row.innerHTML = `<span style="color:var(--muted); font-weight:700">[${ev.inning}] ${lbl}</span> ${detail}`;
         logBox.appendChild(row);
         logBox.scrollTop = logBox.scrollHeight;
         await new Promise(r => setTimeout(r, 120));
