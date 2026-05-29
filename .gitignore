@@ -29,3 +29,6 @@ probe-debug.mjs
 
 # Gemini 원본 이미지 (대용량 — 가공본만 assets/ 에 커밋)
 gemini_images/
+
+# BGM 원본 WAV (대용량 — 가공본만 assets/audio 에 커밋)
+aibgm/

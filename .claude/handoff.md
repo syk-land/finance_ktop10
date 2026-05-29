@@ -8,7 +8,9 @@
   champion/hof/draft/intl/allstar/military/training/award/injury/retire/demote/fa/trade).
   Gemini 워터마크 제거 + WebP 축소(각 37~140KB). manifest 14키 전부 파일 존재 확인.
   부상은 수술(토미존) 시 컷 모달, 은퇴는 비-HoF 등급에 eventRetire.
-- **남은 것: BGM 2곡**(`bgm-menu.mp3`/`bgm-game.mp3`, MusicFX) 뿐. 효과음은 합성으로 동작 중.
+- **BGM 2곡 완료** — MusicFX 생성 WAV(원본 `aibgm/`, gitignore)를 모노 22050Hz WAV(각 1.3MB)로 변환 →
+  `assets/audio/bgm-{menu,game}.wav`. 브라우저 재생 확인(200). 효과음은 합성으로 동작.
+- **★ 에셋 작업(이미지 14 + BGM 2 + 효과음) 전부 완료.** ffmpeg 있으면 BGM 을 mp3(≈400KB)로 더 줄일 수 있음(선택).
 - **이벤트 컷 8장 wiring 완료** — 우승(buildFinalResult)/입단(드래프트 모달)/HoF(careerEnded, rank hof)/
   군입대(openMilitaryModal)/올스타·국제대회(result 화면)/특훈(offseason intense·camp)/시상(awards 슬라이드).
   공용 헬퍼 `eventCut(key)` (weekly.js, 파일 없으면 미표시). title-hero 는 타이틀 화면.

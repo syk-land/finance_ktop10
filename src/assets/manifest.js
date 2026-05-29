@@ -25,6 +25,6 @@ export const IMAGES = {
 };
 
 export const BGM = {
-  menu: { src: "assets/audio/bgm-menu.mp3", loop: true },   // 타이틀/메뉴
-  game: { src: "assets/audio/bgm-game.mp3", loop: true },   // 경기(weekly)
+  menu: { src: "assets/audio/bgm-menu.wav", loop: true },   // 타이틀/메뉴 (차분)
+  game: { src: "assets/audio/bgm-game.wav", loop: true },   // 경기(weekly) (경쾌)
 };
