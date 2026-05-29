@@ -49,13 +49,38 @@ export const UNIV_TEAMS = [
   { name: "건국대", region: "서울", strength: 62 },
 ];
 
+// MLB 30개 구단 (AL/NL 6개 디비전). strength 는 통산 경쟁력 대략치(70~88).
 export const MLB_TEAMS = [
-  { name: "LA Dodgers", region: "LA", strength: 85 },
-  { name: "NY Yankees", region: "NY", strength: 84 },
-  { name: "Boston Red Sox", region: "Boston", strength: 80 },
+  { name: "NY Yankees", region: "New York", strength: 84 },
+  { name: "Baltimore Orioles", region: "Baltimore", strength: 82 },
+  { name: "Toronto Blue Jays", region: "Toronto", strength: 79 },
+  { name: "Tampa Bay Rays", region: "Tampa Bay", strength: 79 },
+  { name: "Boston Red Sox", region: "Boston", strength: 78 },
+  { name: "Cleveland Guardians", region: "Cleveland", strength: 78 },
+  { name: "Minnesota Twins", region: "Minnesota", strength: 77 },
+  { name: "Detroit Tigers", region: "Detroit", strength: 74 },
+  { name: "Kansas City Royals", region: "Kansas City", strength: 74 },
+  { name: "Chicago White Sox", region: "Chicago", strength: 70 },
+  { name: "Houston Astros", region: "Houston", strength: 85 },
+  { name: "Texas Rangers", region: "Texas", strength: 80 },
+  { name: "Seattle Mariners", region: "Seattle", strength: 80 },
+  { name: "LA Angels", region: "Los Angeles", strength: 73 },
+  { name: "Oakland Athletics", region: "Oakland", strength: 70 },
+  { name: "Atlanta Braves", region: "Atlanta", strength: 86 },
+  { name: "Philadelphia Phillies", region: "Philadelphia", strength: 83 },
+  { name: "NY Mets", region: "New York", strength: 80 },
+  { name: "Miami Marlins", region: "Miami", strength: 72 },
+  { name: "Washington Nationals", region: "Washington", strength: 71 },
   { name: "Chicago Cubs", region: "Chicago", strength: 78 },
-  { name: "SF Giants", region: "SF", strength: 76 },
-  { name: "Atlanta Braves", region: "Atlanta", strength: 79 },
+  { name: "Milwaukee Brewers", region: "Milwaukee", strength: 79 },
+  { name: "St. Louis Cardinals", region: "St. Louis", strength: 77 },
+  { name: "Cincinnati Reds", region: "Cincinnati", strength: 75 },
+  { name: "Pittsburgh Pirates", region: "Pittsburgh", strength: 72 },
+  { name: "LA Dodgers", region: "Los Angeles", strength: 88 },
+  { name: "San Diego Padres", region: "San Diego", strength: 81 },
+  { name: "SF Giants", region: "San Francisco", strength: 77 },
+  { name: "Arizona Diamondbacks", region: "Arizona", strength: 78 },
+  { name: "Colorado Rockies", region: "Colorado", strength: 71 },
 ];
 
 // stage 별 시즌 메타 (locale에 영향 없음)
