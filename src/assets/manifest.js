@@ -17,6 +17,11 @@ export const IMAGES = {
   eventMilitary: { src: "assets/img/event-military.webp" },               // 군 입대
   eventTraining: { src: "assets/img/event-training.webp" },               // 특훈/재활
   eventAward:    { src: "assets/img/event-award.webp" },                  // 시상식
+  eventInjury:   { src: "assets/img/event-injury.webp" },                 // 부상
+  eventRetire:   { src: "assets/img/event-retire.webp" },                 // 은퇴(일반)
+  eventDemote:   { src: "assets/img/event-demote.webp" },                 // 강등
+  eventFa:       { src: "assets/img/event-fa.webp" },                     // FA 계약
+  eventTrade:    { src: "assets/img/event-trade.webp" },                  // 트레이드
 };
 
 export const BGM = {

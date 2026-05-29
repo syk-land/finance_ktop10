@@ -739,6 +739,7 @@ export const ko = {
     detected: "{type} 부상! ({weeks}주 예상)",
     detectedWithPart: "{part} {type} 부상! ({weeks}주 예상)",
     surgery: "토미존 수술 결정 — 시즌 아웃 ({weeks}주)",
+    modalTitle: "부상 발생",
     aftereffect: "부상 후유증 — 능력치 영구 감소",
     recovered: "{type} 부상이 회복됐다.",
     returned:  "{type} 부상에서 복귀했다.",

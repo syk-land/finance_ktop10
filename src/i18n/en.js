@@ -735,6 +735,7 @@ export const en = {
     detected: "{type} injury! (est. {weeks}w)",
     detectedWithPart: "{part} {type}! (est. {weeks}w)",
     surgery: "Tommy John surgery — out for the season ({weeks}w)",
+    modalTitle: "Injury",
     aftereffect: "Lingering aftereffect — permanent stat loss",
     recovered: "Recovered from {type}.",
     returned:  "Back from {type} injury.",

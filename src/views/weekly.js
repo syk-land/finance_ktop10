@@ -1740,7 +1740,7 @@ function showInjuryToastIfNeeded() {
   if (!inj?._isNew) return;
 
   if (inj.surgery) {
-    showToast(t("injury.surgery", { weeks: inj.weeksLeft }), "bad");
+    showInjuryModal(t("injury.surgery", { weeks: inj.weeksLeft }));   // 큰 부상(수술)은 컷 모달
   } else if (inj.bodyPart) {
     showToast(t("injury.detectedWithPart", {
       part: t("bodyPart." + inj.bodyPart),
@@ -1758,6 +1758,35 @@ function showInjuryToastIfNeeded() {
     setTimeout(() => showToast(t("injury.aftereffect"), "bad"), 600);
   }
   inj._isNew = false;
+}
+
+// 큰 부상(수술) 컷 모달 — eventInjury 일러스트 + 메시지.
+function showInjuryModal(msg) {
+  sfx("bad");
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  const dialog = document.createElement("div");
+  dialog.className = "modal-dialog";
+  dialog.style.maxWidth = "340px";
+  const h = document.createElement("h2");
+  h.style.color = "var(--bad)";
+  h.textContent = t("injury.modalTitle");
+  dialog.appendChild(h);
+  dialog.appendChild(eventCut("eventInjury"));
+  const p = document.createElement("p");
+  p.className = "muted small";
+  p.style.cssText = "margin:0 0 14px; line-height:1.5;";
+  p.textContent = msg;
+  dialog.appendChild(p);
+  const btn = document.createElement("button");
+  btn.className = "primary";
+  btn.style.cssText = "width:100%; padding:11px; font-weight:700;";
+  btn.textContent = t("common.confirm");
+  btn.addEventListener("pointerdown", e => { e.preventDefault(); backdrop.remove(); });
+  dialog.appendChild(btn);
+  backdrop.appendChild(dialog);
+  backdrop.addEventListener("click", e => { if (e.target === backdrop) backdrop.remove(); });
+  document.body.appendChild(backdrop);
 }
 
 // pendingToasts 큐를 소비 — 여러 개면 시간 차로 띄움.
@@ -2126,6 +2155,8 @@ function showFreeAgencyModal(fa, route, onClose) {
   h.textContent = t("fa.title");
   dialog.appendChild(h);
 
+  dialog.appendChild(eventCut("eventFa"));   // FA 계약 컷
+
   const desc = document.createElement("p");
   desc.className = "muted small";
   desc.style.cssText = "margin:0 0 12px; line-height:1.5;";
@@ -2198,6 +2229,8 @@ function showTradeModal(trade, route, onClose) {
   h.textContent = t("trade.title");
   dialog.appendChild(h);
 
+  dialog.appendChild(eventCut("eventTrade"));   // 트레이드 컷
+
   const desc = document.createElement("p");
   desc.className = "muted small";
   desc.style.cssText = "margin:0 0 14px; line-height:1.5;";
@@ -2257,6 +2290,8 @@ function showDemotionModal(fromStage, toStage, route) {
   const h = document.createElement("h2");
   h.textContent = t("demotion.title");
   dialog.appendChild(h);
+
+  dialog.appendChild(eventCut("eventDemote"));   // 강등 컷
 
   const desc = document.createElement("p");
   desc.className = "muted small";
@@ -2609,7 +2644,8 @@ function renderCareerEndedPanel(route) {
   title.textContent = t("hof." + rank + "Title");
   panel.appendChild(title);
 
-  if (rank === "hof") panel.appendChild(eventCut("eventHof"));   // 명예의 전당 헌액 컷
+  // 명예의 전당 헌액(hof)이면 헌액 컷, 그 외 등급은 일반 은퇴 컷.
+  panel.appendChild(eventCut(rank === "hof" ? "eventHof" : "eventRetire"));
 
   const desc = document.createElement("div");
   desc.className = "muted small";
