@@ -2274,6 +2274,38 @@ function showTradeModal(trade, route, onClose) {
   document.body.appendChild(backdrop);
 }
 
+// ─── 콜업 모달 ────────────────────────────────────────────────────
+// 시즌 종료 후 콜업(승격) 직후 표시 — 이전엔 로그만이라 모르고 지나감.
+function showPromotionModal(toStage) {
+  state.paused = true;
+  saveGame();
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  const dialog = document.createElement("div");
+  dialog.className = "modal-dialog";
+  dialog.style.maxWidth = "340px";
+
+  const h = document.createElement("h2");
+  h.style.color = "var(--good)";
+  h.textContent = t("promotion.title");
+  dialog.appendChild(h);
+
+  const p = document.createElement("p");
+  p.className = "muted small";
+  p.style.cssText = "margin:0 0 14px; line-height:1.5;";
+  p.textContent = t("promotion.desc", { stage: t("stage." + toStage), team: state.player.teamName });
+  dialog.appendChild(p);
+
+  const btn = document.createElement("button");
+  btn.className = "primary";
+  btn.style.cssText = "width:100%; padding:11px; font-weight:700;";
+  btn.textContent = t("common.confirm");
+  btn.addEventListener("click", () => { state.paused = false; saveGame(); backdrop.remove(); });
+  dialog.appendChild(btn);
+  backdrop.appendChild(dialog);
+  document.body.appendChild(backdrop);
+}
+
 // ─── 강등 모달 ────────────────────────────────────────────────────
 // 노쇠 등으로 한 단계 강등된 직후 표시 (이미 하위 단계로 전이됨).
 // [계속] = 강등 수용하고 하위 단계에서 진행 / [은퇴] = 커리어 종료.
@@ -2378,6 +2410,8 @@ function showOffseasonModal(route) {
           saveGame();
           backdrop.remove();
           route("weekly");
+          // 콜업 시 — 안내 모달 (이전엔 로그만이라 모르고 지나감).
+          if (tr?.promoted) showPromotionModal(tr.toStage);
           // 강등 시 — 안내 + 은퇴 선택 모달 (이미 하위 단계로 전이된 상태).
           if (tr?.demoted) showDemotionModal(tr.fromStage, tr.toStage, route);
         };
@@ -2397,7 +2431,11 @@ function showOffseasonModal(route) {
 
 function buildOffseasonPickPhase(dialog, rerender) {
   const h = document.createElement("h2");
-  h.textContent = t("offseason.title", { grade: state.player.grade });
+  // 아마추어(고교/대학)는 "{grade}학년 종료", 프로/MLB 는 학년 개념이 없으므로 "만N세 시즌 종료".
+  const isAmateur = state.player.stage === "high" || state.player.stage === "univ";
+  h.textContent = isAmateur
+    ? t("offseason.title", { grade: state.player.grade })
+    : t("offseason.titlePro", { age: state.player.age });
   dialog.appendChild(h);
 
   const hint = document.createElement("p");

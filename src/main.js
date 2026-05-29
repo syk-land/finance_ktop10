@@ -16,7 +16,7 @@ import {
   t, loadLocaleFromStorage,
 } from "./i18n/index.js";
 import { openSettingsModal } from "./views/settingsModal.js";
-import { initAudioUnlock, playBgm } from "./assets/audio.js";
+import { initAudioUnlock, playBgm, sfx } from "./assets/audio.js";
 import { preloadImages } from "./assets/images.js";
 
 // 뷰별 BGM 매핑 — 시작/메뉴/상점은 menu 곡, 경기는 game 곡.
@@ -218,6 +218,22 @@ function init() {
   setupScrollTopButton();
   initAudioUnlock();   // 첫 사용자 제스처에 오디오 unlock
   preloadImages();     // preload=true 이미지 미리 받기 (없으면 조용히 실패)
+  // 모든 버튼 클릭에 효과음(위임) + 모달 통과 클릭 차단.
+  // 통과 클릭: 모달이 pointerdown 으로 닫히면, 같은 탭의 click 이 뒤에 드러난 요소(예: 훈련 버튼)에
+  //   떨어져 의도치 않게 눌린다. pointerdown 이 모달 안에서 시작됐는데 click 이 모달 밖이면 그 click 을 무시.
+  let pdInModal = false;
+  document.addEventListener("pointerdown", e => {
+    pdInModal = !!e.target?.closest?.(".modal-backdrop");
+    const btn = e.target?.closest?.("button");
+    if (btn && !btn.disabled) sfx("click");
+  }, true);
+  document.addEventListener("click", e => {
+    if (pdInModal && !e.target?.closest?.(".modal-backdrop")) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    pdInModal = false;
+  }, true);
   route("start");
   scheduleTick();
 }

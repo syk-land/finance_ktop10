@@ -42,6 +42,16 @@
 | event-fa (eventFa) | FA 계약 | `A Korean baseball player at a press table signing a contract with a pen, confident smile, a new team cap and folded jersey on the table, camera flashes, celebratory professional press conference` |
 | event-trade (eventTrade) | 트레이드 | `A Korean baseball player carrying a duffel bag over his shoulder, glancing back at his old stadium while wearing a new team's cap, moving-on mood, overcast evening sky` |
 
+### 결승 POV / 캐릭터 생성 (다음 단계, 애니메이션 검토)
+| 파일(→키) | 장면 | 프롬프트 (앞부분 + 공통 접미) |
+|---|---|---|
+| pov-bat (povBat) | 타석 POV | `First-person batter's box point of view in a baseball stadium, pitcher winding up on the mound ahead, catcher and umpire framing, tense at-bat moment` |
+| pov-pitch (povPitch) | 마운드 POV | `First-person pitcher's mound point of view, looking toward home plate, batter set in the box and catcher giving signs, stadium crowd behind` |
+| char-batter (charBatter) | 생성-타자 | `Full-body Korean baseball player in batting stance with bat, clean studio background, character select pose, confident` |
+| char-pitcher (charPitcher) | 생성-투수 | `Full-body Korean baseball player in pitching wind-up pose, clean studio background, character select pose` |
+
+> 애니메이션: Gemini는 정지뿐. 1순위 = 정지 이미지 + CSS 미세 모션(줌/흔들림). 타격 폼은 스프라이트 시트(프레임 여러 장 → CSS steps()) 검토. 상세는 `.claude/handoff.md`.
+
 ### BGM (MusicFX / Lyria, 루프 ≤1MB)
 | 파일 | 프롬프트 |
 |---|---|

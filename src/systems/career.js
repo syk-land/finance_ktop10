@@ -47,10 +47,10 @@ export function transitionAfterSeason() {
   // 콜업 체크 (KBO 2군 → 1군 / MLB 마이너 각 단계 → 다음 단계)
   const promotion = checkPromotion(player);
   if (promotion) {
+    const fromStage = player.stage;
     const pool = getTeamPool(promotion, getLocale());
-    const pick = pickTeamForStage(pool, player);
     player.stage = promotion;
-    player.teamName = pick.name;
+    player.teamName = teamForStageKeeping(pool, player);   // 같은 구단 풀이면 팀 유지 (2군→1군 등)
     player.gamesSinceLastPitch = 99;
     player.injury = null;
     resetGameDateForNewSeason(state.gameDate);
@@ -60,7 +60,7 @@ export function transitionAfterSeason() {
       msg: t("log.promoted", { stage: t("stage." + promotion), team: player.teamName }),
       kind: "good",
     });
-    return { ended: false, promoted: true };
+    return { ended: false, promoted: true, fromStage, toStage: promotion };
   }
 
   // 강등 체크 (노쇠 등으로 유지 임계 미달) — 콜업이 아닐 때만. 한 단계 하향 후 모달로 은퇴 선택 제공.
@@ -68,9 +68,8 @@ export function transitionAfterSeason() {
   if (demotion) {
     const fromStage = player.stage;
     const pool = getTeamPool(demotion, getLocale());
-    const pick = pickTeamForStage(pool, player);
     player.stage = demotion;
-    player.teamName = pick.name;
+    player.teamName = teamForStageKeeping(pool, player);   // 같은 구단 풀이면 팀 유지 (1군→2군 등)
     player.gamesSinceLastPitch = 99;
     player.injury = null;
     resetGameDateForNewSeason(state.gameDate);
@@ -263,6 +262,13 @@ export function transitionToStage(targetStage, teamNameOverride = null) {
     msg: t("log.stageTransition", { stage: t("stage." + targetStage), team: player.teamName }),
     kind: "good",
   });
+}
+
+// 단계 이동 시 팀 결정 — 현재 팀이 새 단계의 팀 풀에 있으면 그대로 유지(같은 구단),
+// 없으면(다른 리그로 이동 등) 새로 배정. KBO 2군↔1군 / MLB 마이너↔메이저는 같은 풀이라 구단 유지.
+function teamForStageKeeping(pool, player) {
+  const same = pool.find(t => t.name === player.teamName);
+  return (same ?? pickTeamForStage(pool, player)).name;
 }
 
 function pickTeamForStage(pool, player) {

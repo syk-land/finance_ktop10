@@ -97,6 +97,7 @@ export const ko = {
   // 시즌 종료 후 휴식기 — 카테고리 선택 → 이벤트 제안 yes/no → 결과
   offseason: {
     title: "휴식기 — {grade}학년 종료",
+    titlePro: "휴식기 — 만{age}세 시즌 종료",
     pickHint: "다음 시즌까지 어떻게 보낼까?",
     proposalTitle: "특별한 일이 생겼다!",
     btnYes: "도전한다",
@@ -778,6 +779,11 @@ export const ko = {
     retired: "야구 인생을 마감합니다.",
     promoted: "{stage} {team} 콜업!",
     demoted: "{stage} {team}(으)로 강등...",
+  },
+
+  promotion: {
+    title: "콜업!",
+    desc: "{team} {stage}(으)로 콜업되었습니다. 더 높은 무대에서 뜁니다.",
   },
 
   demotion: {

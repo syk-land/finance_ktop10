@@ -96,6 +96,7 @@ export const en = {
   // Offseason — pick a category → event proposal yes/no → result
   offseason: {
     title: "Offseason — Year {grade} Ended",
+    titlePro: "Offseason — Age {age} Season Ended",
     pickHint: "How will you spend the break?",
     proposalTitle: "Something special came up!",
     btnYes: "Take it on",
@@ -774,6 +775,11 @@ export const en = {
     retired: "Retired from baseball.",
     promoted: "Called up to {team} ({stage})!",
     demoted: "Demoted to {team} ({stage})...",
+  },
+
+  promotion: {
+    title: "Called up!",
+    desc: "Called up to {team} ({stage}). Time to play on a bigger stage.",
   },
 
   demotion: {

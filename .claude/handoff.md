@@ -59,6 +59,21 @@
 오디오 `assets/audio/`: `bgm-menu.mp3` (메뉴 루프 ≤1MB), `bgm-game.mp3` (경기 루프 ≤1MB).
 (상세 스펙은 `assets/README.md`.)
 
+## 진행 메모 (v0.7.1 fix — 이번 세션)
+- 배포: firebase.json ignore 에서 `assets/**` 제거(→ 이미지·BGM 배포). 원본 폴더는 ignore.
+- 오디오: 효과음 suspended-resume + 모든 버튼 클릭음. 모달 통과클릭 전역 가드(main.js).
+- 콜업: 같은 구단 유지(teamForStageKeeping) + 콜업 모달(showPromotionModal). 휴식기 타이틀 프로=나이.
+
+## 다음 세션 — 결승 POV / 캐릭터 생성 이미지 + 애니메이션 (사용자 요청, 미착수)
+- 대상: ① 결승전 라이브 모달 POV 씬(`src/render/finalAnim.js` createPOVScene — 현재 SVG),
+  ② 캐릭터 생성 화면(`src/views/menu.js` renderPreview — 현재 createCharacterSVG).
+- 이미지: Gemini 로 생성(프롬프트는 `assets/README.md` Phase 2 에 POV/캐릭터 항목 추가해둠).
+- **애니메이션 현실성**: Gemini 는 정지 이미지만. 선택지 —
+  (a) 정지 이미지 + CSS 미세 애니(살짝 줌/흔들림/패럴랙스) — 쉽고 가벼움, 권장 1순위.
+  (b) 스프라이트 시트(여러 프레임 한 장) → CSS steps() 로 프레임 애니 — 타격 폼 등.
+  (c) 영상 생성(Veo 등) → 짧은 루프 webp/mp4 — 용량·생성난도↑.
+- 권장: 우선 (a) 로 정지 일러스트 교체 + 은은한 모션, 반응 보고 (b) 검토.
+
 ## 다음 세션 시작 시 할 일 (우선순위)
 1. **부족 이벤트 컷 생성** (부상/은퇴/강등/FA·트레이드) — 프롬프트 시트(`assets/README.md`)에 추가 후 사용자가 Gemini 로 생성 → `gemini_images/` → §에셋 가공(워터마크 제거+WebP) → manifest 키 추가 → 해당 모달에 `eventCut(키)`.
    (강등=showDemotionModal, FA=showFreeAgencyModal, 트레이드=showTradeModal, 부상/은퇴=해당 표시 지점)

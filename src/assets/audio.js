@@ -55,7 +55,8 @@ function whiteNoise(c, dur) {
 export function sfx(name) {
   if (isMuted()) return;
   const c = audioCtx();
-  if (!c || c.state !== "running") return;   // unlock 전이면 무음
+  if (!c) return;
+  if (c.state === "suspended") c.resume().catch(() => {});  // 첫 제스처 직후에도 울리도록
   const t = c.currentTime;
   const vol = sfxVol();
   const out = c.createGain();
