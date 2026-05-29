@@ -8,7 +8,7 @@
 //
 // 사용 측은 trait 시스템을 모르더라도 kind 키만 알면 효과를 적용할 수 있다.
 
-import { TRAITS, RELICS } from "../data/shopCatalog.js";
+import { TRAITS, relicResolvedEffect } from "../data/shopCatalog.js";
 
 function collectEffects(player) {
   const out = [];
@@ -16,8 +16,9 @@ function collectEffects(player) {
     const e = TRAITS[k]?.effect;
     if (e) out.push(e);
   }
+  // 유물은 레벨에 따라 효과가 커진다 — player.relicLevels[key] (없으면 Lv.1).
   for (const k of player?.relics ?? []) {
-    const e = RELICS[k]?.effect;
+    const e = relicResolvedEffect(k, player?.relicLevels?.[k] ?? 1);
     if (e) out.push(e);
   }
   return out;

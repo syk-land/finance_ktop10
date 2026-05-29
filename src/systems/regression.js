@@ -15,7 +15,7 @@
 import { state } from "../state.js";
 import {
   TALENT_SLOTS_TIERS, STAT_KEYS, STAT_CAP_STEP, statCapCost,
-  STARTING_STAT_PRESETS, TRAITS, RELICS, isTraitUnlocked,
+  STARTING_STAT_PRESETS, TRAITS, RELICS, isTraitUnlocked, relicCost,
 } from "../data/shopCatalog.js";
 
 export const REGRESSION_KEY = "ninthinning.regression.v1";
@@ -30,7 +30,8 @@ export function defaultRegressionMeta() {
       talentSlots: 0,                              // 0~2 (추가 슬롯 수. 총 1+N 재능)
       statCaps: {},                                // 스탯별 +5 캡 구매 횟수 { contact:N, ... } — 전 stage 공통
       ownedTraits: [],                              // 영구 소유 trait 키 — 장착/해제와 무관, 한 번 사면 보존
-      ownedRelics: [],                              // 영구 소유 relic 키
+      ownedRelics: [],                              // 영구 소유 relic 키 (relicLevels 와 동기 — 키 존재 = 보유)
+      relicLevels: {},                              // 유물 레벨 { relicKey: level(>=1) } — 재구매 시 +1, 효과 점증
     },
     unlockedItems: [],                              // 도전과제 해금 키
     loadout: {
@@ -63,6 +64,11 @@ function migrateMeta(data) {
   }
   for (const k of out.loadout.relics) {
     if (!out.permanentPurchases.ownedRelics.includes(k)) out.permanentPurchases.ownedRelics.push(k);
+  }
+  // 유물 레벨 — 누락(옛 세이브) 시 보유 유물을 Lv.1 로 초기화.
+  out.permanentPurchases.relicLevels = { ...(data?.permanentPurchases?.relicLevels ?? {}) };
+  for (const k of out.permanentPurchases.ownedRelics) {
+    if (!(out.permanentPurchases.relicLevels[k] >= 1)) out.permanentPurchases.relicLevels[k] = 1;
   }
   return out;
 }
@@ -229,16 +235,19 @@ export function purchaseTrait(key) {
 }
 
 // relic 구매 — 미소유시 비용 차감 + ownedRelics 등록. 소유 중이면 no-op.
+// 유물 구매 — 첫 구매는 Lv.1 보유, 재구매 시 레벨업(효과·가격 점증, 상한 없음).
 export function purchaseRelic(key) {
   const m = ensureMeta();
   if (!RELICS[key]) return { ok: false, reason: "invalid" };
-  if (m.permanentPurchases.ownedRelics.includes(key)) return { ok: false, reason: "owned" };
-  const cost = RELICS[key].cost;
+  if (!m.permanentPurchases.relicLevels) m.permanentPurchases.relicLevels = {};
+  const curLevel = m.permanentPurchases.relicLevels[key] ?? 0;
+  const cost = relicCost(key, curLevel);
   if (m.balance < cost) return { ok: false, reason: "insufficient_balance" };
   m.balance -= cost;
-  m.permanentPurchases.ownedRelics.push(key);
+  m.permanentPurchases.relicLevels[key] = curLevel + 1;
+  if (!m.permanentPurchases.ownedRelics.includes(key)) m.permanentPurchases.ownedRelics.push(key);
   saveRegressionMeta();
-  return { ok: true, key, cost };
+  return { ok: true, key, cost, level: curLevel + 1 };
 }
 
 export function resetLoadout() {
@@ -251,10 +260,14 @@ export function resetLoadout() {
 // 1회용 효과 (시작 능력치/특성/유물) 가 캐릭터당 1번만 적용되도록 보장.
 export function consumeLoadoutForCharacter() {
   const m = ensureMeta();
+  // 장착 유물의 레벨도 함께 넘김 — 캐릭터 효과 계산(traitEffects)에서 레벨 반영.
+  const relicLevels = {};
+  for (const k of m.loadout.relics) relicLevels[k] = m.permanentPurchases.relicLevels?.[k] ?? 1;
   const snapshot = {
     startingStat: m.loadout.startingStat,
     traits: [...m.loadout.traits],
     relics: [...m.loadout.relics],
+    relicLevels,
   };
   resetLoadout();
   return snapshot;

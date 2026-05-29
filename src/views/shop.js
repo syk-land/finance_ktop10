@@ -23,7 +23,7 @@ import {
 } from "../systems/regression.js";
 import {
   TALENT_SLOTS_TIERS, STAT_KEYS, STAT_CAP_STEP, statCapCost,
-  STARTING_STAT_PRESETS, TRAITS, RELICS, isTraitUnlocked,
+  STARTING_STAT_PRESETS, TRAITS, RELICS, isTraitUnlocked, relicCost, relicEffectValue,
 } from "../data/shopCatalog.js";
 
 let activeTab = "talent";
@@ -318,39 +318,61 @@ function renderRelicTab() {
 
   for (const key of Object.keys(RELICS)) {
     const re = RELICS[key];
-    const owned = m.permanentPurchases.ownedRelics.includes(key);
+    const lvl = m.permanentPurchases.relicLevels?.[key] ?? 0;
+    const owned = lvl >= 1;
     const equipped = m.loadout.relics.includes(key);
     const capacity = m.loadout.relics.length < 2;
-    const canBuy = !owned && m.balance >= re.cost;
+    const cost = relicCost(key, lvl);            // 다음 레벨 구매 비용
+    const canBuy = m.balance >= cost;
+    const curStr = owned ? fmtRelicVal(key, relicEffectValue(key, lvl)) : null;
+    const nextStr = fmtRelicVal(key, relicEffectValue(key, lvl + 1));
 
-    let cardState;
-    if (equipped) cardState = "equipped";
-    else if (owned) cardState = capacity ? "equippable" : "full";
-    else if (canBuy) cardState = "buyable";
-    else cardState = "insufficient";
+    // 효과 안내 — 현재(보유 시) → 다음 레벨
+    const effLine = owned
+      ? t("shop.relicLevelCur", { lvl, cur: curStr, next: nextStr })
+      : t("shop.relicLevelBuy", { next: nextStr });
 
-    panel.appendChild(makeShopCard({
-      title: t("relic." + key + ".name"),
-      desc: t("relic." + key + ".desc"),
-      cost: re.cost,
-      state: cardState,
+    const buyCard = makeShopCard({
+      title: t("relic." + key + ".name") + (owned ? ` Lv.${lvl}` : ""),
+      desc: t("relic." + key + ".desc") + " · " + effLine,
+      cost,
+      state: canBuy ? "buyable" : "insufficient",
       onClick: () => {
-        if (equipped) {
-          const next = m.loadout.relics.filter(k => k !== key);
-          setRelics(next);
-        } else if (owned) {
-          if (!capacity) return;
-          setRelics([...m.loadout.relics, key]);
-        } else {
-          const r = purchaseRelic(key);
-          if (!r.ok) return;
-          if (capacity) setRelics([...m.loadout.relics, key]);
-        }
+        const r = purchaseRelic(key);
+        if (!r.ok) return;
+        // 첫 구매(Lv.1)면 자리 있을 때 자동 장착.
+        if (r.level === 1 && !equipped && capacity) setRelics([...m.loadout.relics, key]);
         renderShop(document.getElementById("view-root"), routeRef);
       },
-    }));
+    });
+    panel.appendChild(buyCard);
+
+    // 장착/해제 토글 (보유 시) — 캐릭터당 최대 2개.
+    if (owned) {
+      const eq = document.createElement("button");
+      eq.type = "button";
+      eq.style.cssText = "width:100%; margin:-4px 0 8px; padding:6px; font-size:11px;";
+      eq.textContent = equipped ? t("shop.relicUnequip") : (capacity ? t("shop.relicEquip") : t("shop.relicEquipFull"));
+      eq.className = equipped ? "primary" : "";
+      eq.disabled = !equipped && !capacity;
+      eq.addEventListener("click", () => {
+        if (equipped) setRelics(m.loadout.relics.filter(k => k !== key));
+        else if (capacity) setRelics([...m.loadout.relics, key]);
+        else return;
+        renderShop(document.getElementById("view-root"), routeRef);
+      });
+      panel.appendChild(eq);
+    }
   }
   return panel;
+}
+
+// 유물 효과값 표시 형식 — multiplier ×N / flatAddPct +N% / boost +N.
+function fmtRelicVal(key, v) {
+  const prop = RELICS[key]?.effect?.prop ?? "multiplier";
+  if (prop === "flatAddPct") return `+${v}%`;
+  if (prop === "boost")      return `+${v}`;
+  return `×${v}`;
 }
 
 // ── 카드 컴포넌트 ────────────────────────────────────────────────

@@ -85,14 +85,44 @@ export const TRAITS = {
 };
 
 // ── 5. 유물 (재구매·1~2개 장착) ────────────────────────────────────
+// 유물 — 저가·저효과로 시작해, 재구매할 때마다 레벨업(효과·가격 점증). 캐릭터당 최대 2개 장착.
+//   effect.base   : Lv.1 효과값
+//   effect.perLevel: 레벨당 증감 (errorChance 처럼 낮을수록 강한 건 음수)
+//   effect.prop   : 적용 방식 — "multiplier" | "flatAddPct" | "boost"
+//   effect.min/max: 효과값 한계 (선택)
+//   cost / costGrowth: Lv.1 가격 / 레벨당 가격 증가분
 export const RELICS = {
-  past_life_notes: { cost: 100, effect: { kind: "firstSeasonTrainBoost",    multiplier: 2.0 } },
-  lucky_bat:       { cost:  80, effect: { kind: "walkoffChance",            flatAddPct: 5 } },
-  calling_card:    { cost: 150, effect: { kind: "draftRound",               boost: 1 } },
-  mentor_letter:   { cost: 100, effect: { kind: "autoTrainDeficitBoost",    multiplier: 1.5 } },
-  prosthetic:      { cost: 120, effect: { kind: "injuryRecoverySpeed",      multiplier: 2.0 } },
-  golden_glove:    { cost: 150, effect: { kind: "errorChance",              multiplier: 0.5 } },
+  past_life_notes: { cost: 60,  costGrowth: 50, effect: { kind: "firstSeasonTrainBoost", prop: "multiplier", base: 1.3, perLevel: 0.25 } },
+  lucky_bat:       { cost: 50,  costGrowth: 40, effect: { kind: "walkoffChance",          prop: "flatAddPct", base: 3,   perLevel: 2 } },
+  calling_card:    { cost: 100, costGrowth: 90, effect: { kind: "draftRound",             prop: "boost",      base: 1,   perLevel: 1 } },
+  mentor_letter:   { cost: 60,  costGrowth: 50, effect: { kind: "autoTrainDeficitBoost",  prop: "multiplier", base: 1.2, perLevel: 0.2 } },
+  prosthetic:      { cost: 70,  costGrowth: 60, effect: { kind: "injuryRecoverySpeed",    prop: "multiplier", base: 1.4, perLevel: 0.3 } },
+  golden_glove:    { cost: 90,  costGrowth: 70, effect: { kind: "errorChance",            prop: "multiplier", base: 0.7, perLevel: -0.08, min: 0.3 } },
 };
+
+// 다음 레벨(currentLevel→+1) 구매 비용. currentLevel 0 = 첫 구매.
+export function relicCost(key, currentLevel = 0) {
+  const r = RELICS[key];
+  if (!r) return Infinity;
+  return r.cost + (r.costGrowth ?? 0) * currentLevel;
+}
+// 레벨 반영 효과값.
+export function relicEffectValue(key, level = 1) {
+  const r = RELICS[key];
+  if (!r) return null;
+  const e = r.effect;
+  const L = Math.max(1, level);
+  let v = e.base + (e.perLevel ?? 0) * (L - 1);
+  if (e.min != null) v = Math.max(e.min, v);
+  if (e.max != null) v = Math.min(e.max, v);
+  return +v.toFixed(2);
+}
+// player.relics 효과 계산용 — 레벨 반영된 정규화 effect 객체 ({kind, [prop]: value}).
+export function relicResolvedEffect(key, level = 1) {
+  const r = RELICS[key];
+  if (!r) return null;
+  return { kind: r.effect.kind, [r.effect.prop ?? "multiplier"]: relicEffectValue(key, level) };
+}
 
 // ── 헬퍼 ───────────────────────────────────────────────────────────
 // 다음 tier (구매 가능한) — 이미 max tier 면 null

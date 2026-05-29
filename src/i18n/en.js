@@ -525,7 +525,12 @@ export const en = {
     },
 
     traitDesc:       "Equip up to 3 traits. One-shot for next character. ({equipped}/3)",
-    relicDesc:       "Equip up to 2 relics. One-shot for next character. ({equipped}/2)",
+    relicDesc:       "Relics level up each time you rebuy them (stronger effect, higher price). Equip up to 2, applied to next character. ({equipped}/2)",
+    relicLevelBuy:   "Buy → Lv.1 ({next})",
+    relicLevelCur:   "Lv.{lvl} {cur} → Lv.{lvl}+1 {next}",
+    relicEquip:      "Equip",
+    relicUnequip:    "Unequip",
+    relicEquipFull:  "Slots full (2/2)",
   },
 
   trait: {

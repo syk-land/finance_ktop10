@@ -528,7 +528,12 @@ export const ko = {
     },
 
     traitDesc:       "특성을 최대 3개까지 장착. 다음 캐릭터 1회 효과. ({equipped}/3 장착)",
-    relicDesc:       "유물을 최대 2개까지 장착. 다음 캐릭터 1회 효과. ({equipped}/2 장착)",
+    relicDesc:       "유물은 재구매할 때마다 레벨업(효과 강화·가격 상승). 최대 2개 장착, 다음 캐릭터 1회 적용. ({equipped}/2 장착)",
+    relicLevelBuy:   "구매 시 Lv.1 ({next})",
+    relicLevelCur:   "Lv.{lvl} {cur} → Lv.{lvl}+1 {next}",
+    relicEquip:      "장착",
+    relicUnequip:    "장착 해제",
+    relicEquipFull:  "장착 꽉 참 (2/2)",
   },
 
   trait: {

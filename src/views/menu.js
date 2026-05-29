@@ -523,6 +523,7 @@ function renderCreatePanel(route) {
       startingStat: loadout.startingStat,
       traits: loadout.traits,
       relics: loadout.relics,
+      relicLevels: loadout.relicLevels,
     });
     startHighSchoolCareer(name, draft.talent, null);
     state.gameDate = createGameDate();
