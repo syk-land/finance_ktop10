@@ -3,11 +3,11 @@
 // i18n: 사용자 표시 문자열은 모두 t() 호출.
 // 캐릭터 이름은 사용자 입력 그대로 저장 (locale 토글해도 변경되지 않음).
 
-import { state, hasSave, loadGame, deleteSave, saveGame, resetState, getLocalSavedAt } from "../state.js";
+import { state, hasSave, loadGame, deleteSave, saveGame, resetState, resetAllData, getLocalSavedAt } from "../state.js";
 import { createPlayer, TALENTS } from "../systems/player.js";
 import { startHighSchoolCareer } from "../systems/career.js";
 import { consumeLoadoutForCharacter, loadRegressionMeta } from "../systems/regression.js";
-import { loadFromCloud, getCloudSaveMeta } from "../cloud/cloudSave.js";
+import { loadFromCloud, getCloudSaveMeta, deleteFromCloud } from "../cloud/cloudSave.js";
 import { isSignedIn, isAnonymousUser, linkAnonToGoogle, signOutCloud } from "../cloud/auth.js";
 import { FACES, createFaceSVG } from "../render/avatars.js";
 import { createCharacterSVG } from "../render/character.js";
@@ -80,6 +80,7 @@ export function renderMenu(root, route) {
     wrap.appendChild(renderCloudLoadPanel(route));
   }
   wrap.appendChild(renderCreatePanel(route));
+  wrap.appendChild(renderResetPanel(route));
   root.appendChild(wrap);
 
   // 세이브가 있으면 모달 오버레이로 이어하기 노출
@@ -195,6 +196,48 @@ function renderCloudLoadPanel(route) {
   row.appendChild(btn);
 
   panel.appendChild(row);
+  return panel;
+}
+
+// 전체 데이터 초기화 — 세이브/회귀/설정 전부 삭제 (locale 유지).
+// 로그인 상태면 클라우드 문서도 삭제. 되돌릴 수 없으므로 danger confirm 모달 경유.
+function renderResetPanel(route) {
+  const panel = document.createElement("section");
+  panel.className = "panel";
+  panel.style.padding = "10px";
+
+  const desc = document.createElement("div");
+  desc.className = "muted small";
+  desc.style.cssText = "font-size:11px; margin-bottom:8px; line-height:1.4;";
+  desc.textContent = t("menu.resetAllDesc");
+  panel.appendChild(desc);
+
+  const btn = button(t("menu.resetAll"), "danger", () => {
+    const cloudIncluded = isSignedIn();
+    showConfirmModal({
+      title: t("menu.resetAll"),
+      message: cloudIncluded ? t("menu.confirmResetAllCloud") : t("menu.confirmResetAll"),
+      confirmLabel: t("menu.resetAll"),
+      cancelLabel: t("common.cancel"),
+      danger: true,
+      onConfirm: async () => {
+        // 클라우드 문서 먼저 삭제 시도 — 실패해도 로컬 초기화는 진행.
+        if (cloudIncluded) {
+          const r = await deleteFromCloud();
+          if (!r.ok && r.reason !== "not_found") {
+            console.warn("[reset] cloud delete failed:", r.reason);
+          }
+        }
+        resetAllData();
+        location.reload();
+      },
+    });
+  });
+  btn.style.width = "100%";
+  btn.style.padding = "10px";
+  btn.style.fontSize = "13px";
+  panel.appendChild(btn);
+
   return panel;
 }
 

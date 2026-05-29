@@ -207,3 +207,22 @@ export function resetState() {
   state.pendingEvents = [];
   // locale 은 게임 리셋과 무관하게 사용자 선택을 유지
 }
+
+// 전체 데이터 초기화 — 세이브/회귀/설정 등 ninthinning.* localStorage 키를 모두 제거.
+// locale (ninthinning.locale.v1) 은 UI 선호이므로 keepLocale 옵션으로 보존 (기본 true).
+// 클라우드(Firestore) 문서 삭제는 별도(cloudSave.deleteFromCloud) — 호출 측에서 처리.
+const LOCALE_KEY = "ninthinning.locale.v1";
+export function resetAllData({ keepLocale = true } = {}) {
+  const toRemove = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k || !k.startsWith("ninthinning.")) continue;
+    if (keepLocale && k === LOCALE_KEY) continue;
+    toRemove.push(k);
+  }
+  for (const k of toRemove) localStorage.removeItem(k);
+  resetState();
+  // 별도 키로 영속화되는 메타도 메모리에서 비워 다음 로드가 기본값을 다시 만들게 함.
+  state.regression = null;
+  state.settings = null;
+}

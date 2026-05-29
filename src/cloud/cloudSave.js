@@ -11,7 +11,7 @@
 //   - 사용자가 ☁️ 불러오기 버튼 누를 때만 1 read
 //   - hasCloudSave 체크가 필요하면 read 1회 추가 — UI 가 load 시도 직전에 한 번만.
 
-import { doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 import { state } from "../state.js";
 import { getFirebaseDb, isFirebaseReady } from "./firebase.js";
 import { currentUid, isSignedIn } from "./auth.js";
@@ -114,6 +114,23 @@ export async function getCloudSaveMeta() {
   } catch (e) {
     console.error("[cloud] getCloudSaveMeta 실패", e);
     return null;
+  }
+}
+
+// ☁️ 삭제 — Firestore 의 saves/{uid} 문서 제거 (전체 데이터 초기화용).
+// 되돌릴 수 없음. 미로그인/firebase 미준비/문서 없음은 모두 graceful 처리.
+// 반환: { ok: true } | { ok: false, reason: string }
+export async function deleteFromCloud() {
+  if (!isFirebaseReady()) return { ok: false, reason: "firebase_not_ready" };
+  if (!isSignedIn())      return { ok: false, reason: "not_signed_in" };
+  const ref = saveDocRef();
+  if (!ref) return { ok: false, reason: "no_ref" };
+  try {
+    await deleteDoc(ref);
+    return { ok: true };
+  } catch (e) {
+    console.error("[cloud] deleteFromCloud 실패", e);
+    return { ok: false, reason: "delete_failed", error: e.message };
   }
 }
 
