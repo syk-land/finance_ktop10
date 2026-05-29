@@ -26,3 +26,6 @@ package-lock.json
 # Claude Code 로컬 설정 (개인 권한)
 .claude/settings.local.json
 probe-debug.mjs
+
+# Gemini 원본 이미지 (대용량 — 가공본만 assets/ 에 커밋)
+gemini_images/

@@ -8,9 +8,15 @@
 // 생성된 에셋을 아래 경로/파일명에 맞춰 넣으면 즉시 반영된다.
 
 export const IMAGES = {
-  titleHero:     { src: "assets/img/title-hero.png",     preload: true },  // 타이틀 화면 대표 일러스트
-  eventDraft:    { src: "assets/img/event-draft.png" },                    // 특별이벤트 컷 (예시)
-  eventChampion: { src: "assets/img/event-champion.png" },
+  titleHero:     { src: "assets/img/title-hero.webp",    preload: true },  // 타이틀 — 석양 타자
+  eventChampion: { src: "assets/img/event-champion.webp" },               // 우승 트로피 세리머니
+  eventHof:      { src: "assets/img/event-hof.webp" },                    // 명예의 전당 헌액
+  eventDraft:    { src: "assets/img/event-draft.webp" },                  // 드래프트 입단
+  eventIntl:     { src: "assets/img/event-intl.webp" },                   // 국제대회 금메달(대표팀)
+  eventAllstar:  { src: "assets/img/event-allstar.webp" },                // 올스타전
+  eventMilitary: { src: "assets/img/event-military.webp" },               // 군 입대
+  eventTraining: { src: "assets/img/event-training.webp" },               // 특훈/재활
+  eventAward:    { src: "assets/img/event-award.webp" },                  // 시상식
 };
 
 export const BGM = {
