@@ -4,7 +4,7 @@
 // 로케일 변경 시 모든 정적 chrome (logo/title/footer)와 현재 뷰를 재렌더한다.
 
 import { state, loadGame, hasSave, saveGame } from "./state.js";
-import { renderMenu } from "./views/menu.js";
+import { renderMenu, renderStart } from "./views/menu.js";
 import { renderWeekly } from "./views/weekly.js";
 import { renderShop } from "./views/shop.js";
 import { advanceOneDay } from "./systems/tick.js";
@@ -18,6 +18,7 @@ import {
 import { openSettingsModal } from "./views/settingsModal.js";
 
 const VIEWS = {
+  start: renderStart,
   menu: renderMenu,
   weekly: renderWeekly,
   shop: renderShop,
@@ -208,7 +209,7 @@ function init() {
   wireSettingsButton();
   wirePauseButton();
   setupScrollTopButton();
-  route("menu");
+  route("start");
   scheduleTick();
 }
 

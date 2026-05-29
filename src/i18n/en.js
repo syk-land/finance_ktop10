@@ -817,6 +817,11 @@ export const en = {
   },
 
   menu: {
+    loading: "Loading…",
+    tagline: "From freshman year to retirement — a baseball life sim",
+    newGameBtn: "New Game",
+    backToStart: "Start screen",
+    lastSavedAt: "Last saved: {when}",
     continueTitle: "Continue",
     continueHint: "A saved game was found.",
     continueBtn: "Continue",

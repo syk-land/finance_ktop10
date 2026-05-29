@@ -13,6 +13,7 @@ import { FACES, createFaceSVG } from "../render/avatars.js";
 import { createCharacterSVG } from "../render/character.js";
 import { createGameDate } from "../systems/tick.js";
 import { t, getLocale } from "../i18n/index.js";
+import { randomName } from "../data/names.js";
 import { resetWeeklyCarousel } from "./weekly.js";
 
 // 신규 게임 입력 상태 (라이브 갱신용)
@@ -62,31 +63,132 @@ function relativeTime(ts) {
   return t("menu.dayAgo", { n: day });
 }
 
-export function renderMenu(root, route) {
+// 시작(타이틀/로딩) 화면 — 앱 진입 첫 화면.
+//   1) 최초 1회 짧은 로딩 연출 → 2) 타이틀 메뉴 (이어하기/새 게임 + 로그인/클라우드/상점/데이터초기화)
+//   캐릭터 생성 화면(renderMenu)은 깔끔하게 생성만 담당하도록 분리.
+let startLoadingDone = false;
+export function renderStart(root, route) {
   root.innerHTML = "";
   const wrap = document.createElement("div");
   wrap.className = "stack";
-  // Google 계정 연동 / 로그인 상태 표시 — Firebase 활성일 때만.
-  if (isSignedIn()) {
-    wrap.appendChild(renderAuthPanel(route));
+  root.appendChild(wrap);
+
+  if (startLoadingDone) {
+    buildStartMenu(wrap, route);
+    return;
   }
-  // 회귀 메타가 1회 이상 적립된 경우만 상점 진입 노출
+  // 로딩 연출 (1회) — 로고 + 스피너, 잠시 후 타이틀 메뉴로 전환.
+  buildLoadingPhase(wrap);
+  setTimeout(() => {
+    startLoadingDone = true;
+    if (state.view === "start") { wrap.innerHTML = ""; buildStartMenu(wrap, route); }
+  }, 900);
+}
+
+function ensureSpinnerStyle() {
+  if (document.getElementById("spin-style")) return;
+  const s = document.createElement("style");
+  s.id = "spin-style";
+  s.textContent =
+    "@keyframes nir-spin{to{transform:rotate(360deg)}}" +
+    "@keyframes nir-fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}";
+  document.head.appendChild(s);
+}
+
+function buildLoadingPhase(wrap) {
+  ensureSpinnerStyle();
+  const box = document.createElement("div");
+  box.style.cssText = "display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; min-height:60vh;";
+
+  const title = document.createElement("div");
+  title.textContent = t("app.logo");
+  title.style.cssText = "font-size:30px; font-weight:800; color:var(--accent); letter-spacing:1px; animation:nir-fade .5s ease;";
+  box.appendChild(title);
+
+  const spin = document.createElement("div");
+  spin.style.cssText = "width:34px; height:34px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:nir-spin .8s linear infinite;";
+  box.appendChild(spin);
+
+  const txt = document.createElement("div");
+  txt.className = "muted small";
+  txt.textContent = t("menu.loading");
+  box.appendChild(txt);
+
+  wrap.appendChild(box);
+}
+
+function buildStartMenu(wrap, route) {
+  ensureSpinnerStyle();
+  // 로고 + 태그라인
+  const hero = document.createElement("div");
+  hero.style.cssText = "text-align:center; margin:14px 0 4px; animation:nir-fade .4s ease;";
+  const logo = document.createElement("div");
+  logo.textContent = t("app.logo");
+  logo.style.cssText = "font-size:30px; font-weight:800; color:var(--accent); letter-spacing:1px;";
+  hero.appendChild(logo);
+  const tag = document.createElement("div");
+  tag.className = "muted small";
+  tag.style.cssText = "margin-top:4px; font-size:12px;";
+  tag.textContent = t("menu.tagline");
+  hero.appendChild(tag);
+  wrap.appendChild(hero);
+
+  // 로그인 상태
+  if (isSignedIn()) wrap.appendChild(renderAuthPanel(route));
+
+  // 시작 버튼 — 세이브 있으면 이어하기 + 새 게임, 없으면 게임 시작
+  const startPanel = document.createElement("section");
+  startPanel.className = "panel";
+  startPanel.style.padding = "12px";
+  if (hasSave()) {
+    const cont = button(t("menu.continueBtn"), "primary", () => {
+      if (loadGame()) { resetWeeklyCarousel(); route("weekly"); }
+    });
+    cont.style.cssText = "width:100%; padding:13px; font-size:16px; font-weight:700; margin-bottom:8px;";
+    startPanel.appendChild(cont);
+    const localTs = getLocalSavedAt();
+    if (localTs) {
+      const when = document.createElement("div");
+      when.className = "muted small";
+      when.style.cssText = "text-align:center; font-size:11px; margin-bottom:10px;";
+      when.textContent = t("menu.lastSavedAt", { when: relativeTime(localTs) });
+      startPanel.appendChild(when);
+    }
+    const fresh = button(t("menu.newGameBtn"), "", () => route("menu"));
+    fresh.style.cssText = "width:100%; padding:10px; font-size:13px;";
+    startPanel.appendChild(fresh);
+  } else {
+    const startBtn = button(t("menu.startBtn"), "primary", () => route("menu"));
+    startBtn.style.cssText = "width:100%; padding:13px; font-size:16px; font-weight:700;";
+    startPanel.appendChild(startBtn);
+  }
+  wrap.appendChild(startPanel);
+
+  // 회귀 상점 진입 (적립 있을 때)
   const m = state.regression;
   if (m && (m.totalEarned > 0 || m.balance > 0 || m.runs > 0)) {
     wrap.appendChild(renderShopEntryPanel(route));
   }
-  // 로컬 세이브가 없고 클라우드 인증되어 있으면 ☁️ 클라우드 로드 패널 — 새 기기에서 이어할 수 있게.
+  // 클라우드 불러오기 (로컬 세이브 없고 로그인 시)
   if (!hasSave() && isSignedIn()) {
     wrap.appendChild(renderCloudLoadPanel(route));
   }
-  wrap.appendChild(renderCreatePanel(route));
+  // 데이터 초기화 (작은 링크)
   wrap.appendChild(renderResetPanel(route));
-  root.appendChild(wrap);
+}
 
-  // 세이브가 있으면 모달 오버레이로 이어하기 노출
-  if (hasSave() && !loadModalDismissed) {
-    root.appendChild(renderLoadModal(route));
-  }
+export function renderMenu(root, route) {
+  root.innerHTML = "";
+  const wrap = document.createElement("div");
+  wrap.className = "stack";
+
+  // 시작 화면으로 돌아가기 (작은 링크)
+  const back = button("← " + t("menu.backToStart"), "", () => route("start"));
+  back.style.cssText = "align-self:flex-start; background:none; border:none; color:var(--muted); font-size:12px; padding:2px 0; cursor:pointer;";
+  wrap.appendChild(back);
+
+  wrap.appendChild(renderCreatePanel(route));
+  root.appendChild(wrap);
 }
 
 function renderAuthPanel(route) {
@@ -202,17 +304,11 @@ function renderCloudLoadPanel(route) {
 // 전체 데이터 초기화 — 세이브/회귀/설정 전부 삭제 (locale 유지).
 // 로그인 상태면 클라우드 문서도 삭제. 되돌릴 수 없으므로 danger confirm 모달 경유.
 function renderResetPanel(route) {
-  const panel = document.createElement("section");
-  panel.className = "panel";
-  panel.style.padding = "10px";
+  // 한 화면 절약 — 별도 패널/설명 없이 컴팩트한 텍스트 버튼만 (확인 모달에 설명 포함).
+  const wrap = document.createElement("div");
+  wrap.style.cssText = "text-align:center; margin-top:2px;";
 
-  const desc = document.createElement("div");
-  desc.className = "muted small";
-  desc.style.cssText = "font-size:11px; margin-bottom:8px; line-height:1.4;";
-  desc.textContent = t("menu.resetAllDesc");
-  panel.appendChild(desc);
-
-  const btn = button(t("menu.resetAll"), "danger", () => {
+  const btn = button(t("menu.resetAll"), "", () => {
     const cloudIncluded = isSignedIn();
     showConfirmModal({
       title: t("menu.resetAll"),
@@ -233,12 +329,10 @@ function renderResetPanel(route) {
       },
     });
   });
-  btn.style.width = "100%";
-  btn.style.padding = "10px";
-  btn.style.fontSize = "13px";
-  panel.appendChild(btn);
+  btn.style.cssText = "background:none; border:none; color:var(--muted); font-size:11px; text-decoration:underline; opacity:0.7; padding:2px;";
+  wrap.appendChild(btn);
 
-  return panel;
+  return wrap;
 }
 
 function renderShopEntryPanel(route) {
@@ -487,12 +581,15 @@ function showConfirmModal({ title, message, confirmLabel, cancelLabel, danger, o
 
 function renderCreatePanel(route) {
   const panel = panelEl(t("menu.newGameTitle"));
+  panel.style.padding = "10px";          // 한 화면 절약 — 기본 패널 패딩 축소
+  const h = panel.querySelector("h2");
+  if (h) h.style.cssText = "margin:0 0 2px; font-size:14px;";
 
   // 안드로이드 portrait(~412px) 기준 — 세로 stack
   // 순서: 이름 → 얼굴 → 자세 → 재능 → 캐릭터 미리보기 → 시작
   const col = document.createElement("div");
   col.className = "stack";
-  col.style.gap = "8px"; // 한 화면 안에 들어오도록 간격 축소
+  col.style.gap = "4px"; // 한 화면 안에 들어오도록 간격 축소
 
   col.appendChild(renderNameField());
   col.appendChild(renderFaceGallery());
@@ -533,9 +630,9 @@ function renderCreatePanel(route) {
     saveGame();
     route("weekly");
   });
-  startBtn.style.marginTop = "8px";
+  startBtn.style.marginTop = "4px";
   startBtn.style.width = "100%";
-  startBtn.style.padding = "12px";
+  startBtn.style.padding = "9px";
   startBtn.style.fontSize = "15px";
   col.appendChild(startBtn);
 
@@ -555,11 +652,11 @@ function renderPreview() {
   card.style.background = "var(--panel-2)";
   card.style.border = "1px solid var(--border)";
   card.style.borderRadius = "8px";
-  card.style.padding = "8px";
+  card.style.padding = "5px";
   card.style.textAlign = "center";
 
-  // 안드로이드 폭에 맞게 캐릭터 SVG 작게
-  const charSVG = createCharacterSVG(draft.faceId, draft.hand, { w: 160, h: 200 });
+  // 안드로이드 폭에 맞게 캐릭터 SVG 작게 — 한 화면에 들어오도록 더 축소
+  const charSVG = createCharacterSVG(draft.faceId, draft.hand, { w: 88, h: 104 });
   card.appendChild(charSVG);
 
   const name = document.createElement("div");
@@ -580,6 +677,8 @@ function renderPreview() {
 }
 
 function renderNameField() {
+  // 최초 진입 시 언어에 맞는 평범한 이름을 랜덤으로 미리 채워둠 (사용자가 지우고 바꿔도 됨).
+  if (!draft.name) draft.name = randomName(getLocale());
   const wrap = document.createElement("div");
   wrap.appendChild(label(t("menu.fieldName")));
   const input = document.createElement("input");
@@ -610,7 +709,7 @@ function renderFaceGallery() {
     cell.style.background = "var(--panel-2)";
     cell.style.border = "1.5px solid var(--border)";
     cell.style.borderRadius = "6px";
-    cell.style.padding = "3px 2px";
+    cell.style.padding = "2px 1px";
     cell.style.cursor = "pointer";
     cell.style.transition = "border-color 120ms";
     cell.style.textAlign = "center";
@@ -620,7 +719,7 @@ function renderFaceGallery() {
     const svgWrap = document.createElement("div");
     svgWrap.style.display = "flex";
     svgWrap.style.justifyContent = "center";
-    svgWrap.appendChild(createFaceSVG(face.id, 44));
+    svgWrap.appendChild(createFaceSVG(face.id, 36));
     cell.appendChild(svgWrap);
 
     const lbl = document.createElement("div");
@@ -661,7 +760,7 @@ function renderHandField() {
     const btn = document.createElement("button");
     btn.textContent = t("hand." + val);
     btn.style.fontSize = "12px";
-    btn.style.padding = "8px 2px";
+    btn.style.padding = "6px 2px";
     btn.style.minWidth = "0";
     btn.style.whiteSpace = "nowrap";
     if (draft.hand === val) btn.classList.add("primary");

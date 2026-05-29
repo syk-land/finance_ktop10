@@ -821,6 +821,11 @@ export const ko = {
   },
 
   menu: {
+    loading: "불러오는 중…",
+    tagline: "고교 1학년부터 은퇴까지 — 야구 인생 시뮬레이션",
+    newGameBtn: "새 게임 시작",
+    backToStart: "시작 화면",
+    lastSavedAt: "마지막 저장: {when}",
     continueTitle: "이어하기",
     continueHint: "이전에 저장된 게임이 있습니다.",
     continueBtn: "이어하기",
