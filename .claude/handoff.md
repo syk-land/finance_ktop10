@@ -1,6 +1,14 @@
 # 인계 문서 — 이미지/사운드 에셋 작업 (다음 세션 이어가기용)
 
 > 마지막 갱신: 2026-05-29. 이 문서만 읽으면 이어서 진행 가능하도록 정리.
+> **개발/테스트/에셋 절차는 `DEVELOPMENT.md`** 에 상세히 있음 (이 문서는 진행상황·결정 위주).
+
+## ⏩ 현재 상태 (최신)
+- 이미지 **9장 생성·가공 완료** → `assets/img/*.webp` (title-hero + event-champion/hof/draft/intl/allstar/military/training/award). Gemini 워터마크 제거 + WebP 축소. `manifest.js` 등록 완료.
+- **title-hero 만 화면에 적용됨**(타이틀 화면). **이벤트 컷 8장은 모달 wiring 미완** ← 다음 작업.
+- BGM 파일 아직 없음(무음). 효과음은 합성으로 동작 중.
+- 미생성 이벤트 컷: **부상/토미존, 은퇴, 강등, FA/트레이드** (+휴식기 옵션).
+- 원본 `gemini_images/`(70MB) 는 .gitignore (가공본만 커밋).
 
 ## 큰 그림 / 결정 사항
 게임에 **바이너리 에셋(이미지 + 오디오)** 을 추가한다. 기존 원칙(zero-asset, 코드생성 SVG)에서 벗어나는 결정.
@@ -43,11 +51,15 @@
 오디오 `assets/audio/`: `bgm-menu.mp3` (메뉴 루프 ≤1MB), `bgm-game.mp3` (경기 루프 ≤1MB).
 (상세 스펙은 `assets/README.md`.)
 
-## 다음 세션 시작 시 할 일
-1. Phase 2: `assets/README.md` 의 표에 **실제 Gemini/MusicFX 프롬프트**를 채워 스펙시트 완성.
-2. (선택) Phase 3: `tools/gen-assets.mjs` 작성 — 본인 PC 실행용. Playwright persistentContext.
-3. 사용자가 생성한 파일을 `assets/` 에 넣으면 동작 확인 (브라우저 스모크).
-4. 특별이벤트 컷을 실제 이벤트 모달(드래프트/우승 등)에 wiring.
+## 다음 세션 시작 시 할 일 (우선순위)
+1. **이벤트 컷 8장 wiring** — 각 이벤트 모달에 `createImage(키)` 삽입:
+   우승→eventChampion / 드래프트→eventDraft / HoF→eventHof / 국제대회→eventIntl /
+   올스타→eventAllstar / 군입대→eventMilitary / 특훈·재활→eventTraining / 시상→eventAward.
+   (모달 위치: 우승·결승 `finals.js`+`weekly.js`, 드래프트·HoF `career.js`+`weekly.js`,
+    국제대회·올스타 `seasonEvents.js`+`weekly.js`, 군입대 `military.js`+`weekly.js`)
+2. **부족 이벤트 컷 생성** (부상/은퇴/강등/FA) — 프롬프트 시트(`assets/README.md`)에 추가 후 사용자 생성.
+3. **BGM**: MusicFX 로 `bgm-menu.mp3`/`bgm-game.mp3` 생성 → `assets/audio/`.
+4. (선택) `tools/gen-assets.mjs` — 본인 PC Playwright persistentContext 자동 생성 스크립트.
 
 ## 개발 환경 메모 (브라우저 검증)
 - 이 샌드박스 브라우저는 **`ignoreHTTPSErrors:true`** 면 외부 사이트 접근 가능(인증서 가로채기 회피).
