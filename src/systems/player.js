@@ -609,6 +609,27 @@ export function overallScore(player) {
   return +((bat * 0.6 + pit * 0.4)).toFixed(1);
 }
 
+// 포지션(타자) / 투수 역할별 OVR — 각 스탯 평균.
+export function roleOVRs(player) {
+  const b = player.batter;
+  const p = player.pitcher;
+  return {
+    bat: (b.contact + b.power + b.eye + b.speed + b.defense) / 5,
+    pit: (p.velocity + p.control + p.breaking + p.stamina + p.mental) / 5,
+  };
+}
+
+// 대표팀/올스타 선발 평가 — 실제 선발처럼 "강한 포지션" 기준 + 양방향 프리미엄.
+//   - 순수 타자/투수(특화): 강한 쪽 OVR 으로 평가 (약한 쪽은 거의 영향 없음)
+//   - 양방향(둘 다 준수): 약한 쪽의 25% 가산 → 유틸리티/오타니형 프리미엄
+// overallScore(타×0.6+투×0.4 블렌드)와 달리 특화 선수를 불리하게 누르지 않음.
+export function nationalTeamRating(player) {
+  const { bat, pit } = roleOVRs(player);
+  const hi = Math.max(bat, pit);
+  const lo = Math.min(bat, pit);
+  return +(hi + lo * 0.25).toFixed(1);
+}
+
 // 컨디션 70 을 기준으로 +/− 작용. cond=70 → modifier 0, cond=100 → +0.43, cond=0 → -1.0.
 // 실제 게임 영향은 *0.3 곱연산으로 합산되므로 cond=100 시 +13%, cond=0 시 -30% 정도.
 function conditionModifier(condition) {

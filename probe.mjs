@@ -130,7 +130,7 @@ ok(univCh.bat === 1 && univCh.pitch > 0, `대학 출장 bat=${univCh.bat*100}% p
 section("3. KBO 1군 (pro1)");
 const kboTeam = pickTeam("pro1");
 state.player = makePlayer({
-  stage: "pro1", grade: 1, age: 22, fame: 60,
+  stage: "pro1", grade: 1, age: 22, fame: 250,
   teamName: kboTeam,
   batter:  { contact: 110, power: 90, eye: 100, speed: 80, defense: 85 },
   pitcher: { velocity: 115, control: 105, breaking: 95, stamina: 100, mental: 90 },
@@ -153,11 +153,11 @@ const proCh = appearanceChance(state.player, getPlayerTeam(state.league));
 ok(proCh.bat === 1, "KBO 타자 100%");
 ok(proCh.pitch > 0, `KBO 투수 ${(proCh.pitch*100).toFixed(0)}%`);
 
-// 올스타 트리거 조건 (year 2030 ≥ fame 50)
+// 올스타 트리거 — 새 기준: fame ≥ 200 && OVR ≥ 88
 const allStarEv = SEASON_EVENTS.find(e => e.key === "all_star");
 ok(allStarEv.type === "modal", `올스타 type="${allStarEv.type}" (modal 이어야 함)`);
 ok(allStarEv.handlerKey === "allStarLive", `handlerKey="${allStarEv.handlerKey}"`);
-ok(allStarEv.trigger(state.player, state.gameDate), "7월 12일 fame 60 → 올스타 트리거");
+ok(allStarEv.trigger(state.player, state.gameDate), "7월 12일 fame250+OVR96 → 올스타 트리거");
 
 // 올스타 게임 시뮬레이션
 const asResult = simulateAllStarGame(state.player, state.league);
@@ -206,7 +206,7 @@ if (psFake) {
 section("4. MLB (mlb)");
 const mlbTeam = pickTeam("mlb");
 state.player = makePlayer({
-  stage: "mlb", grade: 1, age: 24, fame: 90,
+  stage: "mlb", grade: 1, age: 24, fame: 250,
   teamName: mlbTeam,
   batter:  { contact: 180, power: 160, eye: 170, speed: 140, defense: 150 },
   pitcher: { velocity: 190, control: 175, breaking: 165, stamina: 170, mental: 160 },
@@ -224,7 +224,7 @@ ok(mlbTitle.includes("메이저"), `MLB 타이틀: "${mlbTitle}"`);
 const mlbCh = appearanceChance(state.player, getPlayerTeam(state.league));
 ok(mlbCh.bat === 1 && mlbCh.pitch > 0, `MLB 출장 bat=${mlbCh.bat*100}% pit=${(mlbCh.pitch*100).toFixed(0)}%`);
 
-// 올스타 트리거 (year 2032 ≥ fame 50)
+// 올스타 트리거 — fame ≥ 200 && OVR ≥ 88
 ok(allStarEv.trigger(state.player, state.gameDate), "MLB 7월 14일 → 올스타 트리거");
 const mlbAs = simulateAllStarGame(state.player, state.league);
 ok(!!mlbAs, "MLB 올스타 시뮬 성공");

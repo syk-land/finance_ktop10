@@ -10,7 +10,7 @@
 //
 // 표시 텍스트는 모두 i18n: offseason.<cat>, offseason.event.<key>.{label,desc,great,ok,bad}.
 
-import { BATTER_STATS, PITCHER_STATS, applyInjury, overallScore, addFame, getPlayerStatCap } from "./player.js";
+import { BATTER_STATS, PITCHER_STATS, applyInjury, nationalTeamRating, addFame, getPlayerStatCap } from "./player.js";
 import { state } from "../state.js";
 
 const STAT_MIN = 20;
@@ -115,9 +115,10 @@ export const OFFSEASON_CATEGORIES = {
 // 항상 노출되는 기본 카테고리. (youth_worldcup 같은 조건부는 getAvailableCategories 에서 추가)
 export const CATEGORY_KEYS = ["intense", "camp", "regular", "rest"];
 
-// 청소년 세계대회 차출 기준 — 학년 무관, 종합 능력치 기준
-// 1학년이라도 종합 60 이상이면 차출 (높은 잠재력 = 조기 발탁)
-const YOUTH_WORLDCUP_OVR_THRESHOLD = 60;
+// 청소년 세계대회(U-18 대표) 차출 기준 — 학년 무관, nationalTeamRating(강한 포지션+양방향) 기준.
+// 현실 반영: U-18 국가대표는 전국 고교 최상위. 너프 후 고3 졸업 rating ~85-95 수준이므로,
+// 90 이면 잘 큰 상위권 고교생만 차출 (첫 인생 평범한 1·2학년은 진입 불가).
+const YOUTH_WORLDCUP_RATING_THRESHOLD = 90;
 
 // ─── 이벤트 정의 — 각 이벤트는 great/ok/bad 3 단계 효과 ───────────
 // 이벤트 라벨/설명/결과 텍스트는 i18n. 여기엔 효과만.
@@ -356,7 +357,7 @@ export function getAvailableCategories(player) {
   const isWorldCupYear = year != null && year % 2 === 1;
   if (
     player.stage === "high"
-    && overallScore(player) >= YOUTH_WORLDCUP_OVR_THRESHOLD
+    && nationalTeamRating(player) >= YOUTH_WORLDCUP_RATING_THRESHOLD
     && isWorldCupYear
   ) {
     list.push("youth_worldcup");

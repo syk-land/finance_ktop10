@@ -18,12 +18,29 @@
 
 import { state, pushToast } from "../state.js";
 import { t } from "../i18n/index.js";
-import { BATTER_STATS, PITCHER_STATS, getPlayerStatCap, addFame } from "./player.js";
+import { BATTER_STATS, PITCHER_STATS, getPlayerStatCap, addFame, nationalTeamRating } from "./player.js";
 import { simulateGame } from "./simulator.js";
 import { createRoster } from "./npc.js";
 import { getPlayerTeam } from "./league.js";
 
 const STAT_MIN = 20;
+
+// ─── 대표팀/올스타 선발 기준 ──────────────────────────────────────
+// 현실 반영: 국제대회(국가대표)는 "현재 실력" 만으로 선발 — 누적 명성과 무관.
+//   → 기량 정체 시 못 가고, 노장이라도 실력 떨어지면 자연 탈락.
+// 선발 지표 = nationalTeamRating: 강한 포지션(타자/투수) 기준 + 양방향 프리미엄.
+//   특화 선수는 강한 쪽으로, 양방향 선수는 가산점으로 평가 (실제 대표팀 선발 방식).
+// rating 스케일(너프 후): 프로 신인 ~95, 전성기 양방향 ~196, 특화 만렙 ~165.
+// 난이도 순서대로 임계 차등 (AG < P12 < WBC < 올림픽).
+// 첫 인생 피크 rating 분포 ~150~181 (median ~162) 기준 — 강한 커리어는 닿고 평범하면 미달.
+const SELECT_RATING = {
+  asian_games: 135,  // 아시안게임 — 상대적으로 진입 빠름 (어린 선수/와일드카드 포함)
+  premier12:   148,
+  wbc:         158,
+  olympics:    165,  // 올림픽 — 최상위 (상위권 커리어만)
+};
+const ALLSTAR_RATING_MIN = 120;  // 올스타 실력 하한 (리그 상위)
+const ALLSTAR_FAME_MIN = 200;    // 올스타 명성 하한 (인지도 — 인기 투표 성격)
 
 function bumpAll(player, delta) {
   const cap = getPlayerStatCap(player);
@@ -65,7 +82,8 @@ export const SEASON_EVENTS = [
       return (player.stage === "pro1" || player.stage === "mlb")
         && gameDate.month === 7
         && gameDate.dayOfMonth >= 8 && gameDate.dayOfMonth <= 18
-        && (player.fame ?? 0) >= 50;
+        && (player.fame ?? 0) >= ALLSTAR_FAME_MIN
+        && nationalTeamRating(player) >= ALLSTAR_RATING_MIN;
     },
   },
 
@@ -83,7 +101,7 @@ export const SEASON_EVENTS = [
         && gameDate.month === 3
         && gameDate.dayOfMonth <= 14
         && gameDate.year % 4 === 2
-        && (player.fame ?? 0) >= 60;
+        && nationalTeamRating(player) >= SELECT_RATING.wbc;
     },
     apply(player) {
       fameUp(player, 15);
@@ -102,7 +120,7 @@ export const SEASON_EVENTS = [
       return isProStage(player.stage)
         && (gameDate.month === 7 || gameDate.month === 8)
         && gameDate.year % 4 === 0
-        && (player.fame ?? 0) >= 70;
+        && nationalTeamRating(player) >= SELECT_RATING.olympics;
     },
     apply(player) {
       fameUp(player, 20);
@@ -122,7 +140,7 @@ export const SEASON_EVENTS = [
         && gameDate.month === 9
         && gameDate.dayOfMonth <= 14
         && gameDate.year % 4 === 2
-        && (player.fame ?? 0) >= 50;
+        && nationalTeamRating(player) >= SELECT_RATING.asian_games;
     },
     apply(player) {
       fameUp(player, 12);
@@ -141,7 +159,7 @@ export const SEASON_EVENTS = [
       return isProStage(player.stage)
         && gameDate.month === 11
         && gameDate.year % 4 === 3
-        && (player.fame ?? 0) >= 50;
+        && nationalTeamRating(player) >= SELECT_RATING.premier12;
     },
     apply(player) {
       fameUp(player, 10);
@@ -163,7 +181,7 @@ export function checkOffseasonEvents(player, year) {
   if (!player.processedEvents[agKey]
       && year % 4 === 2
       && player.stage === "pro1"
-      && (player.fame ?? 0) >= 50) {
+      && nationalTeamRating(player) >= SELECT_RATING.asian_games) {
     player.processedEvents[agKey] = true;
     state.pendingEvents.push({ key: "asian_games", type: "modal", handlerKey: "intlTournamentLive", year });
   }
@@ -172,7 +190,7 @@ export function checkOffseasonEvents(player, year) {
   const p12Key = `${year}-premier12`;
   if (!player.processedEvents[p12Key]
       && year % 4 === 3
-      && (player.fame ?? 0) >= 50) {
+      && nationalTeamRating(player) >= SELECT_RATING.premier12) {
     player.processedEvents[p12Key] = true;
     state.pendingEvents.push({ key: "premier12", type: "modal", handlerKey: "intlTournamentLive", year });
   }
