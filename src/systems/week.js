@@ -107,14 +107,8 @@ export function endWeek() {
       applyGameExperience(player, r.mainPlayer);
       player.seasonStats.games++;
 
-      // 투수 등판 시 자기 팀의 승/패를 누적 — 마일스톤(통산 N승)·통산 통계용
-      if (r.mainPlayer.roles?.pitch && r.winner) {
-        const myTeam = r.home.team.isPlayerTeam ? r.home.team : r.away.team.isPlayerTeam ? r.away.team : null;
-        if (myTeam) {
-          if (r.winner === myTeam.name) player.seasonStats.w = (player.seasonStats.w ?? 0) + 1;
-          else                          player.seasonStats.l = (player.seasonStats.l ?? 0) + 1;
-        }
-      }
+      // (제거) 예전엔 "메인 등판 경기에서 팀 승" 마다 seasonStats.w 를 또 더해 투수 W 가 폭증(통산 100+)했다.
+      // 투수 승/패/세이브는 mergeSeasonStats 가 시뮬레이터의 결승투수 판정(myBoxPitcher.w/l/sv)으로만 집계한다.
 
       // 마일스톤 검출 (단경기 + 통산)
       detectMilestones(player, r, state.gameDate);
