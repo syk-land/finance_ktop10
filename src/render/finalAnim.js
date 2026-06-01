@@ -120,8 +120,9 @@ export function createPOVScene(mode = "bat") {
     : (hand === "left" || hand === "lefty_rb");
 
   // 컨테이너: 배경이미지(z0) < SVG 오버레이(z1) < 전경소품(z2). 그라데이션은 SVG 폴백용 배경.
+  // width:100% 필수 — 자식이 전부 position:absolute 라 명시 너비 없으면 flex 부모에서 0 으로 붕괴.
   const container = document.createElement("div");
-  container.style.cssText = "position:relative; max-width:340px; height:200px; margin:0 auto; border-radius:6px; overflow:hidden; border:1px solid var(--border); background:linear-gradient(180deg,#142030 0%,#1a2a3d 70%,#0e1116 100%);";
+  container.style.cssText = "position:relative; width:100%; max-width:340px; height:200px; margin:0 auto; border-radius:6px; overflow:hidden; border:1px solid var(--border); background:linear-gradient(180deg,#142030 0%,#1a2a3d 70%,#0e1116 100%);";
 
   const svg = svgEl("svg", { width: "100%", height: "100%", viewBox: `0 0 ${W} ${H}` });
   svg.style.cssText = "position:absolute; inset:0; display:block; z-index:1;";
@@ -160,8 +161,10 @@ export function createPOVScene(mode = "bat") {
     imgStyle: "width:100%; height:100%; object-fit:cover;",
     onload: () => { bgGroup.style.display = "none"; opponentGroup.style.display = "none"; },
   });
+  // 전경: 높이 기준으로 맞춰(컨테이너 200px 안에) 방망이 끝 잘림 방지. 정사각 소품이라 aspect-ratio 1/1.
   const fgImg = createImage(mode === "bat" ? "povFgBat" : "povFgPitch", {
-    style: `position:absolute; left:50%; bottom:0; width:62%; z-index:2; will-change:transform; transform-origin:50% 100%; transform:translateX(-50%)${fgFlip ? " scaleX(-1)" : ""};`,
+    style: `position:absolute; left:50%; bottom:0; height:94%; aspect-ratio:1/1; width:auto; z-index:2; will-change:transform; transform-origin:50% 100%; transform:translateX(-50%)${fgFlip ? " scaleX(-1)" : ""};`,
+    imgStyle: "height:100%; width:100%; object-fit:contain;",
     onload: () => { backGroup.style.display = "none"; swingRef.fg = fgImg; },
   });
 
