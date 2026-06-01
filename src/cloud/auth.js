@@ -9,7 +9,8 @@
 
 import {
   signInAnonymously, onAuthStateChanged, signOut as fbSignOut,
-  GoogleAuthProvider, signInWithRedirect, linkWithRedirect, getRedirectResult,
+  GoogleAuthProvider, signInWithPopup, linkWithPopup,
+  signInWithRedirect, linkWithRedirect, getRedirectResult,
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import { state } from "../state.js";
 import { getFirebaseAuth, isFirebaseReady } from "./firebase.js";
@@ -77,9 +78,24 @@ export function isAnonymousUser() {
   return !!state.cloudUser?.isAnonymous;
 }
 
-// 익명 → Google 계정 연동. redirect 방식 — 호출 즉시 페이지 전체 리로드.
-// 결과는 initAuth 의 getRedirectResult 에서 처리. 이미 영구 계정이면 alreadyLinked 즉시 반환.
-// 그 Google 계정이 이미 다른 익명 uid 에 link 되어 있으면 자동으로 signInWithRedirect 로 폴백 (initAuth 안에서).
+// 팝업 차단/환경 미지원 — redirect 폴백 대상.
+function isPopupBlocked(e) {
+  return e?.code === "auth/popup-blocked"
+    || e?.code === "auth/operation-not-supported-in-environment"
+    || e?.code === "auth/web-storage-unsupported";
+}
+// 사용자가 팝업을 닫음/중복 요청 — 에러 아님(조용히 무시).
+function isUserCancel(e) {
+  return e?.code === "auth/popup-closed-by-user"
+    || e?.code === "auth/cancelled-popup-request"
+    || e?.code === "auth/user-cancelled";
+}
+
+// 익명 → Google 계정 연동.
+// 1차: popup 방식 (linkWithPopup) — 즉시 결과 반환. 서드파티 쿠키 차단 환경에서도
+//      redirect 와 달리 로그인 상태 유실이 없다 (redirect 가 "갔다 와도 로그인 안 됨"의 원인).
+// 폴백: 팝업 차단 시에만 linkWithRedirect 로 전환.
+// 그 Google 계정이 이미 다른 익명 uid 에 연결돼 있으면 그 계정으로 signInWithPopup (익명 데이터 포기).
 export async function linkAnonToGoogle() {
   if (!isFirebaseReady()) return { ok: false, reason: "firebase_not_ready" };
   const auth = getFirebaseAuth();
@@ -90,30 +106,65 @@ export async function linkAnonToGoogle() {
   if (!user.isAnonymous) {
     return { ok: true, user, alreadyLinked: true };
   }
+
   try {
-    sessionStorage.setItem(REDIRECT_INTENT_KEY, "link");
-    await linkWithRedirect(user, provider);
-    // 정상이면 페이지 리로드되므로 여기까지 안 옴.
-    return { ok: true, redirecting: true };
+    const result = await linkWithPopup(user, provider);
+    return { ok: true, user: result.user, linked: true };
   } catch (e) {
-    sessionStorage.removeItem(REDIRECT_INTENT_KEY);
+    // 이미 다른 익명 uid 에 연결된 Google 계정 → 그 계정으로 로그인 (익명 데이터 포기).
+    if (e.code === "auth/credential-already-in-use" || e.code === "auth/email-already-in-use") {
+      try {
+        const r2 = await signInWithPopup(auth, provider);
+        return { ok: true, user: r2.user, linked: true, switched: true };
+      } catch (e2) {
+        if (isPopupBlocked(e2)) return linkRedirectFallback(auth, user, provider);
+        if (isUserCancel(e2)) return { ok: false, reason: "cancelled" };
+        console.error("[cloud] signInWithPopup 폴백 실패", e2);
+        return { ok: false, reason: "link_failed", code: e2.code, error: e2.message };
+      }
+    }
+    if (isPopupBlocked(e)) return linkRedirectFallback(auth, user, provider);
+    if (isUserCancel(e)) return { ok: false, reason: "cancelled" };
     console.error("[cloud] linkAnonToGoogle 실패", e);
     return { ok: false, reason: "link_failed", code: e.code, error: e.message };
   }
 }
 
-// Google 로그인 (link 실패 또는 다른 계정 진입). redirect 방식 — 호출 즉시 페이지 리로드.
+// 팝업이 막힌 환경에서만 쓰는 redirect 폴백. 결과는 initAuth 의 getRedirectResult 에서 처리.
+async function linkRedirectFallback(auth, user, provider) {
+  try {
+    sessionStorage.setItem(REDIRECT_INTENT_KEY, "link");
+    await linkWithRedirect(user, provider);
+    return { ok: true, redirecting: true };
+  } catch (e) {
+    sessionStorage.removeItem(REDIRECT_INTENT_KEY);
+    console.error("[cloud] linkWithRedirect 폴백 실패", e);
+    return { ok: false, reason: "link_failed", code: e.code, error: e.message };
+  }
+}
+
+// Google 로그인 (link 실패 또는 다른 계정 진입). popup 우선, 차단 시 redirect 폴백.
 // 익명 데이터는 잃음.
 export async function signInWithGoogle() {
   if (!isFirebaseReady()) return { ok: false, reason: "firebase_not_ready" };
   const auth = getFirebaseAuth();
   const provider = new GoogleAuthProvider();
   try {
-    sessionStorage.setItem(REDIRECT_INTENT_KEY, "signin");
-    await signInWithRedirect(auth, provider);
-    return { ok: true, redirecting: true };
+    const r = await signInWithPopup(auth, provider);
+    return { ok: true, user: r.user };
   } catch (e) {
-    sessionStorage.removeItem(REDIRECT_INTENT_KEY);
+    if (isPopupBlocked(e)) {
+      try {
+        sessionStorage.setItem(REDIRECT_INTENT_KEY, "signin");
+        await signInWithRedirect(auth, provider);
+        return { ok: true, redirecting: true };
+      } catch (e2) {
+        sessionStorage.removeItem(REDIRECT_INTENT_KEY);
+        console.error("[cloud] signInWithRedirect 폴백 실패", e2);
+        return { ok: false, reason: "signin_failed", code: e2.code, error: e2.message };
+      }
+    }
+    if (isUserCancel(e)) return { ok: false, reason: "cancelled" };
     console.error("[cloud] signInWithGoogle 실패", e);
     return { ok: false, reason: "signin_failed", code: e.code, error: e.message };
   }

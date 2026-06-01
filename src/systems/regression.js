@@ -244,10 +244,17 @@ export function purchaseRelic(key) {
   const cost = relicCost(key, curLevel);
   if (m.balance < cost) return { ok: false, reason: "insufficient_balance" };
   m.balance -= cost;
+  const wasNew = curLevel === 0;
   m.permanentPurchases.relicLevels[key] = curLevel + 1;
   if (!m.permanentPurchases.ownedRelics.includes(key)) m.permanentPurchases.ownedRelics.push(key);
+  // 최초 구매 유물은 빈 슬롯이 있으면 자동 장착 (최대 2개). 모든 구매 경로에서 일관 적용.
+  let equipped = false;
+  if (wasNew && m.loadout.relics.length < 2 && !m.loadout.relics.includes(key)) {
+    m.loadout.relics.push(key);
+    equipped = true;
+  }
   saveRegressionMeta();
-  return { ok: true, key, cost, level: curLevel + 1 };
+  return { ok: true, key, cost, level: curLevel + 1, equipped };
 }
 
 export function resetLoadout() {

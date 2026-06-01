@@ -597,9 +597,13 @@ function coachJudgment(player, team, options = {}) {
   if (ratio >= 0.95) return 0.90;  // 거의 동급 — 정상 등판
   if (ratio >= 0.80) return 0.70;  // 약간 약체 — 자주 등판
   if (ratio >= 0.65) return 0.45;  // 약체 — 절반 정도
-  if (ratio >= 0.50) return 0.25;  // 더 약체 — 가끔
-  return 0.10;                     // 극단 약체 — 드물게라도 등판
+  if (ratio >= PITCH_SKIP_RATIO) return 0.25;  // 더 약체 — 가끔
+  return 0;                        // 리그 기준 이하 — 등판 안 함 (타자 올인 빌드 등)
 }
+
+// 컷오프 — 메인의 투구 OVR 이 팀 SP 평균의 이 비율 미만이면 등판 0.
+// 타격 올인 빌드(예: MLB 에서 투구 70 vs 선발 평균 150)가 마운드에 끌려나가는 것 방지.
+const PITCH_SKIP_RATIO = 0.50;
 
 // 선발 탈락 시 불펜 등판 확률 — 휴식 충분할 때만, 낮게.
 // "수준이하라 선발엔 못 들지만 불펜으로는 교체출장" 케이스.
@@ -616,7 +620,8 @@ export function appearanceChance(player, team = null) {
   const restGames = player.gamesSinceLastPitch ?? 99;
   const judgment = coachJudgment(player, team);
   const startP = pitcherChanceByRest(restGames) * judgment;
-  const reliefP = (1 - startP) * reliefChance(restGames);
+  // 컷오프(judgment=0)면 구원도 0 — 마운드에 아예 안 올라감.
+  const reliefP = judgment > 0 ? (1 - startP) * reliefChance(restGames) : 0;
   return { bat: 1, pitch: clamp(startP + reliefP, 0, 1) };
 }
 
@@ -632,8 +637,8 @@ export function decideRolesForGame(player, team, options = {}) {
   let pitchRole = null;
   if (Math.random() < restChance * judgment) {
     pitchRole = "SP";                                                   // 선발 등판
-  } else if (!options.gateType && Math.random() < reliefChance(restGames)) {
-    pitchRole = "RP";                                                   // 선발 탈락 → 불펜 구원
+  } else if (!options.gateType && judgment > 0 && Math.random() < reliefChance(restGames)) {
+    pitchRole = "RP";                                                   // 선발 탈락 → 불펜 구원 (컷오프면 제외)
   }
   return { bat: true, pitch: pitchRole != null, pitchRole };
 }

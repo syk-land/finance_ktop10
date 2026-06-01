@@ -33,9 +33,9 @@ export function getStatLabels() {
 // 재능 타입 — 훈련 효율에 영향. 라벨은 i18n 의 talent.<key>.
 export const TALENTS = {
   contact:   { boost: { contact: 1.4, eye: 1.2 } },
-  power:     { boost: { power: 1.4, contact: 0.9 } },
-  speedster: { boost: { speed: 1.5, defense: 1.2 } },
-  defender:  { boost: { defense: 1.5, contact: 1.1 } },
+  power:     { boost: { power: 1.4, contact: 1.2 } },
+  speedster: { boost: { speed: 1.5, contact: 1.2 } },
+  defender:  { boost: { defense: 1.5, speed: 1.2 } },
   all_round: { boost: { contact: 1.15, power: 1.15, eye: 1.15, speed: 1.15, defense: 1.15, velocity: 1.15, control: 1.15, breaking: 1.15, stamina: 1.15, mental: 1.15 } },
   fireball:  { boost: { velocity: 1.5, stamina: 1.2 } },
   finesse:   { boost: { control: 1.5, mental: 1.2 } },
@@ -292,9 +292,11 @@ export function applyTraining(player, trainingKey) {
   const firstSeasonBoost = isFirstSeason(player)
     ? effectMultiplier(player, "firstSeasonTrainBoost")
     : 1;
+  // 훈련 효율 배수 — mentor_letter (멘토의 편지). 모든 훈련 획득량에 곱연산.
+  const trainEff = effectMultiplier(player, "trainEfficiency");
   const gained = {};
   for (const stat of tr.stats) {
-    const base = (0.5 + Math.random() * 0.9) * TRAIN_GAIN_COEFF * firstSeasonBoost;
+    const base = (0.5 + Math.random() * 0.9) * TRAIN_GAIN_COEFF * firstSeasonBoost * trainEff;
     const boost = talentBoost[stat] ?? 1.0;
     const cap = getPlayerStatCap(player, stat);
     const target = player.batter[stat] !== undefined ? player.batter : player.pitcher;

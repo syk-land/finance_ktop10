@@ -239,17 +239,17 @@ function renderAuthPanel(route) {
     linkBtn.addEventListener("click", async () => {
       linkBtn.disabled = true;
       linkBtn.textContent = t("auth.linking");
-      // redirect 방식 — 정상이면 페이지 전체 리로드. 결과 분기는 initAuth/getRedirectResult 에서.
-      // credential-already-in-use 폴백도 initAuth 안에서 자동 처리.
+      // popup 우선 — 성공 시 즉시 결과 반환되므로 여기서 리로드해 로그인 상태 반영.
+      // 팝업이 막힌 환경에서만 redirect 폴백(result.redirecting)이라 페이지가 리로드된다.
       const result = await linkAnonToGoogle();
-      if (result.ok && result.alreadyLinked) {
+      if (result.redirecting) return;          // redirect 폴백 — 페이지 전환 대기.
+      if (result.ok) {                          // popup 연동/로그인 성공.
         location.reload();
         return;
       }
-      // redirect 성공이면 여기 도달 안 함. 실패 시에만.
       linkBtn.disabled = false;
       linkBtn.textContent = t("auth.linkGoogle");
-      alert(t("auth.linkFailed"));
+      if (result.reason !== "cancelled") alert(t("auth.linkFailed"));   // 사용자가 닫은 경우는 조용히.
     });
     row.appendChild(linkBtn);
   } else {

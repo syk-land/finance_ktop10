@@ -8,7 +8,7 @@ import {
   BATTER_STATS, PITCHER_STATS, TALENTS, overallScore, nationalTeamRating, getStatLabels, getPlayerStatCap, getPlayerMaxStatCap, applyGameExperience,
 } from "../systems/player.js";
 import { advanceToNextSeason, mergeSeasonStats } from "../systems/week.js";
-import { transitionAfterSeason, transitionToStage, eligibleCareerPaths, kboDraft, determineMLBStartStage, compositeScore, checkFreeAgency, applyFreeAgencyDecision, maybeTradeOffer, applyTradeAccept, checkMLBChallenge } from "../systems/career.js";
+import { transitionAfterSeason, transitionToStage, eligibleCareerPaths, kboDraft, determineMLBStartStage, compositeScore, checkFreeAgency, applyFreeAgencyDecision, maybeTradeOffer, applyTradeAccept, checkMLBChallenge, TRADE_CONSENT_FAME } from "../systems/career.js";
 import { getPlayerTeam, standings } from "../systems/league.js";
 import { createFaceSVG } from "../render/avatars.js";
 import { AUTO_PRESETS, autoFillWeek, topWeightStat, isTrainDirectionMaxed } from "../systems/autoTrain.js";
@@ -61,6 +61,9 @@ export function renderWeekly(root, route, opts = {}) {
       return;
     }
     renderSeasonEnd(root, route);
+    // pendingToasts 큐 처리 — 시즌 종료 시점에 쌓인 토스트(수상/탈락 등)를
+    // 여기서 비워야 다음 시즌 첫 렌더로 밀리지 않는다.
+    drainPendingToasts();
     showSeasonEventModalIfNeeded(route);
     return;
   }
@@ -114,10 +117,14 @@ export function renderWeekly(root, route, opts = {}) {
 
 // 토너먼트 결승 모달 — state.pendingFinal 이 있고 아직 모달 안 띄웠으면 발동
 // 시즌 중 발생 시 자동 일시정지(사용자가 ▶ 다시 누를 때까지 시즌 멈춤)
-let _finalModalShown = false;
 function showFinalModalIfNeeded(route) {
   const f = state.pendingFinal;
-  if (!f || _finalModalShown) return;
+  if (!f) return;
+  // 이미 결승 모달이 떠 있으면 중복 생성 방지 — DOM 존재로 판정.
+  // (예전 모듈 플래그 _finalModalShown 은 완료 콜백 미실행 시 true 로 고착되어,
+  //  pendingFinal 이 있는데도 모달이 영영 안 떠 시즌 종료 화면으로 못 넘어가고
+  //  "마지막 주에서 멈춤" 되는 원인이었음. DOM 기반은 항상 self-heal.)
+  if (document.querySelector("[data-modal='final']")) return;
 
   // 설정 — skipFinalsModal ON 이면 모달 띄우지 않고 자동 시뮬+보상+토스트만.
   if (state.settings?.skipFinalsModal) {
@@ -138,8 +145,6 @@ function showFinalModalIfNeeded(route) {
     return;
   }
 
-  _finalModalShown = true;
-
   // 결승 진출 시 시즌 일시정지 — 직전 상태를 보존했다가 결승 종료 후 복원해서 자동 진행 이어감
   if (f._wasPaused == null) f._wasPaused = state.paused;
   state.paused = true;
@@ -147,6 +152,7 @@ function showFinalModalIfNeeded(route) {
 
   const backdrop = document.createElement("div");
   backdrop.className = "modal-backdrop";
+  backdrop.dataset.modal = "final";
   const dialog = document.createElement("div");
   dialog.className = "modal-dialog";
   dialog.style.position = "relative";
@@ -164,7 +170,6 @@ function showFinalModalIfNeeded(route) {
       }
       const restorePaused = f._wasPaused ?? false;
       state.pendingFinal = null;
-      _finalModalShown = false;
       state.paused = restorePaused;
       saveGame();
       backdrop.remove();
@@ -1876,55 +1881,84 @@ function statBlock(title, accent) {
 // 시즌 종료 carousel 인덱스
 let seasonEndCarouselIdx = 0;
 
-// 커리어 하이 grid — careerHistory + 현재 시즌의 stat별 최고 기록
+// 리그(단계)별 경쟁 수준 가중치 — 커리어 하이 판정용.
+// 같은 기록이면 상위 리그가 채택되고, 상위 리그의 다소 낮은 기록도 가중 환산 시 하위 리그를 이길 수 있다.
+const CAREER_HIGH_LEAGUE_WEIGHT = {
+  high:    1,
+  univ:    2,
+  pro2:    3,   // KBO 2군
+  mlb_a:   4,   // 싱글A
+  mlb_aa:  5,   // AA
+  pro1:    6,   // KBO 1군
+  mlb_aaa: 7,   // AAA
+  mlb:     9,   // 메이저
+};
+function careerHighLeagueWeight(stage) {
+  return CAREER_HIGH_LEAGUE_WEIGHT[stage] ?? 1;
+}
+
+// 커리어 하이 grid — careerHistory + 현재 시즌의 stat별 최고 기록.
+// 각 기록은 "원본 수치 × 리그 가중치"(ERA 는 ÷ 가중치, 낮을수록 우수)로 비교해
+// 최고인 시즌을 채택하고, 그 시즌의 원본 수치 + 소속 리그 라벨을 함께 표시한다.
 function renderCareerHighGrid(player) {
   const seasons = [
-    ...(player.careerHistory ?? []).map(h => h.stats),
-    player.seasonStats,
+    ...(player.careerHistory ?? []).map(h => ({ stats: h.stats ?? {}, stage: h.stage })),
+    { stats: player.seasonStats ?? {}, stage: player.stage },
   ];
 
-  function max(getter) {
-    let m = 0;
+  // higher-better: value × weight 최대인 시즌 채택. valid(s) 로 자격 거른다.
+  function bestHigh(getValue, valid = () => true) {
+    let bestScore = -Infinity, bestVal = 0, bestStage = null;
     for (const s of seasons) {
-      const v = getter(s);
-      if (v != null && v > m) m = v;
+      if (!valid(s.stats)) continue;
+      const v = getValue(s.stats);
+      if (v == null) continue;
+      const score = v * careerHighLeagueWeight(s.stage);
+      if (score > bestScore) { bestScore = score; bestVal = v; bestStage = s.stage; }
     }
-    return m;
+    return { val: bestVal, stage: bestStage };
   }
-  function bestBA() {
-    let best = 0;
+  // lower-better (ERA): value ÷ weight 최소인 시즌 채택.
+  function bestLow(getValue, valid) {
+    let bestScore = Infinity, bestVal = null, bestStage = null;
     for (const s of seasons) {
-      if (s.ab > 0) {
-        const ba = s.h / s.ab;
-        if (ba > best) best = ba;
-      }
+      if (!valid(s.stats)) continue;
+      const v = getValue(s.stats);
+      if (v == null) continue;
+      const score = v / careerHighLeagueWeight(s.stage);
+      if (score < bestScore) { bestScore = score; bestVal = v; bestStage = s.stage; }
     }
-    return best > 0 ? best.toFixed(3).replace(/^0/, "") : ".---";
+    return { val: bestVal, stage: bestStage };
   }
-  function bestERA() {
-    let best = null;
-    for (const s of seasons) {
-      if (s.ip > 0) {
-        const era = (s.er / s.ip) * 9;
-        if (best == null || era < best) best = era;
-      }
-    }
-    return best == null ? "-" : best.toFixed(2);
-  }
+
+  const stageLabel = stage => (stage ? t("stage." + stage) : null);
+
+  const ba  = bestHigh(s => (s.ab > 0 ? s.h / s.ab : null), s => s.ab > 0);
+  const hr  = bestHigh(s => s.hr ?? 0);
+  const h   = bestHigh(s => s.h ?? 0);
+  const era = bestLow(s => (s.ip > 0 ? (s.er / s.ip) * 9 : null), s => s.ip > 0);
+  const kk  = bestHigh(s => s.pK ?? 0);
+  const ip  = bestHigh(s => s.ip ?? 0);
+  const pa  = bestHigh(s => s.pa ?? 0);
+  const g   = bestHigh(s => s.games ?? 0);
+
+  const baStr  = ba.val > 0  ? ba.val.toFixed(3).replace(/^0/, "") : ".---";
+  const eraStr = era.val == null ? "-" : era.val.toFixed(2);
 
   const grid = document.createElement("div");
   grid.style.display = "grid";
   grid.style.gridTemplateColumns = "repeat(4, minmax(0, 1fr))";
   grid.style.gap = "6px 8px";
 
-  grid.appendChild(infoBlock(t("weekly.statBa"), bestBA(), null, "sm"));
-  grid.appendChild(infoBlock(t("weekly.statHr"), max(s => s.hr), null, "sm"));
-  grid.appendChild(infoBlock(t("weekly.statH"),  max(s => s.h),  null, "sm"));
-  grid.appendChild(infoBlock(t("weekly.statEra"), bestERA(), null, "sm"));
-  grid.appendChild(infoBlock(t("weekly.statKK"),  max(s => s.pK), null, "sm"));
-  grid.appendChild(infoBlock(t("weekly.statIp"),  max(s => s.ip).toFixed(1), null, "sm"));
-  grid.appendChild(infoBlock(t("weekly.statPa"),  max(s => s.pa), null, "sm"));
-  grid.appendChild(infoBlock(t("weekly.statG"),   max(s => s.games), null, "sm"));
+  // 기록이 없으면(0/null) 리그 라벨 생략.
+  grid.appendChild(infoBlock(t("weekly.statBa"), baStr, null, "sm", ba.val > 0 ? stageLabel(ba.stage) : null));
+  grid.appendChild(infoBlock(t("weekly.statHr"), hr.val, null, "sm", hr.val > 0 ? stageLabel(hr.stage) : null));
+  grid.appendChild(infoBlock(t("weekly.statH"),  h.val,  null, "sm", h.val > 0 ? stageLabel(h.stage) : null));
+  grid.appendChild(infoBlock(t("weekly.statEra"), eraStr, null, "sm", era.val != null ? stageLabel(era.stage) : null));
+  grid.appendChild(infoBlock(t("weekly.statKK"),  kk.val, null, "sm", kk.val > 0 ? stageLabel(kk.stage) : null));
+  grid.appendChild(infoBlock(t("weekly.statIp"),  ip.val.toFixed(1), null, "sm", ip.val > 0 ? stageLabel(ip.stage) : null));
+  grid.appendChild(infoBlock(t("weekly.statPa"),  pa.val, null, "sm", pa.val > 0 ? stageLabel(pa.stage) : null));
+  grid.appendChild(infoBlock(t("weekly.statG"),   g.val,  null, "sm", g.val > 0 ? stageLabel(g.stage) : null));
 
   return grid;
 }
@@ -2128,7 +2162,14 @@ function renderSeasonEnd(root, route) {
         }
         const trade = maybeTradeOffer(state.player);
         if (trade) {
-          showTradeModal(trade, route, () => showOffseasonModal(route));
+          // 명성 임계 미만이면 선수 동의권 없음 — 구단이 일방 트레이드(자동 이적), 모달 생략.
+          if ((state.player.fame ?? 0) < TRADE_CONSENT_FAME) {
+            applyTradeAccept(state.player, trade.fromTeam);
+            pushToast(t("trade.autoResult", { team: trade.fromTeam }), "info");
+            showOffseasonModal(route);
+          } else {
+            showTradeModal(trade, route, () => showOffseasonModal(route));
+          }
           return;
         }
         showOffseasonModal(route);

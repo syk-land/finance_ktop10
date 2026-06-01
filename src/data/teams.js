@@ -86,15 +86,18 @@ export const MLB_TEAMS = [
 // stage 별 시즌 메타 (locale에 영향 없음)
 // 고교: 실제 한국 고교야구 일정 (3월 ~ 8월 말, 약 26주). 주작기(phoenix_cup)가
 // 8.6~8.29 라 시즌 26주(3.1 + 182일 = 8.29 경) 까지 가야 결승까지 시즌 안에 진행됨.
+// 프로/MLB 는 실제 야구 경기수에 맞춤 (weeksPerSeason × gamesPerWeek = 시즌 경기수).
+//   MLB 162, AAA 150, AA 138, A 132, KBO 1군 144, KBO 퓨처스(2군) ~100.
+// 고교/대학은 토너먼트 캘린더(결승 종료일)와 weeksPerSeason 이 묶여 있어 그대로 유지.
 const STAGE_META = {
-  high:    { weeksPerSeason: 26, gamesPerWeek: 1 },
-  univ:    { weeksPerSeason: 22, gamesPerWeek: 2 },
-  pro2:    { weeksPerSeason: 26, gamesPerWeek: 3 },
-  pro1:    { weeksPerSeason: 26, gamesPerWeek: 3 },
-  mlb:     { weeksPerSeason: 26, gamesPerWeek: 3 },
-  mlb_aaa: { weeksPerSeason: 26, gamesPerWeek: 3 },
-  mlb_aa:  { weeksPerSeason: 26, gamesPerWeek: 3 },
-  mlb_a:   { weeksPerSeason: 26, gamesPerWeek: 3 },
+  high:    { weeksPerSeason: 26, gamesPerWeek: 2 },   // 주말리그 토·일 2경기 = 52경기 (주수는 토너먼트 일정 고정)
+  univ:    { weeksPerSeason: 22, gamesPerWeek: 2 },   // 44경기 (주수는 토너먼트 일정 고정)
+  pro2:    { weeksPerSeason: 20, gamesPerWeek: 5 },   // KBO 퓨처스 ≈ 100경기
+  pro1:    { weeksPerSeason: 24, gamesPerWeek: 6 },   // KBO 1군 = 144경기
+  mlb:     { weeksPerSeason: 27, gamesPerWeek: 6 },   // MLB = 162경기
+  mlb_aaa: { weeksPerSeason: 25, gamesPerWeek: 6 },   // AAA ≈ 150경기
+  mlb_aa:  { weeksPerSeason: 23, gamesPerWeek: 6 },   // AA ≈ 138경기
+  mlb_a:   { weeksPerSeason: 22, gamesPerWeek: 6 },   // 싱글A ≈ 132경기
 };
 
 // stage + locale → 팀 풀

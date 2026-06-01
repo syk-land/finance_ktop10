@@ -505,6 +505,25 @@ KBO에서 MLB로 가는 경로가 없던 것 → 실제 규정 모델로 추가.
 
 검증: 8개 파일 `node --check`, `probe.mjs`/`probe-career.mjs` 통과, 강제은퇴·FA타이밍·타율·3루타 Node 재현 확인. (거짓양성 1건 — IP/ERA `ipOuts` vs `ip` 는 둘 다 동기 저장돼 정상 — 은 제외.)
 
+### v0.7.11 추가 ✓ — 등판 컷오프 · 실제 경기수 · 밸런스/UX 일괄
+
+| 영역 | 작업 |
+|---|---|
+| **실제 야구 경기수** (`teams.js`) | 프로계 전부 26주×3=78 동일이던 것 → 리그별 실제 경기수. MLB 27주×6=**162**, AAA 25×6=150, AA 23×6=138, 싱글A 22×6=132, KBO 1군 24×6=**144**, 퓨처스(2군) 20×5=100. 고교 26×2=**52**(주말리그 토·일 2경기), 대학 22×2=44. 고교/대학 `weeksPerSeason` 은 토너먼트 결승 캘린더와 묶여 고정, `gamesPerWeek` 만 조정. |
+| **등판 리그 컷오프** (`simulator.js`) | 타자 올인 빌드가 메이저에서 가끔 투수로 끌려나가던 문제. `coachJudgment` 최하위 구간(투구 OVR < 팀 SP평균 50%)을 0.10 → **0**(등판 안 함). 구원(`decideRolesForGame`)·UI 표시(`appearanceChance`)도 컷오프 시 0 으로 연동. 정상 양방향 선수는 영향 없음. |
+| **트레이드 자동 전송** (`career.js` + `weekly.js`) | 명성 < `TRADE_CONSENT_FAME`(50) 이면 선수 동의권 없이 구단이 일방 트레이드 → 모달 생략·자동 이적·토스트. 50 이상은 기존 수락/거절 모달 유지. |
+| **FA 오퍼 리미트 해제** (`career.js`) | 최대 3팀(잔류+3=4) 캡 제거. 점수 120+ 면 전 구단 오퍼, 100+ 상위 절반(최소 4), 80+ 3팀. 모달은 `max-height`+스크롤이라 다수 표시 가능. |
+| **커리어 하이 리그 표시 + 가중치** (`weekly.js`) | 각 기록 옆에 달성 리그 라벨. `값 × 리그가중치`(ERA 는 ÷)로 최고 시즌 선정 → 상위 리그의 기록이 우대(`CAREER_HIGH_LEAGUE_WEIGHT`: high1<…<mlb9). 표시 수치는 원본. |
+| **타자/투수 밸런스 프리셋** (`autoTrain.js`) | 기존 `two_way`(전 스탯)에 더해 `batter_balance`(타격 5종만)·`pitcher_balance`(투구 5종만) 추가. `equalizeStats` 부분집합으로 균등화. |
+| **멘토의 편지 → 훈련 효율 배수** (`shopCatalog.js`/`player.js`/`autoTrain.js`) | `autoTrainDeficitBoost`(자동선택 편향) → `trainEfficiency`(훈련 획득량 ×1.2 곱연산, `applyTraining` 적용). v0.6 changelog 의 ×1.5 자동훈련 보정 항목을 대체. |
+| **최초 유물 2개 자동 장착** (`regression.js` + `shop.js`) | 신규 유물 구매 시 빈 슬롯(<2) 있으면 코어 `purchaseRelic` 에서 자동 장착 — 모든 구매 경로 일관(뷰 레벨 중복 로직 제거). |
+| **재능 배수 조정** (`player.js`) | 파워형 `contact 0.9→1.2`, 주루형 `defense 1.2→contact 1.2`, 수비형 `contact 1.1→speed 1.2`. 생성 시작값(+8%)·훈련 획득 양쪽에 반영. |
+| **fix — 토스트 시즌 종료 화면 미표시** (`weekly.js`) | 시즌 종료 시점에 쌓인 토스트가 다음 시즌 첫 렌더에야 뜨던 버그. `season.finished` 분기 `renderSeasonEnd` 직후 `drainPendingToasts()` 추가. |
+| **fix — 첫 시즌 "마지막 주에서 멈춤"** (`weekly.js`) | 결승 모달이 모듈 플래그 `_finalModalShown` 고착으로 억제되면 `pendingFinal` 이 있어도 안 떠 시즌 종료로 못 넘어가던 추정 원인. 플래그 제거 → **DOM 존재(`[data-modal='final']`) 기반** self-heal 가드. (헤드리스 재현 불가 — 실기 확인 대기.) |
+| **fix(auth) — Google 로그인 redirect 실패 복원** (`auth.js` + `menu.js`) | "Google 갔다 와도 로그인 안 됨"(서드파티 쿠키/크로스스토리지 차단으로 redirect 결과 유실). v0.6.1 의 redirect 방식 → **`signInWithPopup`/`linkWithPopup` 우선**, 팝업 차단/COOP 시에만 redirect 폴백. (브라우저 런타임 의존 — 실기 확인 대기.) |
+
+검증: `node probe.mjs` 전체 통과. 고교(52)·MLB(162) 시즌 자동 종료·경기수 Node 재현, 재능 배수·멘토편지 ×1.2·리그별 경기수 실측 확인. auth/마지막주 멈춤은 DOM/런타임 의존이라 실기 확인 필요.
+
 **자동 검증** (회귀·밸런스): `node probe.mjs` + `node probe-career.mjs` — 실행 방법 §시뮬레이션 돌려보기 참고.
 
 **수동 시나리오** (브라우저 UX 확인):

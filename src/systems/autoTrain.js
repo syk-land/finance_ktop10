@@ -11,13 +11,13 @@
 import { state } from "../state.js";
 import { doDailyAction } from "./week.js";
 import { TRAININGS, getPlayerStatCap, BATTER_STATS, PITCHER_STATS } from "./player.js";
-import { effectMultiplier } from "./traitEffects.js";
 
-// equalize 프리셋(밸런스)의 공통 목표값 = 전 스탯 중 최저 cap.
-// 주력/수비 cap 150, 나머지 200 이면 → 150. 모든 능력치를 같은 값으로 수렴시킨다.
-function equalizeTarget(player) {
+// equalize 프리셋(밸런스)의 공통 목표값 = 대상 스탯 중 최저 cap.
+// 주력/수비 cap 150, 나머지 200 이면 → 150. 대상 능력치를 같은 값으로 수렴시킨다.
+// stats 미지정이면 전 스탯(양방향 밸런스), 지정 시 그 부분집합(타자/투수 밸런스)만.
+function equalizeTarget(player, stats = [...BATTER_STATS, ...PITCHER_STATS]) {
   let min = Infinity;
-  for (const stat of [...BATTER_STATS, ...PITCHER_STATS]) {
+  for (const stat of stats) {
     const cap = getPlayerStatCap(player, stat);
     if (isFinite(cap) && cap > 0 && cap < min) min = cap;
   }
@@ -35,8 +35,10 @@ export const AUTO_PRESETS = {
   contact:    { statWeights: W(1.00, 0.55, 0.90, 0.70, 0.65, 0, 0, 0, 0, 0) },          // 교타자 — 컨택/선구
   speedster:  { statWeights: W(0.80, 0.65, 0.70, 1.00, 0.75, 0, 0, 0, 0, 0) },          // 호타준족 — 주력 중심 호타
   defender:   { statWeights: W(0.60, 0.45, 0.60, 0.85, 1.00, 0, 0, 0, 0, 0) },          // 수비형 — 수비/주력
+  batter_balance:  { statWeights: W(1, 1, 1, 1, 1, 0, 0, 0, 0, 0), equalize: true, equalizeStats: BATTER_STATS },   // 타자 밸런스 — 타격 5종 같은 값(최저 cap)으로
   fireballer: { statWeights: W(0, 0, 0, 0, 0, 1.00, 0.65, 0.70, 0.85, 0.60) },          // 파워피처 — 구속/스태미나
   finesse:    { statWeights: W(0, 0, 0, 0, 0, 0.60, 1.00, 0.90, 0.70, 0.85) },          // 기교파 — 제구/변화구/멘탈
+  pitcher_balance: { statWeights: W(0, 0, 0, 0, 0, 1, 1, 1, 1, 1), equalize: true, equalizeStats: PITCHER_STATS },  // 투수 밸런스 — 투구 5종 같은 값(최저 cap)으로
   two_way:    { statWeights: W(1, 1, 1, 1, 1, 1, 1, 1, 1, 1), equalize: true },          // 밸런스 — 전 스탯 같은 값(최저 cap)으로
   recovery:   { statWeights: W(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5), restBias: 0.6 }, // 회복 우선
 };
@@ -59,8 +61,9 @@ export function isTrainDirectionMaxed(player, presetKey) {
   const preset = AUTO_PRESETS[presetKey];
   if (!preset || !player) return false;
   if (preset.equalize) {
-    const target = equalizeTarget(player);
-    return [...BATTER_STATS, ...PITCHER_STATS].every(s => {
+    const stats = preset.equalizeStats ?? [...BATTER_STATS, ...PITCHER_STATS];
+    const target = equalizeTarget(player, stats);
+    return stats.every(s => {
       const v = statValue(player, s);
       return v != null && v >= target;
     });
@@ -100,7 +103,7 @@ const LEAK_PENALTY = 0.4;
 function trainingScore(trKey, preset, player) {
   const tr = TRAININGS[trKey];
   if (!tr) return 0;
-  const equalTarget = preset.equalize ? equalizeTarget(player) : null;
+  const equalTarget = preset.equalize ? equalizeTarget(player, preset.equalizeStats) : null;
   let s = 0;
   for (const stat of tr.stats) {
     const w = preset.statWeights[stat] ?? 0;
@@ -118,7 +121,7 @@ function trainingScore(trKey, preset, player) {
 }
 
 // 다음 한 칸의 행동 결정 — 목표 비중 대비 부족분에 비례한 가중 추첨.
-// 모든 목표 도달(또는 비중 0뿐) 이면 휴식. mentor_letter 는 부족분을 곱으로 강조.
+// 모든 목표 도달(또는 비중 0뿐) 이면 휴식.
 export function pickAutoAction(presetKey, player) {
   if (player.injury) return { action: "rest" };
   if (player.stamina < 25) return { action: "rest" };
@@ -130,8 +133,7 @@ export function pickAutoAction(presetKey, player) {
   // 체력 50 미만이면 추가 휴식 확률
   if (player.stamina < 50 && Math.random() < 0.2) return { action: "rest" };
 
-  const boost = effectMultiplier(player, "autoTrainDeficitBoost");  // mentor_letter
-  const scored = Object.keys(TRAININGS).map(k => [k, trainingScore(k, preset, player) * boost]);
+  const scored = Object.keys(TRAININGS).map(k => [k, trainingScore(k, preset, player)]);
   const total = scored.reduce((a, [, w]) => a + w, 0);
   // 모든 목표 달성 — 더 키울 게 없음. 휴식.
   if (total <= 0.001) return { action: "rest" };

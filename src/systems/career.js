@@ -322,10 +322,13 @@ export function checkFreeAgency(player) {
   if (!pool || pool.length === 0) return { offers: [], canStay: true };
   const sorted = [...pool].filter(t => t.name !== player.teamName)
                           .sort((a, b) => b.strength - a.strength);
+  // 오퍼 수 제한 없음 — 점수가 높을수록 관심 구단이 늘고, 최상위는 전 구단이 오퍼.
+  // 모달은 max-height+스크롤이라 오퍼가 많아도 표시 가능.
   let offers;
-  if (score >= 120) offers = sorted.slice(0, 3);
-  else if (score >= 100) offers = pickRandom(sorted.slice(0, Math.min(8, sorted.length)), 2);
-  else if (score >= 80)  offers = pickRandom(sorted, 1);
+  const n = sorted.length;
+  if (score >= 120)      offers = sorted;                                          // 전체 구단
+  else if (score >= 100) offers = sorted.slice(0, Math.max(4, Math.ceil(n / 2)));  // 상위 절반(최소 4)
+  else if (score >= 80)  offers = pickRandom(sorted, Math.min(3, n));              // 3팀
   else offers = [];
   return { offers, canStay: true, score };
 }
@@ -351,9 +354,13 @@ export function applyFreeAgencyDecision(player, decision, newTeamName = null) {
   return { stayed: false, teamName: player.teamName };
 }
 
+// 트레이드 동의권 임계 명성 — 이 값 미만이면 선수 동의 없이 구단이 일방 트레이드(자동 이적).
+// 이 값 이상(어지간한 스타)이면 트레이드 모달로 수락/거절을 직접 선택.
+export const TRADE_CONSENT_FAME = 50;
+
 // 트레이드 굴림 — 휴식기 진입 시 낮은 확률로 다른 팀이 제안.
 // 조건: 프로/MLB + 계약 잔여 1년 이상 (계약 중 트레이드만, 만료는 FA 분기).
-// 8% 확률로 한 팀이 제안. 거절해도 페널티 없음 (선수 동의권).
+// 8% 확률로 한 팀이 제안. 명성이 임계 이상이면 거절 가능(선수 동의권).
 // 수락 시 계약 yearsLeft 그대로 인수 + 팀 변경.
 export function maybeTradeOffer(player) {
   if (!player.contract || player.contract.yearsLeft <= 0) return null;

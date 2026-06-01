@@ -95,7 +95,7 @@ export const RELICS = {
   past_life_notes: { cost: 60,  costGrowth: 50, effect: { kind: "firstSeasonTrainBoost", prop: "multiplier", base: 1.3, perLevel: 0.25 } },
   lucky_bat:       { cost: 50,  costGrowth: 40, effect: { kind: "walkoffChance",          prop: "flatAddPct", base: 3,   perLevel: 2 } },
   calling_card:    { cost: 100, costGrowth: 90, effect: { kind: "draftRound",             prop: "boost",      base: 1,   perLevel: 1 } },
-  mentor_letter:   { cost: 60,  costGrowth: 50, effect: { kind: "autoTrainDeficitBoost",  prop: "multiplier", base: 1.2, perLevel: 0.2 } },
+  mentor_letter:   { cost: 60,  costGrowth: 50, effect: { kind: "trainEfficiency",        prop: "multiplier", base: 1.2, perLevel: 0.2 } },
   prosthetic:      { cost: 70,  costGrowth: 60, effect: { kind: "injuryRecoverySpeed",    prop: "multiplier", base: 1.4, perLevel: 0.3 } },
   golden_glove:    { cost: 90,  costGrowth: 70, effect: { kind: "errorChance",            prop: "multiplier", base: 0.7, perLevel: -0.08, min: 0.3 } },
 };

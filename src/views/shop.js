@@ -340,8 +340,7 @@ function renderRelicTab() {
       onClick: () => {
         const r = purchaseRelic(key);
         if (!r.ok) return;
-        // 첫 구매(Lv.1)면 자리 있을 때 자동 장착.
-        if (r.level === 1 && !equipped && capacity) setRelics([...m.loadout.relics, key]);
+        // 첫 구매 자동 장착은 purchaseRelic 코어에서 처리됨 (모든 경로 일관).
         renderShop(document.getElementById("view-root"), routeRef);
       },
     });
