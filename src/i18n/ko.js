@@ -773,6 +773,7 @@ export const ko = {
     careerStart: "{school} 야구부 입단! 고교 1학년 시작.",
     graduation: "졸업 — 진로를 선택하세요",
     seasonStart: "{team} {grade}학년 시즌 시작.",
+    seasonStartPro: "{team} 만{age}세 시즌 시작.",
     seasonEnd: "{stage} {grade}학년 시즌 종료",
     trainingCritical: "{label} 대성공! 효과 2배",
     stageTransition: "{stage} {team} 입단!",

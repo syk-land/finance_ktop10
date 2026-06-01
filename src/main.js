@@ -35,10 +35,9 @@ function getRoot() {
 
 // 정적 chrome (topbar 로고, 토글 버튼 라벨, footer 버전, document.title) 동기화
 function updateChrome() {
-  const logo = document.getElementById("logo-text");
-  if (logo) logo.textContent = t("app.logo");
-  const version = document.getElementById("version-text");
-  if (version) version.textContent = t("app.version");
+  // 게임명은 푸터 오른쪽에 표시(헤더 로고 제거, 버전 문자열 미표시).
+  const footerTitle = document.getElementById("footer-title");
+  if (footerTitle) footerTitle.textContent = t("app.logo");
   const toggle = document.getElementById("locale-toggle");
   if (toggle) {
     toggle.textContent = "⚙";
@@ -114,7 +113,8 @@ export function route(name, opts = {}) {
   updateTopbar();
   updateFooter();
   if (isViewChange) {
-    window.scrollTo({ top: 0, behavior: "instant" });
+    // 스크롤은 #view-root 에서 일어나므로 그 컨테이너를 리셋.
+    getRoot().scrollTo({ top: 0, behavior: "instant" });
   }
 }
 
@@ -181,19 +181,20 @@ function setupScrollTopButton() {
   btn.type = "button";
   btn.textContent = "↑";
   btn.setAttribute("aria-label", "Scroll to top");
+  const scroller = getRoot();   // 스크롤 컨테이너 = #view-root
   btn.addEventListener("click", () => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    scroller.scrollTo({ top: 0, behavior: "smooth" });
   });
   document.body.appendChild(btn);
 
   const THRESHOLD = 200;
   let ticking = false;
   function update() {
-    if (window.scrollY > THRESHOLD) btn.classList.add("visible");
+    if (scroller.scrollTop > THRESHOLD) btn.classList.add("visible");
     else btn.classList.remove("visible");
     ticking = false;
   }
-  window.addEventListener("scroll", () => {
+  scroller.addEventListener("scroll", () => {
     if (!ticking) {
       requestAnimationFrame(update);
       ticking = true;

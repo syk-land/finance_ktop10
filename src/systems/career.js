@@ -91,10 +91,11 @@ export function transitionAfterSeason() {
     state.league = createLeague(player.stage, player.teamName);
   }
   state.season = createSeason(player.stage);
-  pushLog({
-    msg: t("log.seasonStart", { team: player.teamName, grade: player.grade }),
-    kind: "info",
-  });
+  // 고교/대학은 "{grade}학년", 프로·MLB 는 학년 개념이 없으므로 "만N세 시즌" (17학년 오표기 방지).
+  const startMsg = (player.stage === "high" || player.stage === "univ")
+    ? t("log.seasonStart", { team: player.teamName, grade: player.grade })
+    : t("log.seasonStartPro", { team: player.teamName, age: player.age });
+  pushLog({ msg: startMsg, kind: "info" });
   return { ended: false };
 }
 

@@ -769,6 +769,7 @@ export const en = {
     careerStart: "Joined {school} baseball team — Year 1 begins.",
     graduation: "Graduated — choose your career path.",
     seasonStart: "{team} Year {grade} season begins.",
+    seasonStartPro: "{team} season begins (age {age}).",
     seasonEnd: "{stage} Year {grade} season ended.",
     trainingCritical: "{label} — critical! 2x effect",
     stageTransition: "Signed with {team} ({stage})!",

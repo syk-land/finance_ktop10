@@ -30,7 +30,9 @@ html, body {
 #app {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;       /* 모바일 주소창 반영 */
+  overflow: hidden;     /* 스크롤은 #view-root 만 */
   max-width: 412px;
   margin: 0 auto;
   padding: 0 12px;
@@ -42,6 +44,7 @@ html, body {
   justify-content: space-between;
   padding: 14px 0;
   border-bottom: 1px solid var(--border);
+  flex-shrink: 0;       /* 헤더 고정 — 자기 영역 차지 */
 }
 
 .logo {
@@ -171,15 +174,35 @@ html, body {
 
 .bottombar {
   display: flex;
+  align-items: center;
   justify-content: space-between;
+  gap: 8px;
   padding: 10px 0;
   border-top: 1px solid var(--border);
   color: var(--muted);
   font-size: 12px;
+  flex-shrink: 0;       /* 푸터 고정 — 자기 영역 차지 */
+}
+/* 상태 메시지 — 푸터 폭 대부분 차지(길게 표시). 게임명은 오른쪽에 작게 고정. */
+#footer-status {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.footer-title {
+  flex-shrink: 0;
+  color: var(--accent-2);
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 #view-root {
   flex: 1;
+  min-height: 0;        /* flex 자식 축소 허용 → 내부 스크롤 동작 */
+  overflow-y: auto;     /* 본문만 스크롤 */
+  -webkit-overflow-scrolling: touch;
   padding: 18px 0;
 }
 
