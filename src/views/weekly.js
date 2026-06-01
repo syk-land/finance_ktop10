@@ -24,7 +24,11 @@ import { createImage } from "../assets/images.js";
 
 // 이벤트 컷 삽입 헬퍼 — 에셋 있으면 일러스트, 없으면(파일 X) 아무것도 안 그림.
 function eventCut(key) {
-  return createImage(key, { style: "max-width:300px; margin:0 auto 10px; border-radius:8px; overflow:hidden;" });
+  // 세로로 긴 이벤트 이미지가 모달을 넘기지 않도록 높이 상한 + 가운데 크롭(object-fit cover).
+  return createImage(key, {
+    style: "max-width:300px; max-height:180px; margin:0 auto 10px; border-radius:8px; overflow:hidden;",
+    imgStyle: "max-height:180px; object-fit:cover;",
+  });
 }
 import { randomName } from "../data/names.js";
 import { getTeamPool } from "../data/teams.js";
@@ -1818,7 +1822,8 @@ function statBarRow(label, value, color, max = 150) {
   v.className = "stat-val";
   v.style.color = color;
   v.style.fontWeight = "600";
-  v.textContent = Math.round(value);
+  // 소수 1자리 — 훈련 1회 +0.2 같은 작은 증가도 보이게 (정수 반올림은 누적돼야 변함).
+  v.textContent = (Math.round(value * 10) / 10).toFixed(1);
 
   row.appendChild(n);
   row.appendChild(bar);

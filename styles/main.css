@@ -103,6 +103,11 @@ html, body {
   max-width: 340px;
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
   animation: slideUp 200ms ease-out;
+  /* 내용이 길면(이미지+오퍼 등) 뷰포트를 넘지 않고 모달 내부 스크롤 */
+  max-height: 90vh;
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .modal-dialog h2 {
   margin: 0 0 8px;
