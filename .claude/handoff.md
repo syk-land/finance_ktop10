@@ -60,22 +60,30 @@
 
 ## ★ 다음 개발 사항 — 결승 POV / 캐릭터 생성 이미지 + 애니메이션 (사용자 요청, 미착수)
 
-**목표:** ① 결승 라이브 모달의 POV 씬과 ② 캐릭터 생성 미리보기를 일러스트로 교체하고, 가능하면 움직이게.
+**목표:** ① 결승 라이브 모달의 POV 씬과 ② 캐릭터 생성 미리보기를 일러스트로 교체하고, CSS 리깅으로 움직이게.
+**에셋 16장 확정(2026-06-01):** 캐릭터 12(6얼굴×2포즈) + POV 4(배경2+전경2). 상세는 아래 + `assets/README.md`.
 
 **대상 코드:**
 - POV: `src/render/finalAnim.js` `createPOVScene(mode)` — 현재 SVG(타석/마운드). `playPitch(ev)`가 프레임 호출.
 - 캐릭터 생성: `src/views/menu.js` `renderPreview()` — 현재 `createCharacterSVG(faceId,hand,...)`.
 
-**생성 프롬프트:** `assets/README.md` "결승 POV / 캐릭터 생성" 표 (povBat/povPitch/charBatter/charPitcher).
+**생성 프롬프트:** `assets/README.md` "🔲 결승 POV / 캐릭터 생성" 표 — **총 16장**으로 확정(아래).
 사용자가 본인 Chrome 의 Gemini 로 생성 → `gemini_images/` → 워터마크 제거+WebP(§DEVELOPMENT 5.2) → `assets/img/` → manifest 키.
 
-**진행 순서:**
-1. 프롬프트로 4장 생성 → 가공 → manifest 등록(povBat/povPitch/charBatter/charPitcher).
-2. **정지 교체(1순위, 쉬움)**: createPOVScene/renderPreview 가 에셋 있으면 이미지, 없으면 기존 SVG 폴백(`createImage` 패턴 재사용).
-3. **은은한 모션(CSS)**: 정지 이미지에 keyframe(살짝 줌/흔들림/패럴랙스). 타석 타격 순간엔 짧은 흔들림/플래시.
-4. (선택) **스프라이트 시트**: 타격 폼 등 프레임 여러 장을 한 이미지로 → CSS `steps()` 프레임 애니. 생성·정렬 부담 큼.
+**확정된 에셋 구성 (16장):**
+- **(A) 캐릭터 선택 미리보기 12장** = 얼굴 6종(f1~f6, `avatars.js` FACES 와 1:1) × 포즈 2(타자/투수). 3인칭 전신 portrait 3:4.
+  좌/우타·좌/우투는 코드 `scaleX(-1)` 거울반전 → 우타·우투 기준 1장씩만 생성. 키: `charBatF1`..`charBatF6`, `charPitchF1`..`charPitchF6`.
+- **(B) 결승 POV 4장** = 배경 2(`povBgBat`/`povBgPitch`, landscape 3:2, 중앙 비움) + 전경 소품 2(`povFgBat` 방망이+손/`povFgPitch` 던지는팔+글러브, 1:1 누끼).
+  **1인칭이라 얼굴 안 보임 → POV 는 6얼굴 매트릭스와 무관.**
 
-**애니메이션 결론:** Gemini=정지만. → (a) 정지+CSS 미세모션 = 권장 1순위(가볍고 즉효), (b) 스프라이트 시트 = 타격 폼용 차순위, (c) 영상생성(Veo 등)=용량·난도↑ 보류.
+**진행 순서:**
+1. 프롬프트로 16장 생성 → 가공(누끼는 단색배경 키잉) → manifest 등록(위 키).
+2. **정지 교체(1순위)**: `renderPreview()` 가 `createImage("charBat"+faceId)`(폴백=기존 `createCharacterSVG`), `createPOVScene` 가 배경/전경 이미지(폴백=기존 SVG). `createImage` 패턴 재사용.
+3. **모션(CSS 리깅, 추가 이미지 0)**: POV 모션 엔진(`animateBall`/`swingBat`/`spawnFireworks`)은 그대로. povFgBat 은 `transform-origin` 손쪽 + rotate 로 스윙, povFgPitch 는 release 에 맞춰 push, 배경 미세 줌/패럴랙스. 좌/우는 `scaleX(-1)`(타격 flip=hand∈{left,mixed}, 투구 flip=hand∈{left,lefty_rb}).
+4. 캐릭터 미리보기: 정지 + 선택적 idle 미세 흔들림. 좌타 flip=hand∈{left,mixed}.
+
+**애니메이션 결론:** Gemini=정지만. **단일 정지 + CSS 변형(회전/패럴랙스)으로 진짜 스윙·투구 모션을 낸다(권장).**
+스프라이트 시트(프레임 여러 장)는 **비권장** — Gemini 가 프레임 간 캐릭터 일관성을 못 지켜 품질 불가. 영상생성(Veo 등)=용량·난도↑ 보류.
 
 ## 🐛 미해결 버그 / 설계 이슈 (이번 세션 감사 — 코드 미변경, 방향 미정)
 
