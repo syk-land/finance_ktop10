@@ -419,6 +419,14 @@ export const en = {
     declineResult: "Trade declined — staying put",
   },
 
+  // Training review — weekly.js (top-weight stat hit cap)
+  trainSwitch: {
+    title:     "Training Review",
+    desc:      "Your {label} build's key stat '{stat}' has reached its cap. Change training direction for more efficient growth?",
+    btnChange: "Change direction",
+    btnKeep:   "Keep current",
+  },
+
   // FA (free agency) — career.js + weekly.js
   fa: {
     title:        "Free Agency",

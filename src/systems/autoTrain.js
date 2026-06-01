@@ -41,6 +41,37 @@ export const AUTO_PRESETS = {
   recovery:   { statWeights: W(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5), restBias: 0.6 }, // 회복 우선
 };
 
+// 프리셋의 최고 비중 스탯 키 (동률이면 스탯 순서상 첫 번째). 안내 메시지/캡 판정용.
+export function topWeightStat(presetKey) {
+  const preset = AUTO_PRESETS[presetKey];
+  if (!preset) return null;
+  let best = null, bestW = -1;
+  for (const [stat, w] of Object.entries(preset.statWeights)) {
+    if (w > bestW) { bestW = w; best = stat; }
+  }
+  return best;
+}
+
+// 현재 훈련 방향이 "더 올릴 게 없음" 인가 — 일시정지+방향변경 안내 트리거.
+//   밸런스(equalize): 전 스탯이 공통 목표값(최저 cap) 도달.
+//   그 외: 최고 비중 스탯이 자기 cap 도달.
+export function isTrainDirectionMaxed(player, presetKey) {
+  const preset = AUTO_PRESETS[presetKey];
+  if (!preset || !player) return false;
+  if (preset.equalize) {
+    const target = equalizeTarget(player);
+    return [...BATTER_STATS, ...PITCHER_STATS].every(s => {
+      const v = statValue(player, s);
+      return v != null && v >= target;
+    });
+  }
+  const stat = topWeightStat(presetKey);
+  if (!stat) return false;
+  const v = statValue(player, stat);
+  const cap = getPlayerStatCap(player, stat);
+  return v != null && isFinite(cap) && v >= cap;
+}
+
 function statValue(player, stat) {
   if (player.batter[stat] !== undefined) return player.batter[stat];
   if (player.pitcher[stat] !== undefined) return player.pitcher[stat];

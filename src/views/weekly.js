@@ -11,7 +11,7 @@ import { advanceToNextSeason, mergeSeasonStats } from "../systems/week.js";
 import { transitionAfterSeason, transitionToStage, eligibleCareerPaths, kboDraft, determineMLBStartStage, compositeScore, checkFreeAgency, applyFreeAgencyDecision, maybeTradeOffer, applyTradeAccept } from "../systems/career.js";
 import { getPlayerTeam, standings } from "../systems/league.js";
 import { createFaceSVG } from "../render/avatars.js";
-import { AUTO_PRESETS, autoFillWeek } from "../systems/autoTrain.js";
+import { AUTO_PRESETS, autoFillWeek, topWeightStat, isTrainDirectionMaxed } from "../systems/autoTrain.js";
 import { CATEGORY_KEYS, applyCategoryAndPickEvent, applyEventChoice, getAvailableCategories } from "../systems/offseason.js";
 import { appearanceChance, batterOVR, pitcherOVR, decideRolesForGame } from "../systems/simulator.js";
 import { createRadarSVG } from "../render/radar.js";
@@ -63,6 +63,14 @@ export function renderWeekly(root, route, opts = {}) {
     renderSeasonEnd(root, route);
     showSeasonEventModalIfNeeded(route);
     return;
+  }
+
+  // 훈련 방향의 최고비중 스탯이 cap 도달 → 일시정지 + 방향 변경 안내(자동모드, 방향당 1회).
+  if (state.autoMode && !state.paused && !state.trainSwitchAcked
+      && isTrainDirectionMaxed(player, state.autoMode)) {
+    state.paused = true;
+    state.trainSwitchAcked = true;
+    openTrainSwitchModal(route);
   }
 
   // tick 자동 호출 시 schedule panel 자체를 보존(이벤트 리스너 유지) — 클릭 안정.
@@ -1680,6 +1688,7 @@ function renderAutoPanel(route) {
     });
     card.addEventListener("click", () => {
       state.autoMode = key;
+      state.trainSwitchAcked = false;   // 방향 바꾸면 새 방향의 cap 도달 안내 재활성화
       const summary = autoFillWeek(key);
       saveGame();
       route("weekly");
@@ -3016,6 +3025,53 @@ function openDraftLiveModal(player, onClose) {
   }
 
   rerender();
+  backdrop.appendChild(dialog);
+  document.body.appendChild(backdrop);
+}
+
+// 훈련 방향 점검 모달 — 최고비중 스탯 cap 도달 시. 변경=훈련방향 탭 이동(일시정지 유지) / 유지=닫기.
+function openTrainSwitchModal(route) {
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  const dialog = document.createElement("div");
+  dialog.className = "modal-dialog";
+  dialog.style.maxWidth = "320px";
+
+  const h = document.createElement("h2");
+  h.textContent = t("trainSwitch.title");
+  dialog.appendChild(h);
+
+  const stat = topWeightStat(state.autoMode);
+  const desc = document.createElement("p");
+  desc.className = "muted small";
+  desc.style.cssText = "margin:0 0 14px; line-height:1.5;";
+  desc.textContent = t("trainSwitch.desc", {
+    label: t("preset." + state.autoMode + ".label"),
+    stat: stat ? t("stat." + stat) : "",
+  });
+  dialog.appendChild(desc);
+
+  const change = document.createElement("button");
+  change.className = "primary";
+  change.style.cssText = "width:100%; padding:10px; margin-bottom:6px; font-weight:700;";
+  change.textContent = t("trainSwitch.btnChange");
+  change.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    backdrop.remove();
+    weeklyCarouselIdx = 0;          // 훈련방향 탭(슬라이드 0)
+    route("weekly");                 // 일시정지 유지한 채 이동
+  });
+  dialog.appendChild(change);
+
+  const keep = document.createElement("button");
+  keep.style.cssText = "width:100%; padding:10px;";
+  keep.textContent = t("trainSwitch.btnKeep");
+  keep.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    backdrop.remove();               // 그대로(일시정지 유지, 재생은 사용자가)
+  });
+  dialog.appendChild(keep);
+
   backdrop.appendChild(dialog);
   document.body.appendChild(backdrop);
 }

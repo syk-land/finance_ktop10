@@ -422,6 +422,14 @@ export const ko = {
     declineResult: "트레이드 거절 — 현 팀에 잔류",
   },
 
+  // 훈련 방향 점검 — weekly.js (최고비중 스탯 cap 도달)
+  trainSwitch: {
+    title:     "훈련 방향 점검",
+    desc:      "{label} 훈련의 주력 능력치 '{stat}' 이(가) 최대치에 도달했습니다. 더 효율적인 성장을 위해 훈련 방향을 바꾸시겠습니까?",
+    btnChange: "훈련 방향 바꾸기",
+    btnKeep:   "그대로 두기",
+  },
+
   // FA (자유계약) — career.js + weekly.js
   fa: {
     title:        "FA 자격 획득",
