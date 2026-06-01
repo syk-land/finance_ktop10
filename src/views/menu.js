@@ -663,7 +663,7 @@ function renderPreview() {
   card.style.background = "var(--panel-2)";
   card.style.border = "1px solid var(--border)";
   card.style.borderRadius = "8px";
-  card.style.padding = "5px";
+  card.style.padding = "3px";
   card.style.textAlign = "center";
 
   // 캐릭터 일러스트(얼굴별 타자 그림) — 없으면 기존 파라메트릭 SVG 폴백.
@@ -671,11 +671,11 @@ function renderPreview() {
   //   idle 미세 흔들림(nir-idle)은 wrap 에만 적용 → flip 과 충돌 없음.
   ensureSpinnerStyle();
   const battingLeft = draft.hand === "left" || draft.hand === "mixed";
-  // 높이 96px 고정(원래 SVG 104px 보다 작게) — 생성 화면 1스크린 맞춤 유지. width:auto 로 비율 보존.
+  // 높이 70px 고정 — 생성 화면 1스크린 맞춤(이전 96px도 살짝 넘쳐 더 축소). width:auto 로 비율 보존.
   const charImg = createImage("charBat" + draft.faceId.toUpperCase(), {
     style: "animation:nir-idle 3.2s ease-in-out infinite;",
-    imgStyle: `height:96px; width:auto; margin:0 auto;${battingLeft ? " transform:scaleX(-1);" : ""}`,
-    fallback: () => createCharacterSVG(draft.faceId, draft.hand, { w: 80, h: 96 }),
+    imgStyle: `height:70px; width:auto; margin:0 auto;${battingLeft ? " transform:scaleX(-1);" : ""}`,
+    fallback: () => createCharacterSVG(draft.faceId, draft.hand, { w: 60, h: 72 }),
   });
   card.appendChild(charImg);
 

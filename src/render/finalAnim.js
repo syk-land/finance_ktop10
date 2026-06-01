@@ -153,30 +153,34 @@ export function createPOVScene(mode = "bat") {
   ball.style.opacity = "0";
   svg.appendChild(ball);
 
-  const labelHost = svgEl("g", {});
-  svg.appendChild(labelHost);
-
   // ── 이미지 레이어 (있으면 위 SVG 폴백 숨김) ──
   const bgImg = createImage(mode === "bat" ? "povBgBat" : "povBgPitch", {
     style: "position:absolute; inset:0; z-index:0;",
     imgStyle: "width:100%; height:100%; object-fit:cover;",
     onload: () => { bgGroup.style.display = "none"; opponentGroup.style.display = "none"; },
   });
-  // 전경: 높이 기준으로 맞춰(컨테이너 200px 안에) 방망이 끝 잘림 방지. 정사각 소품이라 aspect-ratio 1/1.
+  // 전경 소품 — 1인칭 하단에 작게(높이 ~50%) 배치. 너무 크면 가운데 상대/공/결과글자를 가린다.
   const fgImg = createImage(mode === "bat" ? "povFgBat" : "povFgPitch", {
-    style: `position:absolute; left:50%; bottom:0; height:94%; aspect-ratio:1/1; width:auto; z-index:2; will-change:transform; transform-origin:50% 100%; transform:translateX(-50%)${fgFlip ? " scaleX(-1)" : ""};`,
+    style: `position:absolute; left:50%; bottom:-2%; height:50%; aspect-ratio:1/1; width:auto; z-index:2; will-change:transform; transform-origin:50% 100%; transform:translateX(-50%)${fgFlip ? " scaleX(-1)" : ""};`,
     imgStyle: "height:100%; width:100%; object-fit:contain;",
     onload: () => { backGroup.style.display = "none"; swingRef.fg = fgImg; },
   });
 
+  // 최상단 오버레이(z3) — 결과 라벨/폭죽. 전경 소품 위에 떠야 "뭐 했는지" 글자가 안 가려진다.
+  const overlaySvg = svgEl("svg", { width: "100%", height: "100%", viewBox: `0 0 ${W} ${H}` });
+  overlaySvg.style.cssText = "position:absolute; inset:0; z-index:3; pointer-events:none;";
+  const labelHost = svgEl("g", {});
+  overlaySvg.appendChild(labelHost);
+
   container.appendChild(bgImg);
   container.appendChild(svg);
   container.appendChild(fgImg);
+  container.appendChild(overlaySvg);
 
   return {
     el: container,
     playPitch(event) {
-      return playPitchSequence({ svg, ball, labelHost, swingRef, event, mode });
+      return playPitchSequence({ svg, fxHost: overlaySvg, ball, labelHost, swingRef, event, mode });
     },
   };
 }
@@ -237,7 +241,7 @@ function playResultSfx(type) {
   else if (type === "K") sfx("strikeout");
 }
 
-function playPitchSequence({ svg, ball, labelHost, swingRef, event, mode }) {
+function playPitchSequence({ svg, fxHost, ball, labelHost, swingRef, event, mode }) {
   const spec = PLAYBOOK[event.type] ?? PLAYBOOK.OUT;
   const { contact, final } = pickEndPoint(spec);
 
@@ -270,7 +274,7 @@ function playPitchSequence({ svg, ball, labelHost, swingRef, event, mode }) {
     .then(() => {
       // 홈런이면 공이 멀어진 뒤 폭죽 + 라벨 유지 길게
       if (spec.firework) {
-        spawnFireworks(svg);
+        spawnFireworks(fxHost ?? svg);
         return waitMs(900);
       }
       return waitMs(220);
