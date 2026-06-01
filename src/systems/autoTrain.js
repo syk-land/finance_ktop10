@@ -10,8 +10,19 @@
 
 import { state } from "../state.js";
 import { doDailyAction } from "./week.js";
-import { TRAININGS, getPlayerStatCap } from "./player.js";
+import { TRAININGS, getPlayerStatCap, BATTER_STATS, PITCHER_STATS } from "./player.js";
 import { effectMultiplier } from "./traitEffects.js";
+
+// equalize 프리셋(밸런스)의 공통 목표값 = 전 스탯 중 최저 cap.
+// 주력/수비 cap 150, 나머지 200 이면 → 150. 모든 능력치를 같은 값으로 수렴시킨다.
+function equalizeTarget(player) {
+  let min = Infinity;
+  for (const stat of [...BATTER_STATS, ...PITCHER_STATS]) {
+    const cap = getPlayerStatCap(player, stat);
+    if (isFinite(cap) && cap > 0 && cap < min) min = cap;
+  }
+  return isFinite(min) ? min : 150;
+}
 
 // 스탯 순서: 컨택 파워 선구 주력 수비 | 구속 제구 변화 스태 멘탈
 function W(contact, power, eye, speed, defense, velocity, control, breaking, stamina, mental) {
@@ -26,7 +37,7 @@ export const AUTO_PRESETS = {
   defender:   { statWeights: W(0.60, 0.45, 0.60, 0.85, 1.00, 0, 0, 0, 0, 0) },          // 수비형 — 수비/주력
   fireballer: { statWeights: W(0, 0, 0, 0, 0, 1.00, 0.65, 0.70, 0.85, 0.60) },          // 파워피처 — 구속/스태미나
   finesse:    { statWeights: W(0, 0, 0, 0, 0, 0.60, 1.00, 0.90, 0.70, 0.85) },          // 기교파 — 제구/변화구/멘탈
-  two_way:    { statWeights: W(1, 1, 1, 1, 1, 1, 1, 1, 1, 1) },                          // 양방향 — 전 스탯 균등
+  two_way:    { statWeights: W(1, 1, 1, 1, 1, 1, 1, 1, 1, 1), equalize: true },          // 밸런스 — 전 스탯 같은 값(최저 cap)으로
   recovery:   { statWeights: W(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5), restBias: 0.6 }, // 회복 우선
 };
 
@@ -36,14 +47,16 @@ function statValue(player, stat) {
   return null;
 }
 
-// 목표(비중×cap) 대비 부족분 (0~weight). 이미 목표 도달이면 0.
-function statDeficit(stat, player, weight) {
+// 목표 대비 부족분 (0~1). 이미 목표 도달이면 0.
+//   기본: 목표 = 비중 × cap.
+//   equalTarget 지정(밸런스): 목표 = min(공통목표값, 해당 cap) → 전 스탯 같은 값으로 수렴.
+function statDeficit(stat, player, weight, equalTarget = null) {
   if (!weight || weight <= 0) return 0;
   const v = statValue(player, stat);
   if (v == null) return 0;
   const cap = getPlayerStatCap(player, stat);
   if (!isFinite(cap) || cap <= 0) return 0;
-  const target = weight * cap;
+  const target = equalTarget != null ? Math.min(equalTarget, cap) : weight * cap;
   if (v >= target) return 0;
   return (target - v) / cap;
 }
@@ -56,10 +69,11 @@ const LEAK_PENALTY = 0.4;
 function trainingScore(trKey, preset, player) {
   const tr = TRAININGS[trKey];
   if (!tr) return 0;
+  const equalTarget = preset.equalize ? equalizeTarget(player) : null;
   let s = 0;
   for (const stat of tr.stats) {
     const w = preset.statWeights[stat] ?? 0;
-    const def = statDeficit(stat, player, w);
+    const def = statDeficit(stat, player, w, equalTarget);
     if (def > 0) {
       s += def;
     } else {
