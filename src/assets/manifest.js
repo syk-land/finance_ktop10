@@ -22,6 +22,18 @@ export const IMAGES = {
   eventDemote:   { src: "assets/img/event-demote.webp" },                 // 강등
   eventFa:       { src: "assets/img/event-fa.webp" },                     // FA 계약
   eventTrade:    { src: "assets/img/event-trade.webp" },                  // 트레이드
+
+  // 캐릭터 생성 미리보기 — 얼굴 6종(avatars FACES) × 포즈 2(타자/투수). 우투/우타 기준, 좌측은 CSS scaleX(-1).
+  charBatF1: { src: "assets/img/char-bat-f1.webp" },   charPitchF1: { src: "assets/img/char-pitch-f1.webp" },
+  charBatF2: { src: "assets/img/char-bat-f2.webp" },   charPitchF2: { src: "assets/img/char-pitch-f2.webp" },
+  charBatF3: { src: "assets/img/char-bat-f3.webp" },   charPitchF3: { src: "assets/img/char-pitch-f3.webp" },
+  charBatF4: { src: "assets/img/char-bat-f4.webp" },   charPitchF4: { src: "assets/img/char-pitch-f4.webp" },
+  charBatF5: { src: "assets/img/char-bat-f5.webp" },   charPitchF5: { src: "assets/img/char-pitch-f5.webp" },
+  charBatF6: { src: "assets/img/char-bat-f6.webp" },   charPitchF6: { src: "assets/img/char-pitch-f6.webp" },
+
+  // 결승 POV — 배경(앞=상대) + 전경 소품(투명 누끼, 내 방망이/던지는팔). 모션은 CSS 리깅.
+  povBgBat:  { src: "assets/img/pov-bg-bat.webp" },    povBgPitch:  { src: "assets/img/pov-bg-pitch.webp" },
+  povFgBat:  { src: "assets/img/pov-fg-bat.webp" },    povFgPitch:  { src: "assets/img/pov-fg-pitch.webp" },
 };
 
 export const BGM = {

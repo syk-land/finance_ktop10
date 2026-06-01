@@ -12,6 +12,7 @@
 import { svgEl } from "./svg.js";
 import { t } from "../i18n/index.js";
 import { state } from "../state.js";
+import { createImage } from "../assets/images.js";
 
 const W = 320, H = 220;
 const ZONE = { x: 130, y: 95, w: 60, h: 65 };
@@ -112,24 +113,37 @@ function makeBackground(svg) {
 }
 
 export function createPOVScene(mode = "bat") {
-  const svg = svgEl("svg", {
-    width: "100%", height: "200", viewBox: `0 0 ${W} ${H}`,
-  });
-  svg.style.cssText = "display:block; max-width:340px; margin:0 auto; background:linear-gradient(180deg, #142030 0%, #1a2a3d 70%, #0e1116 100%); border-radius:6px; border:1px solid var(--border);";
+  // 손방향: 타격 전경은 좌타(left/mixed), 투구 전경은 좌투(left/lefty_rb)에서 좌우반전.
+  const hand = state.player?.hand ?? "right";
+  const fgFlip = mode === "bat"
+    ? (hand === "left" || hand === "mixed")
+    : (hand === "left" || hand === "lefty_rb");
 
-  makeBackground(svg);
+  // 컨테이너: 배경이미지(z0) < SVG 오버레이(z1) < 전경소품(z2). 그라데이션은 SVG 폴백용 배경.
+  const container = document.createElement("div");
+  container.style.cssText = "position:relative; max-width:340px; height:200px; margin:0 auto; border-radius:6px; overflow:hidden; border:1px solid var(--border); background:linear-gradient(180deg,#142030 0%,#1a2a3d 70%,#0e1116 100%);";
 
-  const swingRef = { bat: null };
+  const svg = svgEl("svg", { width: "100%", height: "100%", viewBox: `0 0 ${W} ${H}` });
+  svg.style.cssText = "position:absolute; inset:0; display:block; z-index:1;";
 
+  // ── SVG 폴백 레이어 (이미지 로드 성공 시 해당 그룹 display:none) ──
+  const bgGroup = svgEl("g", {});
+  makeBackground(bgGroup);
+  svg.appendChild(bgGroup);
+
+  const swingRef = { bat: null, fg: null, flip: fgFlip, mode };
+
+  let opponentGroup, backGroup;
   if (mode === "bat") {
-    svg.appendChild(pitcherFront());
-    svg.appendChild(strikeZone());
-    svg.appendChild(batterBack(swingRef));
+    opponentGroup = pitcherFront();      // 앞 = 상대 투수
+    backGroup = batterBack(swingRef);    // 뒤 = 내 타자(방망이 → swingRef.bat)
   } else {
-    svg.appendChild(pitcherBack());
-    svg.appendChild(strikeZone());
-    svg.appendChild(batterFront());
+    opponentGroup = batterFront();       // 앞 = 상대 타자
+    backGroup = pitcherBack();           // 뒤 = 내 투수 어깨
   }
+  svg.appendChild(opponentGroup);
+  svg.appendChild(strikeZone());
+  svg.appendChild(backGroup);
 
   const ball = ballEl();
   ball.setAttribute("cx", "160");
@@ -140,12 +154,32 @@ export function createPOVScene(mode = "bat") {
   const labelHost = svgEl("g", {});
   svg.appendChild(labelHost);
 
+  // ── 이미지 레이어 (있으면 위 SVG 폴백 숨김) ──
+  const bgImg = createImage(mode === "bat" ? "povBgBat" : "povBgPitch", {
+    style: "position:absolute; inset:0; z-index:0;",
+    imgStyle: "width:100%; height:100%; object-fit:cover;",
+    onload: () => { bgGroup.style.display = "none"; opponentGroup.style.display = "none"; },
+  });
+  const fgImg = createImage(mode === "bat" ? "povFgBat" : "povFgPitch", {
+    style: `position:absolute; left:50%; bottom:0; width:62%; z-index:2; will-change:transform; transform-origin:50% 100%; transform:translateX(-50%)${fgFlip ? " scaleX(-1)" : ""};`,
+    onload: () => { backGroup.style.display = "none"; swingRef.fg = fgImg; },
+  });
+
+  container.appendChild(bgImg);
+  container.appendChild(svg);
+  container.appendChild(fgImg);
+
   return {
-    el: svg,
+    el: container,
     playPitch(event) {
       return playPitchSequence({ svg, ball, labelHost, swingRef, event, mode });
     },
   };
+}
+
+// 전경 소품(HTML img wrap)의 기준 transform — 중앙정렬 + 좌우반전 유지(회전은 이 뒤에 덧붙임).
+function fgBaseTransform(ref) {
+  return `translateX(-50%)${ref.flip ? " scaleX(-1)" : ""}`;
 }
 
 function pickEndPoint(spec) {
@@ -205,11 +239,14 @@ function playPitchSequence({ svg, ball, labelHost, swingRef, event, mode }) {
   ball.setAttribute("cy", start.y);
   ball.setAttribute("r", start.r);
 
+  // 투구 POV: 공 릴리스에 맞춰 전경 팔 살짝 push (전경 이미지 있을 때만).
+  if (mode === "pit" && swingRef.fg) throwPush(swingRef);
+
   return animateBall(ball, start, { x: contact.x, y: contact.y, r: 5 }, 380)
     .then(() => {
-      // 스윙 (있으면) + 결과 라벨
-      if (spec.swing && swingRef.bat) {
-        swingBat(swingRef.bat);
+      // 스윙 (타격 POV) — 전경 이미지면 CSS 회전, 아니면 기존 SVG 방망이 회전.
+      if (spec.swing && mode === "bat" && (swingRef.fg || swingRef.bat)) {
+        swingBat(swingRef);
       }
       showLabel(labelHost, t("event." + event.type), spec.accent);
       // 컨택 직후 후속 비행
@@ -315,7 +352,41 @@ function animateBall(ball, from, to, duration) {
   });
 }
 
-function swingBat(bat) {
+// 전경 이미지(있으면) CSS 회전 스윙, 아니면 기존 SVG 방망이 rect 회전.
+function swingBat(ref) {
+  if (ref && ref.fg) { swingFgImage(ref); return; }
+  const bat = ref && ref.bat ? ref.bat : ref;   // 하위호환: rect 직접 전달도 허용
+  if (!bat || !bat.setAttribute) return;
+  swingSvgBat(bat);
+}
+
+// 전경 방망이 이미지 — 손(하단)을 축으로 빠르게 회전했다 복귀(임팩트 잼).
+function swingFgImage(ref) {
+  const el = ref.fg;
+  const base = fgBaseTransform(ref);
+  const m = speedMult();
+  el.style.transition = `transform ${Math.round(70 * m)}ms ease-in`;
+  el.style.transform = `${base} rotate(30deg)`;
+  setTimeout(() => {
+    el.style.transition = `transform ${Math.round(170 * m)}ms ease-out`;
+    el.style.transform = `${base} rotate(0deg)`;
+  }, Math.round(80 * m));
+}
+
+// 투구 전경 팔 — 릴리스 순간 앞으로 살짝 밀었다 복귀.
+function throwPush(ref) {
+  const el = ref.fg;
+  const base = fgBaseTransform(ref);
+  const m = speedMult();
+  el.style.transition = `transform ${Math.round(90 * m)}ms ease-out`;
+  el.style.transform = `${base} translateY(6px) scale(1.04)`;
+  setTimeout(() => {
+    el.style.transition = `transform ${Math.round(200 * m)}ms ease-in`;
+    el.style.transform = base;
+  }, Math.round(100 * m));
+}
+
+function swingSvgBat(bat) {
   // 짧은 회전 애니메이션 (rotate 20 → -60 → 20). 속도 배율 적용.
   const baseTransform = "rotate({deg} 14 -32)";
   const start = 20, mid = -70, end = 20;

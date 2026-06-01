@@ -93,7 +93,8 @@ function ensureSpinnerStyle() {
   s.id = "spin-style";
   s.textContent =
     "@keyframes nir-spin{to{transform:rotate(360deg)}}" +
-    "@keyframes nir-fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}";
+    "@keyframes nir-fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}" +
+    "@keyframes nir-idle{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}";
   document.head.appendChild(s);
 }
 
@@ -665,9 +666,17 @@ function renderPreview() {
   card.style.padding = "5px";
   card.style.textAlign = "center";
 
-  // 안드로이드 폭에 맞게 캐릭터 SVG 작게 — 한 화면에 들어오도록 더 축소
-  const charSVG = createCharacterSVG(draft.faceId, draft.hand, { w: 88, h: 104 });
-  card.appendChild(charSVG);
+  // 캐릭터 일러스트(얼굴별 타자 그림) — 없으면 기존 파라메트릭 SVG 폴백.
+  //   좌타(hand=left/mixed)는 img 만 scaleX(-1) 반전(폴백 SVG 는 내부에서 손방향 처리하므로 미적용).
+  //   idle 미세 흔들림(nir-idle)은 wrap 에만 적용 → flip 과 충돌 없음.
+  ensureSpinnerStyle();
+  const battingLeft = draft.hand === "left" || draft.hand === "mixed";
+  const charImg = createImage("charBat" + draft.faceId.toUpperCase(), {
+    style: "width:96px; margin:0 auto; animation:nir-idle 3.2s ease-in-out infinite;",
+    imgStyle: battingLeft ? "transform:scaleX(-1);" : "",
+    fallback: () => createCharacterSVG(draft.faceId, draft.hand, { w: 88, h: 104 }),
+  });
+  card.appendChild(charImg);
 
   const name = document.createElement("div");
   name.style.marginTop = "4px";

@@ -7,7 +7,7 @@
 import { IMAGES } from "./manifest.js";
 
 export function createImage(key, opts = {}) {
-  const { alt = "", fallback = null, className = "", style = "" } = opts;
+  const { alt = "", fallback = null, className = "", style = "", imgStyle = "", onload = null } = opts;
   const wrap = document.createElement("div");
   if (className) wrap.className = className;
   if (style) wrap.style.cssText = style;
@@ -20,11 +20,13 @@ export function createImage(key, opts = {}) {
 
   const img = document.createElement("img");
   img.alt = alt;
-  img.style.cssText = "display:block; width:100%; height:auto;";
+  // imgStyle: <img> 전용 추가 스타일 (예: transform:scaleX(-1) 손방향 반전). 폴백 노드엔 미적용.
+  img.style.cssText = "display:block; width:100%; height:auto;" + imgStyle;
   img.addEventListener("error", () => {
     wrap.innerHTML = "";
     if (fallback) wrap.appendChild(fallback());
   });
+  if (onload) img.addEventListener("load", () => onload(img, wrap));
   img.src = def.src;
   wrap.appendChild(img);
   return wrap;
