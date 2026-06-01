@@ -671,10 +671,11 @@ function renderPreview() {
   //   idle 미세 흔들림(nir-idle)은 wrap 에만 적용 → flip 과 충돌 없음.
   ensureSpinnerStyle();
   const battingLeft = draft.hand === "left" || draft.hand === "mixed";
+  // 높이 96px 고정(원래 SVG 104px 보다 작게) — 생성 화면 1스크린 맞춤 유지. width:auto 로 비율 보존.
   const charImg = createImage("charBat" + draft.faceId.toUpperCase(), {
-    style: "width:96px; margin:0 auto; animation:nir-idle 3.2s ease-in-out infinite;",
-    imgStyle: battingLeft ? "transform:scaleX(-1);" : "",
-    fallback: () => createCharacterSVG(draft.faceId, draft.hand, { w: 88, h: 104 }),
+    style: "animation:nir-idle 3.2s ease-in-out infinite;",
+    imgStyle: `height:96px; width:auto; margin:0 auto;${battingLeft ? " transform:scaleX(-1);" : ""}`,
+    fallback: () => createCharacterSVG(draft.faceId, draft.hand, { w: 80, h: 96 }),
   });
   card.appendChild(charImg);
 

@@ -99,11 +99,33 @@ export function sfx(name) {
     env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     src.start(t); src.stop(t + dur + 0.02);
   };
+  // 필터 노이즈 — whoosh(공 던지는 소리) / roar(함성) 용. freq 가 [from,to] 면 dur 동안 스윕.
+  const noiseBand = (filterType, freq, dur, peak, env01) => {
+    const src = whiteNoise(c, dur);
+    const flt = c.createBiquadFilter(); flt.type = filterType;
+    if (Array.isArray(freq)) {
+      flt.frequency.setValueAtTime(freq[0], t);
+      flt.frequency.exponentialRampToValueAtTime(freq[1], t + dur);
+    } else { flt.frequency.value = freq; flt.Q.value = 0.7; }
+    const env = c.createGain();
+    src.connect(flt); flt.connect(env); env.connect(out);
+    env.gain.setValueAtTime(0.0001, t);
+    // env01: [[시각비율, 게인비율], ...] — 함성 스웰처럼 다단계 엔벌로프.
+    for (const [tp, gp] of env01) {
+      const time = t + dur * tp, g = Math.max(0.0001, peak * vol * gp);
+      if (gp <= 0.0001) env.gain.exponentialRampToValueAtTime(g, time);
+      else env.gain.linearRampToValueAtTime(g, time);
+    }
+    src.start(t); src.stop(t + dur + 0.02);
+  };
 
   switch (name) {
     case "click":     tone(660, 0.05, "square", 0.12); break;
-    case "hit":       crack(0.10, 0.45); tone(200, 0.10, "triangle", 0.18); break;       // 배트 타격
+    case "pitch":     noiseBand("lowpass", [3200, 600], 0.18, 0.22, [[0.12, 1], [1, 0.0001]]); break;  // 공 던지는 휙
+    case "hit":       crack(0.10, 0.45); tone(200, 0.10, "triangle", 0.18); break;       // 배트 타격(경쾌)
+    case "out":       crack(0.06, 0.20); tone(140, 0.13, "triangle", 0.16); break;       // 범타(둔탁/낮음)
     case "homerun":   crack(0.12, 0.4); tone(330, 0.5, "sawtooth", 0.28); tone(523, 0.5, "sawtooth", 0.18, 0.04); break;
+    case "crowd":     noiseBand("bandpass", 1100, 1.5, 0.5, [[0.18, 1], [0.5, 0.7], [1, 0.0001]]); break;  // 홈런 함성 스웰
     case "strikeout": tone(180, 0.22, "square", 0.22); tone(120, 0.25, "square", 0.18, 0.06); break;
     case "good":      tone(880, 0.12, "sine", 0.22); tone(1320, 0.14, "sine", 0.16, 0.08); break;
     case "bad":       tone(160, 0.3, "sawtooth", 0.22); break;

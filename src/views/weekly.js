@@ -479,12 +479,7 @@ function playLiveGame(dialog, result, opts) {
     diamondNode = node;
   }
   function appendEventLog(ev) {
-    // 효과음 — 메인 타석 결과에 맞춰 (홈런/안타/삼진).
-    if (ev.role === "batter") {
-      if (ev.type === "HR") sfx("homerun");
-      else if (["1B", "2B", "3B"].includes(ev.type)) sfx("hit");
-      else if (ev.type === "K") sfx("strikeout");
-    }
+    // 효과음은 POV playPitch(finalAnim playResultSfx) 에서 투구·컨택 타이밍에 맞춰 재생 — 여기선 중복 방지로 제거.
     const row = document.createElement("div");
     if (ev.type === "PIT_CHANGE") {
       const fromC = ev.fromIsMain ? "var(--accent-2)" : "inherit";

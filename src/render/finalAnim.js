@@ -13,6 +13,7 @@ import { svgEl } from "./svg.js";
 import { t } from "../i18n/index.js";
 import { state } from "../state.js";
 import { createImage } from "../assets/images.js";
+import { sfx } from "../assets/audio.js";
 
 const W = 320, H = 220;
 const ZONE = { x: 130, y: 95, w: 60, h: 65 };
@@ -228,6 +229,14 @@ function pickEndPoint(spec) {
   return { contact, final };
 }
 
+// 결과별 효과음. 타격음 3종(홈런/안타/범타) + 홈런 함성. 삼진은 별도. 볼넷/사구는 무음.
+function playResultSfx(type) {
+  if (type === "HR") { sfx("homerun"); sfx("crowd"); }
+  else if (type === "1B" || type === "2B" || type === "3B") sfx("hit");
+  else if (type === "OUT" || type === "E" || type === "DP" || type === "SF") sfx("out");
+  else if (type === "K") sfx("strikeout");
+}
+
 function playPitchSequence({ svg, ball, labelHost, swingRef, event, mode }) {
   const spec = PLAYBOOK[event.type] ?? PLAYBOOK.OUT;
   const { contact, final } = pickEndPoint(spec);
@@ -242,7 +251,8 @@ function playPitchSequence({ svg, ball, labelHost, swingRef, event, mode }) {
   ball.setAttribute("cy", start.y);
   ball.setAttribute("r", start.r);
 
-  // 투구 POV: 공 릴리스에 맞춰 전경 팔 살짝 push (전경 이미지 있을 때만).
+  // 공투척음 — 모든 투구 릴리스. + 투구 POV 면 전경 팔 살짝 push.
+  sfx("pitch");
   if (mode === "pit" && swingRef.fg) throwPush(swingRef);
 
   return animateBall(ball, start, { x: contact.x, y: contact.y, r: 5 }, 380)
@@ -251,6 +261,8 @@ function playPitchSequence({ svg, ball, labelHost, swingRef, event, mode }) {
       if (spec.swing && mode === "bat" && (swingRef.fg || swingRef.bat)) {
         swingBat(swingRef);
       }
+      // 결과 효과음 — 타격음 3종(홈런/안타/범타) + 홈런 함성, 삼진음. 공 컨택 시점에 맞춤.
+      playResultSfx(event.type);
       showLabel(labelHost, t("event." + event.type), spec.accent);
       // 컨택 직후 후속 비행
       return animateBall(ball, { x: contact.x, y: contact.y, r: 5 }, final, 700);
