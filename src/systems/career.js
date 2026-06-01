@@ -150,6 +150,23 @@ export function getMLBOffers(player) {
   return pickRandom(sorted.slice(Math.floor(n * 0.5)), 1);                                   // 하위권 1팀
 }
 
+// KBO→MLB 도전 자격 (실제 규정 모델):
+//   해외 FA(9시즌+): 자유계약으로 MLB 직행 가능(구단 동의 불필요).
+//   포스팅(7~8시즌): 구단 포스팅으로 도전(구단 동의는 단순화 — 항상 허용). 실력(getMLBOffers)에 따라 관심 구단.
+//   KBO 1군(pro1) 에서만. offers 비면(저실력) 관심 구단 없음 → 도전 불가.
+//   서비스 연수: player.kboSeasons (advanceToNextSeason 에서 KBO 시즌마다 누적).
+export const MLB_POSTING_SEASONS = 7;
+export const MLB_FA_SEASONS = 9;
+export function checkMLBChallenge(player) {
+  if (!player || player.stage !== "pro1") return null;
+  const seasons = player.kboSeasons ?? 0;
+  let type = null;
+  if (seasons >= MLB_FA_SEASONS) type = "fa";
+  else if (seasons >= MLB_POSTING_SEASONS) type = "posting";
+  if (!type) return null;
+  return { type, offers: getMLBOffers(player), kboSeasons: seasons };
+}
+
 // MLB 입단 시작 stage — promotionScore 에 따라 마이너 단계에서 시작.
 // determineMLBStartStage 는 호출자가 이미 점수 계산했을 수 있어 score 직접 받음.
 // 명성 영향 받지 않도록 호출지에서 promotionScore(player) 결과를 넘겨야 함.

@@ -8,7 +8,7 @@ import {
   BATTER_STATS, PITCHER_STATS, TALENTS, overallScore, nationalTeamRating, getStatLabels, getPlayerStatCap, getPlayerMaxStatCap, applyGameExperience,
 } from "../systems/player.js";
 import { advanceToNextSeason, mergeSeasonStats } from "../systems/week.js";
-import { transitionAfterSeason, transitionToStage, eligibleCareerPaths, kboDraft, determineMLBStartStage, compositeScore, checkFreeAgency, applyFreeAgencyDecision, maybeTradeOffer, applyTradeAccept } from "../systems/career.js";
+import { transitionAfterSeason, transitionToStage, eligibleCareerPaths, kboDraft, determineMLBStartStage, compositeScore, checkFreeAgency, applyFreeAgencyDecision, maybeTradeOffer, applyTradeAccept, checkMLBChallenge } from "../systems/career.js";
 import { getPlayerTeam, standings } from "../systems/league.js";
 import { createFaceSVG } from "../render/avatars.js";
 import { AUTO_PRESETS, autoFillWeek, topWeightStat, isTrainDirectionMaxed } from "../systems/autoTrain.js";
@@ -2112,20 +2112,29 @@ function renderSeasonEnd(root, route) {
     btn.addEventListener("pointerdown", e => {
       e.preventDefault();
       // 휴식기 진입 흐름:
+      //   0) KBO→MLB 도전 (포스팅 7시즌 / 해외FA 9시즌, 실력 충족 시 오퍼). 거절 시 ↓ 기존 흐름.
       //   1) FA 자격 (계약 만료) 있으면 FA 모달 → 휴식기.
       //   2) FA 없으면 트레이드 굴림 (8% 확률). 제안 시 트레이드 모달 → 휴식기.
       //   3) 둘 다 없으면 바로 휴식기.
-      const fa = checkFreeAgency(state.player);
-      if (fa) {
-        showFreeAgencyModal(fa, route, () => showOffseasonModal(route));
+      const continueOffseason = () => {
+        const fa = checkFreeAgency(state.player);
+        if (fa) {
+          showFreeAgencyModal(fa, route, () => showOffseasonModal(route));
+          return;
+        }
+        const trade = maybeTradeOffer(state.player);
+        if (trade) {
+          showTradeModal(trade, route, () => showOffseasonModal(route));
+          return;
+        }
+        showOffseasonModal(route);
+      };
+      const mlb = checkMLBChallenge(state.player);
+      if (mlb && mlb.offers.length > 0) {
+        showMLBChallengeModal(mlb, route, continueOffseason);
         return;
       }
-      const trade = maybeTradeOffer(state.player);
-      if (trade) {
-        showTradeModal(trade, route, () => showOffseasonModal(route));
-        return;
-      }
-      showOffseasonModal(route);
+      continueOffseason();
     });
     btnPanel.appendChild(btn);
 
@@ -3025,6 +3034,61 @@ function openDraftLiveModal(player, onClose) {
   }
 
   rerender();
+  backdrop.appendChild(dialog);
+  document.body.appendChild(backdrop);
+}
+
+// KBO→MLB 도전 모달 — 포스팅(7시즌)/해외FA(9시즌). 팀 수락 시 MLB 이적, 거절 시 KBO 잔류(onDecline).
+function showMLBChallengeModal(challenge, route, onDecline) {
+  state.paused = true;
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  const dialog = document.createElement("div");
+  dialog.className = "modal-dialog";
+  dialog.style.maxWidth = "340px";
+
+  const h = document.createElement("h2");
+  h.textContent = t("mlbChallenge.title");
+  dialog.appendChild(h);
+
+  const desc = document.createElement("div");
+  desc.className = "muted small";
+  desc.style.cssText = "margin:0 0 12px; line-height:1.5;";
+  desc.textContent = t(challenge.type === "fa" ? "mlbChallenge.descFa" : "mlbChallenge.descPosting",
+    { seasons: challenge.kboSeasons });
+  dialog.appendChild(desc);
+
+  for (const team of challenge.offers) {
+    const btn = document.createElement("button");
+    btn.style.cssText = "display:block; width:100%; padding:10px; margin-bottom:6px; text-align:left; background:var(--panel-2); border:1px solid var(--accent); color:inherit; font-family:inherit; cursor:pointer; border-radius:6px;";
+    btn.innerHTML = `<div style="font-weight:700; color:var(--accent); font-size:13px">${team.name}</div><div style="font-size:10px; color:var(--muted); margin-top:2px">${t("careerPath.teamStrength", { strength: team.strength })}</div>`;
+    btn.addEventListener("pointerdown", e => {
+      e.preventDefault();
+      if (!confirm(t("mlbChallenge.confirm", { team: team.name }))) return;
+      backdrop.remove();
+      // 진로선택과 동일: advanceToNextSeason() 후 MLB stage 로 전이.
+      advanceToNextSeason();
+      const startStage = determineMLBStartStage(nationalTeamRating(state.player));
+      transitionToStage(startStage, team.name);
+      state.offseason = null;
+      state.paused = true;
+      saveGame();
+      route("weekly");
+    });
+    dialog.appendChild(btn);
+  }
+
+  const reject = document.createElement("button");
+  reject.className = "danger";
+  reject.style.cssText = "width:100%; margin-top:8px; padding:10px;";
+  reject.textContent = t("mlbChallenge.reject");
+  reject.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    backdrop.remove();
+    onDecline();
+  });
+  dialog.appendChild(reject);
+
   backdrop.appendChild(dialog);
   document.body.appendChild(backdrop);
 }

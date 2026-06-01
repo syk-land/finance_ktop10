@@ -419,6 +419,15 @@ export const en = {
     declineResult: "Trade declined — staying put",
   },
 
+  // KBO→MLB challenge — weekly.js (posting 7 seasons / intl FA 9 seasons)
+  mlbChallenge: {
+    title:       "MLB Opportunity",
+    descPosting: "After {seasons} KBO seasons you're posting-eligible. Your club agreed to post you and some MLB clubs are interested. Take the leap?",
+    descFa:      "After {seasons} KBO seasons you're an international free agent. You can sign with an MLB club freely.",
+    confirm:     "Confirm signing with {team}? (Leave KBO for MLB)",
+    reject:      "Decline — stay in KBO",
+  },
+
   // Training review — weekly.js (top-weight stat hit cap)
   trainSwitch: {
     title:     "Training Review",

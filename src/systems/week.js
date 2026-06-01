@@ -229,6 +229,10 @@ export function advanceToNextSeason() {
   });
   // 리셋
   player.seasonStats = emptyStatsLike(player.seasonStats);
+  // KBO 서비스 연수 — 포스팅(7시즌)/해외FA(9시즌) 자격용. KBO(1군/2군) 시즌만 누적.
+  if (player.stage === "pro1" || player.stage === "pro2") {
+    player.kboSeasons = (player.kboSeasons ?? 0) + 1;
+  }
   ageUp(player);
   // 계약 연차 감소 (프로/MLB 단계만). 0 도달 시 transitionAfterSeason 다음 endWeek 에서 FA 모달.
   if (player.contract && player.contract.yearsLeft > 0) {

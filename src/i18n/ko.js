@@ -422,6 +422,15 @@ export const ko = {
     declineResult: "트레이드 거절 — 현 팀에 잔류",
   },
 
+  // KBO→MLB 도전 — weekly.js (포스팅 7시즌 / 해외FA 9시즌)
+  mlbChallenge: {
+    title:       "MLB 진출 기회",
+    descPosting: "KBO {seasons}시즌을 채워 포스팅 자격을 얻었습니다. 구단이 포스팅에 동의했고, 관심을 보인 MLB 구단이 있습니다. 도전하시겠습니까?",
+    descFa:      "KBO {seasons}시즌을 채워 해외 FA 자격을 얻었습니다. MLB 구단과 자유롭게 계약할 수 있습니다.",
+    confirm:     "{team} 입단을 확정하시겠습니까? (KBO를 떠나 MLB로 이적)",
+    reject:      "포기하고 KBO 잔류",
+  },
+
   // 훈련 방향 점검 — weekly.js (최고비중 스탯 cap 도달)
   trainSwitch: {
     title:     "훈련 방향 점검",
