@@ -15,6 +15,7 @@ import { checkScheduledEvents, checkOffseasonEvents } from "./seasonEvents.js";
 import { detectMilestones } from "./milestones.js";
 import { checkPostseasonAdvance } from "./postseason.js";
 import { directionTargets, clampStatsToDirection } from "./autoTrain.js";
+import { maybeShowSeasonAd } from "./ads.js";
 
 export function createSeason(stage) {
   return {
@@ -247,6 +248,7 @@ export function advanceToNextSeason() {
   } else if (player.contract && player.contract.yearsLeft > 0) {
     player.contract.yearsLeft -= 1;
   }
+  maybeShowSeasonAd(player.careerHistory.length);
   return { stage: player.stage, grade: player.grade };
 }
 

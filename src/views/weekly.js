@@ -13,7 +13,7 @@ import { getPlayerTeam, standings } from "../systems/league.js";
 import { createFaceSVG } from "../render/avatars.js";
 import { AUTO_PRESETS, autoFillWeek, topWeightStat, isTrainDirectionMaxed } from "../systems/autoTrain.js";
 import { teamAvgOvr } from "../systems/npc.js";
-import { showInterstitialAd, maybeShowSeasonAd } from "../systems/ads.js";
+import { showInterstitialAd } from "../systems/ads.js";
 import { CATEGORY_KEYS, applyCategoryAndPickEvent, applyEventChoice, getAvailableCategories, isTournamentEvent } from "../systems/offseason.js";
 import { appearanceChance, batterOVR, pitcherOVR, decideRolesForGame } from "../systems/simulator.js";
 import { createRadarSVG } from "../render/radar.js";
@@ -2592,8 +2592,7 @@ function showOffseasonModal(route) {
           if (tr?.promoted) showPromotionModal(tr.toStage);
           // 강등 시 — 안내 + 은퇴 선택 모달 (이미 하위 단계로 전이된 상태).
           if (tr?.demoted) showDemotionModal(tr.fromStage, tr.toStage, route);
-          // 광고 — 새 시즌 시작마다 누적 3시즌 주기로 전면 광고 (고교 졸업 후 첫 프로시즌 등).
-          maybeShowSeasonAd(state.player?.careerHistory?.length ?? 0);
+          // 시즌 전환 광고는 advanceToNextSeason() 안에서 자동 호출됨 (systems/week.js).
         };
         if (needsMilitary) {
           openMilitaryModal(state.player, proceedAfterMilitary);

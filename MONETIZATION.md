@@ -3,7 +3,7 @@
 이 게임은 **GameMonetize.com SDK** 로 수익화합니다 — 웹(HTML5) 게임 전용 광고 네트워크로, **전면(인터스티셜)·보상형 광고**를 지원합니다.
 (이전의 Google AdSense 디스플레이 방식은 게임 모달 광고가 정책상 부적합해 GameMonetize 로 교체함.)
 
-현재는 **placeholder gameId** 라 광고가 안 뜹니다. 아래 ID 하나만 채우면 활성화됩니다.
+현재 GameMonetize 게임 ID = `zk9dnevoky8n3c7r7immy2e4xxbamx4b` (등록 완료, `index.html` `SDK_OPTIONS.gameId` 에 입력됨).
 
 ---
 
@@ -12,10 +12,10 @@
 | 시점 | 트리거 위치 |
 |---|---|
 | 게임 시작(앱 진입) | `src/main.js` `init()` → `showInterstitialAd()` |
-| 3시즌마다 새 시즌 시작 (고교 졸업 후 첫 프로시즌 등) | `src/views/weekly.js` 휴식기→다음시즌 → `maybeShowSeasonAd(careerHistory.length)` |
+| 3시즌마다 새 시즌 시작 (고교 졸업 / 진로 선택 / 일반 시즌 전환 모두 포함) | `src/systems/week.js` `advanceToNextSeason()` 말미 → `maybeShowSeasonAd(careerHistory.length)` |
 | 은퇴 | `src/views/weekly.js` 시즌종료/강등 은퇴 버튼 → `showInterstitialAd()` |
 
-주기 조정: `src/systems/ads.js` 의 `SEASON_AD_INTERVAL`(기본 3).
+`advanceToNextSeason()` 이 시즌 카운트(`careerHistory.length`)를 증가시키는 유일한 지점이라 여기서 호출 — 일반 "다음 연차 진행", 진로 선택(`chooseCareerPath` → univ/kbo/mlb), 군입대 후 복귀 등 모든 경로에서 자동 발화. 주기 조정: `src/systems/ads.js` 의 `SEASON_AD_INTERVAL`(기본 3).
 광고 동안 BGM 은 자동 일시정지/복귀(`main.js __adPause/__adResume` ← SDK `SDK_GAME_PAUSE/START`).
 
 ---
@@ -26,13 +26,13 @@
 1. https://gamemonetize.com 가입(퍼블리셔).
 2. 게임 등록(URL/zip 업로드) → 심사 통과 후 **gameId** 발급.
 
-### (B) gameId 교체
+### (B) gameId 교체 (완료)
 
-| 파일 | 항목 | 현재(placeholder) | 넣을 값 |
-|---|---|---|---|
-| `index.html` (head SDK_OPTIONS) | `gameId` | `"GAMEMONETIZE_GAME_ID"` | 발급받은 gameId |
+| 파일 | 항목 | 값 |
+|---|---|---|
+| `index.html` (head SDK_OPTIONS) | `gameId` | `"zk9dnevoky8n3c7r7immy2e4xxbamx4b"` |
 
-> SDK 스크립트(`https://api.gamemonetize.com/sdk.js`)는 이미 로드됩니다. ID만 바꾸면 됩니다.
+> SDK 스크립트(`https://api.gamemonetize.com/sdk.js`)는 이미 로드됩니다. 게임 ID 변경 시 한 줄만 교체하면 됩니다.
 
 ---
 
