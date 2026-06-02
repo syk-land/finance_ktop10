@@ -42,18 +42,6 @@ const SELECT_RATING = {
 const ALLSTAR_RATING_MIN = 120;  // 올스타 실력 하한 (리그 상위)
 const ALLSTAR_FAME_MIN = 200;    // 올스타 명성 하한 (인지도 — 인기 투표 성격)
 
-function bumpAll(player, delta) {
-  for (const s of BATTER_STATS) {
-    if (player.batter[s] === undefined) continue;
-    const cap = getPlayerStatCap(player, s);
-    player.batter[s] = +Math.max(STAT_MIN, Math.min(cap, player.batter[s] + delta)).toFixed(1);
-  }
-  for (const s of PITCHER_STATS) {
-    if (player.pitcher[s] === undefined) continue;
-    const cap = getPlayerStatCap(player, s);
-    player.pitcher[s] = +Math.max(STAT_MIN, Math.min(cap, player.pitcher[s] + delta)).toFixed(1);
-  }
-}
 function bump(player, group, stat, delta) {
   const cap = getPlayerStatCap(player, stat);
   if (player[group]?.[stat] === undefined) return;
@@ -104,10 +92,9 @@ export const SEASON_EVENTS = [
         && gameDate.year % 4 === 2
         && nationalTeamRating(player) >= SELECT_RATING.wbc;
     },
+    // 시즌 중 라이브 경기는 "출전 경험"(명성)만 — 능력치·메달·병역면제는 휴식기 브래킷 결과로 일원화(이중보상 방지).
     apply(player) {
-      fameUp(player, 15);
-      bumpAll(player, 1);
-      bump(player, "pitcher", "mental", 3);
+      fameUp(player, 8);
     },
   },
 
@@ -124,9 +111,7 @@ export const SEASON_EVENTS = [
         && nationalTeamRating(player) >= SELECT_RATING.olympics;
     },
     apply(player) {
-      fameUp(player, 20);
-      bumpAll(player, 2);
-      bump(player, "pitcher", "mental", 4);
+      fameUp(player, 10);
     },
   },
 
@@ -144,9 +129,7 @@ export const SEASON_EVENTS = [
         && nationalTeamRating(player) >= SELECT_RATING.asian_games;
     },
     apply(player) {
-      fameUp(player, 12);
-      bumpAll(player, 1);
-      bump(player, "pitcher", "mental", 3);
+      fameUp(player, 6);
     },
   },
 
@@ -163,8 +146,7 @@ export const SEASON_EVENTS = [
         && nationalTeamRating(player) >= SELECT_RATING.premier12;
     },
     apply(player) {
-      fameUp(player, 10);
-      bumpAll(player, 1);
+      fameUp(player, 5);
     },
   },
 ];
@@ -293,6 +275,74 @@ export function simulateIntlTournamentGame(player, league) {
   };
   const gameDef = { home: myNational.id, away: oppNational.id };
   return simulateGame(tempLeague, gameDef, player);
+}
+
+// ─── 국제대회 브래킷 시뮬레이션 (실제 경기 결과로 메달 결정) ──────────
+// 대표팀(본인+NPC) vs 상대국을 8강→4강→결승(+동메달전)으로 자동 시뮬.
+// 상대 강도는 라운드별 상승. 본인 능력치가 라인업/마운드에 반영돼 강한 선수일수록 메달 확률↑.
+// 반환: { placement: "gold|silver|bronze|none", rounds: [{round, my, opp, won}], outcomeKind }
+//   outcomeKind 는 기존 보상 매핑용 — 금→great / 은·동→ok / 노메달→bad.
+
+// 한 국제경기 시뮬 → { my, opp, won } (점수 + 승패). 실패 시 null.
+function simIntlGameOnce(player, baseStage, ageRange, myStrength, oppStrength, oppName) {
+  const mk = (id, name, strength, isPlayer) => ({
+    id, name, strength,
+    roster: createRoster(strength, ageRange, { stage: baseStage }),
+    record: { w: 0, l: 0, t: 0 },
+    isPlayerTeam: isPlayer,
+  });
+  const myNational  = mk(-400, t("seasonEvent.intlMyTeamName"), myStrength, true);
+  const oppNational = mk(-401, oppName, oppStrength, false);
+  const tempLeague = {
+    stage: baseStage === "mlb" ? "mlb_final" : "pro1_final",
+    teams: [myNational, oppNational],
+    schedule: [], weeksPerSeason: 1, gamesPerWeek: 1,
+  };
+  const r = simulateGame(tempLeague, { home: myNational.id, away: oppNational.id }, player);
+  if (!r) return null;
+  const myEntry  = r.home.team.isPlayerTeam ? r.home : r.away;
+  const oppEntry = myEntry === r.home ? r.away : r.home;
+  return { my: myEntry.score, opp: oppEntry.score, won: r.winner === myEntry.team.name };
+}
+
+// 대표팀 NPC 기본 강도 — 본인이 이 위에 얹혀 라인업/마운드를 강화. 상대는 라운드별로 강해진다.
+// 선발 기준(SELECT_RATING) 자체가 엘리트라 대표팀을 강하게 잡아, 8강·4강은 우세하고 결승은 박빙이 되도록.
+const INTL_MY_STRENGTH = 93;
+const INTL_OPP_STRENGTH = { qf: 76, sf: 86, final: 94, bronze: 84 };
+
+export function simulateIntlBracket(player) {
+  // 청소년월드컵(고교)·대학은 해당 단계 cap 으로, 프로/MLB 는 각 단계로 대표팀 구성.
+  const baseStage = player.stage === "mlb" ? "mlb"
+                  : (player.stage === "high" || player.stage === "univ") ? player.stage
+                  : "pro1";
+  const ageRange = baseStage === "high" ? [16, 18]
+                 : baseStage === "univ" ? [19, 22]
+                 : baseStage === "mlb" ? [22, 38]
+                 : [22, 36];
+  if (!getPlayerTeam(state.league)) return null;
+
+  const rounds = [];
+  const play = (roundKey) => {
+    const g = simIntlGameOnce(player, baseStage, ageRange, INTL_MY_STRENGTH, INTL_OPP_STRENGTH[roundKey], t("seasonEvent.intlOpp." + roundKey));
+    if (g) rounds.push({ round: roundKey, ...g });
+    return g;
+  };
+
+  let placement = "none";
+  let g = play("qf");
+  if (!g) return null;                       // 첫 경기 시뮬 실패 → 폴백(호출측이 난수 처리)
+  if (g.won) {
+    g = play("sf");
+    if (g && g.won) {
+      g = play("final");
+      placement = g && g.won ? "gold" : "silver";
+    } else if (g) {
+      g = play("bronze");
+      placement = g && g.won ? "bronze" : "none";   // 동메달전 패 = 4위
+    }
+  }
+  const outcomeKind = placement === "gold" ? "great" : placement === "none" ? "bad" : "ok";
+  return { placement, rounds, outcomeKind };
 }
 
 // 올스타전 단판 시뮬레이션.

@@ -659,6 +659,10 @@ export const ko = {
     intlBtnEnd:          "마치기",
     intlMyTeamName:      "국가대표팀",
     intlOppTeamName:     "상대국 대표팀",
+    // 브래킷 시뮬 — 메달/라운드/상대국
+    medal: { gold: "🥇 금메달 — 우승!", silver: "🥈 은메달", bronze: "🥉 동메달", none: "메달 획득 실패" },
+    round: { qf: "8강", sf: "4강", final: "결승", bronze: "동메달 결정전", win: "승", loss: "패" },
+    intlOpp: { qf: "8강 상대국", sf: "4강 상대국", final: "결승 상대국", bronze: "동메달전 상대국" },
     // 국제대회별 (modal title / desc / reward)
     wbcTitle:            "월드 베이스볼 클래식",
     wbcAnnounceDesc:     "월드 베이스볼 클래식 대표 차출! 세계 최강과 맞붙는다.",

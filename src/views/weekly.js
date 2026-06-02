@@ -12,7 +12,7 @@ import { transitionAfterSeason, transitionToStage, eligibleCareerPaths, kboDraft
 import { getPlayerTeam, standings } from "../systems/league.js";
 import { createFaceSVG } from "../render/avatars.js";
 import { AUTO_PRESETS, autoFillWeek, topWeightStat, isTrainDirectionMaxed } from "../systems/autoTrain.js";
-import { CATEGORY_KEYS, applyCategoryAndPickEvent, applyEventChoice, getAvailableCategories } from "../systems/offseason.js";
+import { CATEGORY_KEYS, applyCategoryAndPickEvent, applyEventChoice, getAvailableCategories, isTournamentEvent } from "../systems/offseason.js";
 import { appearanceChance, batterOVR, pitcherOVR, decideRolesForGame } from "../systems/simulator.js";
 import { createRadarSVG } from "../render/radar.js";
 import { formatGameDate, t, getLocale } from "../i18n/index.js";
@@ -34,7 +34,7 @@ import { randomName } from "../data/names.js";
 import { getTeamPool } from "../data/teams.js";
 import { checkMilitaryTrigger, applyMilitaryService, MILITARY_OPTIONS } from "../systems/military.js";
 import { simulatePostseasonGame, applyRoundReward, advanceToNextRound, pushPostseasonRecord, recordSeriesGame, isSeriesClinched, seriesWinner, winsToClinch } from "../systems/postseason.js";
-import { nextPendingEvent, clearPendingEvent, simulateAllStarGame, applyAllStarReward, simulateIntlTournamentGame, applyIntlTournamentReward } from "../systems/seasonEvents.js";
+import { nextPendingEvent, clearPendingEvent, simulateAllStarGame, applyAllStarReward, simulateIntlTournamentGame, applyIntlTournamentReward, simulateIntlBracket } from "../systems/seasonEvents.js";
 import { computeHallOfFameScore, hofRank } from "../systems/hallOfFame.js";
 import { recordRun, loadRegressionMeta, unlockItem } from "../systems/regression.js";
 import { saveToCloud, getCloudSaveMeta } from "../cloud/cloudSave.js";
@@ -2668,13 +2668,14 @@ function buildOffseasonProposalPhase(dialog, rerender) {
   const evKey = off.eventKey;
 
   // 국제대회 자동 진행 — 시즌 중 라이브 모달에서 이미 참가 결정.
-  // yes/no 선택 단계를 건너뛰고 바로 결과 굴림 (great/ok/bad).
-  // 이미 시즌 중에 "참가" 했는데 휴식기에 "참가 여부 물어봄" 으로 보이는 모순 해소.
+  // yes/no 선택 단계를 건너뛰고 바로 실제 브래킷 시뮬 → 메달 등수로 결과(great/ok/bad) 결정.
   if (off.selectedCategory === "intl_tournament") {
-    const { outcomeKind, changes } = applyEventChoice(state.player, evKey);
+    const bracket = simulateIntlBracket(state.player);  // 실패 시 null → 난수 폴백
+    const { outcomeKind, changes } = applyEventChoice(state.player, evKey, bracket?.outcomeKind ?? null);
     off.decided = true;
     off.outcomeKind = outcomeKind;
     off.eventChanges = changes;
+    off.bracket = bracket;   // 라운드별 스코어/메달 — result phase 에서 표시
     saveGame();
     // rerender 즉시 호출 — result phase 로 이동.
     rerender();
@@ -2717,10 +2718,13 @@ function buildOffseasonProposalPhase(dialog, rerender) {
   yesBtn.style.fontSize = "13px";
   yesBtn.addEventListener("pointerdown", e => {
     e.preventDefault();
-    const { outcomeKind, changes } = applyEventChoice(state.player, evKey);
+    // 청소년 세계대회 등 토너먼트 이벤트는 실제 브래킷 시뮬로 결과 결정.
+    const bracket = isTournamentEvent(evKey) ? simulateIntlBracket(state.player) : null;
+    const { outcomeKind, changes } = applyEventChoice(state.player, evKey, bracket?.outcomeKind ?? null);
     state.offseason.decided = true;
     state.offseason.outcomeKind = outcomeKind;
     state.offseason.eventChanges = changes;
+    state.offseason.bracket = bracket;
     saveGame();
     rerender();
   });
@@ -2796,6 +2800,32 @@ function buildOffseasonResultPhase(dialog, rerender, onContinue) {
     skip.style.fontSize = "12px";
     skip.textContent = t("offseason.skipped");
     dialog.appendChild(skip);
+  }
+
+  // 국제대회 브래킷 결과 — 라운드별 스코어 + 메달.
+  if (off.bracket && Array.isArray(off.bracket.rounds)) {
+    const b = off.bracket;
+    const medalColor = { gold: "var(--accent-2)", silver: "#c0c0c0", bronze: "#cd7f32", none: "var(--muted)" }[b.placement] ?? "var(--muted)";
+    const card = document.createElement("div");
+    card.style.cssText = "background:var(--panel-2); border:1px solid var(--border); border-radius:6px; padding:8px 10px; margin-bottom:10px;";
+    const medal = document.createElement("div");
+    medal.style.cssText = `font-weight:700; font-size:13px; margin-bottom:5px; color:${medalColor};`;
+    medal.textContent = t("seasonEvent.medal." + b.placement);
+    card.appendChild(medal);
+    for (const r of b.rounds) {
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex; justify-content:space-between; font-size:11px; padding:2px 0;";
+      const name = document.createElement("span");
+      name.className = "muted";
+      name.textContent = t("seasonEvent.round." + r.round);
+      const score = document.createElement("span");
+      score.style.cssText = `font-weight:700; color:${r.won ? "var(--good)" : "var(--bad)"};`;
+      score.textContent = `${r.my}-${r.opp} ${t("seasonEvent.round." + (r.won ? "win" : "loss"))}`;
+      row.appendChild(name);
+      row.appendChild(score);
+      card.appendChild(row);
+    }
+    dialog.appendChild(card);
   }
 
   const allChanges = [...(off.baseChanges ?? []), ...(off.eventChanges ?? [])];

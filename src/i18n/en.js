@@ -655,6 +655,10 @@ export const en = {
     intlBtnEnd:          "Done",
     intlMyTeamName:      "National Team",
     intlOppTeamName:     "Opposing National Team",
+    // Bracket sim — medal / round / opponents
+    medal: { gold: "🥇 Gold — Champions!", silver: "🥈 Silver", bronze: "🥉 Bronze", none: "No medal" },
+    round: { qf: "Quarterfinal", sf: "Semifinal", final: "Final", bronze: "Bronze Match", win: "W", loss: "L" },
+    intlOpp: { qf: "QF opponent", sf: "SF opponent", final: "Final opponent", bronze: "Bronze opponent" },
     // International tournament titles / desc / reward
     wbcTitle:            "World Baseball Classic",
     wbcAnnounceDesc:     "Selected for the WBC! Facing the world's best.",

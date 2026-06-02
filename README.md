@@ -556,6 +556,17 @@ KBO에서 MLB로 가는 경로가 없던 것 → 실제 규정 모델로 추가.
 
 검증: `node --check` 9파일 통과. `probe.mjs` 전체 통과. `probe-career`(two_way) 피크 능력치 **완전 균등(168~178)**·AVG .28~.30·ERA 2.3~2.9 현실 범위. `probe-regression` capBoosts 실패는 HEAD 동일한 기존 실패(무관). UI 표시는 안드로이드 실기 확인 대기.
 
+### v0.7.15 추가 ✓ — 국제대회 실제 브래킷 시뮬레이션 (메달=실력)
+
+| 영역 | 작업 |
+|---|---|
+| **브래킷 시뮬** (`seasonEvents.simulateIntlBracket`) | 옛 휴식기 국제대회 결과는 `rollEventOutcome()` **20/70/10 고정 난수**(실력 무관). 대표팀(본인+NPC) vs 상대국을 **8강→4강→결승(+동메달전)** 으로 `simulateGame` 자동 시뮬 → 금/은/동/노메달 등수 산출. 상대 강도 라운드별 상승(76→86→94), 대표팀 93. 본인이 라인업/마운드에 반영돼 실력이 승패에 작용. 고교(U-18)/대학/프로/MLB 각 단계 cap. |
+| **결과를 시뮬로** (`offseason.applyEventChoice(...,forcedOutcome)` + `isTournamentEvent`, `weekly.js`) | `intl_tournament`·`youth_worldcup` 는 난수 대신 브래킷 등수로 great/ok/bad 결정 — 기존 메달 보상·병역면제 함수 재사용(금→great·은동→ok·노메달→bad). 시뮬 실패 시 난수 폴백. |
+| **결과 표시** (`weekly.buildOffseasonResultPhase`) | 휴식기 결과에 **메달 배지 + 라운드별 스코어**(예: `8강 5-3 승 · 4강 4-2 승 · 결승 1-2 패 → 🥈 은메달`). i18n `seasonEvent.medal/round/intlOpp.*`(ko/en). |
+| **이중보상 제거** (`seasonEvents.js`) | 시즌 중 라이브 경기 보상을 **명성(출전 경험)만**으로 축소 — 능력치·메달·면제는 휴식기 브래킷 결과로 일원화. 미사용 `bumpAll` 헬퍼 제거. |
+
+검증: `node --check` 통과·`probe.mjs` 전체 통과. 메달 분포 **실력 단조 증가**(시뮬 200~500회): 본인 OVR 110→메달 27%(금 5%) / 135→38%(금 7%) / 160→74%(금 36%). 옛 90% 고정 면제 → 실력 기반 현실 확률. UI/모바일 실기 확인 대기.
+
 **자동 검증** (회귀·밸런스): `node probe.mjs` + `node probe-career.mjs` — 실행 방법 §시뮬레이션 돌려보기 참고.
 
 **수동 시나리오** (브라우저 UX 확인):

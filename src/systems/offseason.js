@@ -402,10 +402,21 @@ export function rollEventOutcome(rng = Math.random) {
   return "ok";
 }
 
-export function applyEventChoice(player, eventKey) {
+// forcedOutcome: 주어지면 난수 굴림 대신 그 결과(great/ok/bad)를 적용 —
+//   국제대회/청소년월드컵은 실제 브래킷 시뮬 등수로 결정된 outcome 을 넘긴다.
+export function applyEventChoice(player, eventKey, forcedOutcome = null) {
   const ev = EVENTS[eventKey];
   if (!ev) return { outcomeKind: "ok", changes: [] };
-  const outcomeKind = rollEventOutcome();
+  const outcomeKind = (forcedOutcome === "great" || forcedOutcome === "ok" || forcedOutcome === "bad")
+    ? forcedOutcome
+    : rollEventOutcome();
   const changes = (ev[outcomeKind](player)) ?? [];
   return { outcomeKind, changes };
+}
+
+// 실제 토너먼트 시뮬로 결과를 정하는 이벤트(국제대회·청소년월드컵) 여부 —
+// 휴식기 UI 가 난수 대신 브래킷 결과를 forcedOutcome 으로 넘길지 판단.
+export function isTournamentEvent(eventKey) {
+  const ev = EVENTS[eventKey];
+  return !!ev && (ev.category === "intl_tournament" || ev.category === "youth_worldcup");
 }
