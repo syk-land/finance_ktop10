@@ -22,15 +22,17 @@ const POS_WEIGHTS = {
 let _npcIdCounter = 1;
 
 // stage 별 NPC stat 한계 (이 cap 을 넘는 NPC 는 없음)
+// 캡 스케일업 — 고교 제외, 각 단계 (캡−100)% 증가 = oldCap²/100 (예: mlb 200→400, aa 150→225, aaa 180→324).
+// 첫회차 양방향+전지훈련 주인공이 30세 평균 ~200 에 도달 → NPC 평균(cap×0.75)도 그에 맞춰 상향.
 const NPC_STAT_CAP_BY_STAGE = {
-  high:    100,
-  univ:    110,
-  pro2:    130,
-  pro1:    160,
-  mlb_a:   130,
-  mlb_aa:  150,
-  mlb_aaa: 180,
-  mlb:     200,
+  high:    100,   // 고교 그대로
+  univ:    121,   // 110²/100
+  pro2:    169,   // 130²/100
+  pro1:    256,   // 160²/100
+  mlb_a:   169,   // 130²/100
+  mlb_aa:  225,   // 150²/100
+  mlb_aaa: 324,   // 180²/100
+  mlb:     400,   // 200²/100
 };
 export function getNpcStatCap(stage) {
   return NPC_STAT_CAP_BY_STAGE[stage] ?? 150;
@@ -54,6 +56,13 @@ function statFromGauss(base, sigma, weight = 1.0, cap = 150) {
 // 팀 strength 영향도 강화(0.3→0.6) — 강팀/약팀 격차 가시화.
 function stageBase(strength, cap) {
   return cap * 0.75 + (strength - 60) * 0.6;
+}
+
+// 팀의 대략적 평균 능력치 (주인공 능력치와 같은 스케일) — 영입/오퍼 카드 표시용.
+// stageBase 를 stage NPC cap 으로 산출 후 [20, cap] 클램프.
+export function teamAvgOvr(strength, stage) {
+  const cap = getNpcStatCap(stage);
+  return Math.round(Math.max(20, Math.min(cap, stageBase(strength, cap))));
 }
 
 function createBatter(strength, ageRange = [19, 35], cap = 150) {

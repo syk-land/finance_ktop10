@@ -599,6 +599,20 @@ KBO에서 MLB로 가는 경로가 없던 것 → 실제 규정 모델로 추가.
 
 검증: `node --check` 3파일 통과·`probe.mjs` 전체 통과. 모달 뒤로가기/× 동작·이어하기/새 게임·군입대 닫기금지·클라우드 진입은 안드로이드 실기 확인 대기.
 
+### v0.7.19 추가 ✓ — 영어 디폴트 · 능력치 스케일업(NPC 2배/주인공 NPC+50) · 광고 골격
+
+| 영역 | 작업 |
+|---|---|
+| **영어 디폴트** (`i18n/index.js`·`state.js`) | `DEFAULT_LOCALE`/`state.locale` = "en". `index.html` lang/title 영어. 한국어는 토글 유지. |
+| **능력치 스케일업** (`npc.js`·`player.js`) | NPC 캡 = oldCap²/100 (고교 100 불변 … pro1 256 … MLB 400). 주인공 캡 = NPC+50. 첫회차 양방향+전지훈련 주인공(~200)을 NPC 평균(cap×0.75)이 따라잡아 도전 성립. |
+| **시뮬 스케일 보정** (`simulator.js`) | `statScale(stage)`(고교×1…MLB×2) 도입. 타석 **매치업 격차는 raw**(NPC 실제 강화) + `stamina`(투수 용량)·`mental`(클러치) **절대기준만 ÷scale** → 큰 스탯에서 폭주 방지. NPC끼리 MLB 경기 총득점 5.5(고교 4.1) 안정 확인. |
+| **OVR 임계 유지** | 주인공 능력치는 훈련 한계로 ~옛 스케일이라 `nationalTeamRating`/`compositeScore` 정규화 안 함 → 대표팀선발·콜업·MLB도전·드래프트 등 고정 임계 그대로 유효. |
+| **영입 표시** (`weekly.js`·`npc.teamAvgOvr`) | MLB 오퍼 카드 `팀 전력 78` → `팀 평균 능력치 ~311`(주인공 스케일 비교). |
+| **광고 골격** (`ads.js`·`index.html`) | AdSense 로더 + 전면(인터스티셜) 광고 모달(`showInterstitialAd`/`maybeShowSeasonAd`). 퍼블리셔/슬롯 ID placeholder. **트리거 배선은 다음 커밋**. |
+| probe | NPC 캡 단언 새 값 + pro fixture 발달선수 → `probe.mjs` 전체 통과. |
+
+검증: `node --check` 통과·`probe.mjs` 전체 통과·NPC-vs-NPC MLB 시뮬 정상. 밸런스 실기 확인 대기(특히 발달 전 선수 출장감). 훈련 성장률 미변경.
+
 **자동 검증** (회귀·밸런스): `node probe.mjs` + `node probe-career.mjs` — 실행 방법 §시뮬레이션 돌려보기 참고.
 
 **수동 시나리오** (브라우저 UX 확인):

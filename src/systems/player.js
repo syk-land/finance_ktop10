@@ -231,16 +231,31 @@ export function ageMultiplier(age) {
 }
 
 // 주인공 stat 한계 — stage 별 (콜업할수록 잠금 해제). 절대 최대 300.
+// 주인공 캡 = 같은 단계 NPC 캡 + 50 (NPC_STAT_CAP_BY_STAGE 와 동기). 평균(NPC cap×0.75)보다
+// 충분히 위라 주인공이 성장하면 리그 평균을 넘어설 수 있다.
 const PLAYER_STAT_CAP_BY_STAGE = {
-  high:    150,
-  univ:    175,
-  pro2:    200,
-  pro1:    250,
-  mlb_a:   200,
-  mlb_aa:  250,
-  mlb_aaa: 275,
-  mlb:     300,
+  high:    150,   // NPC 100 + 50
+  univ:    171,   // 121 + 50
+  pro2:    219,   // 169 + 50
+  pro1:    306,   // 256 + 50
+  mlb_a:   219,   // 169 + 50
+  mlb_aa:  275,   // 225 + 50
+  mlb_aaa: 374,   // 324 + 50
+  mlb:     450,   // 400 + 50
 };
+// 단계별 능력치 스케일 배수 — NPC 캡이 원래(고교100 기준) 대비 커진 비율(= origNpcCap/100).
+// 능력치 표시값은 이 배수만큼 커졌지만, 시뮬레이터 타석공식·OVR 임계비교 등 "내부 계산" 은
+// 이 값으로 나눠 원래 0~150 스케일에서 동작시킨다(공식/임계 재튜닝 불필요). 고교=1.0(불변).
+const STAT_SCALE_BY_STAGE = {
+  high: 1.0, univ: 1.1, pro2: 1.3, pro1: 1.6,
+  mlb_a: 1.3, mlb_aa: 1.5, mlb_aaa: 1.8, mlb: 2.0,
+};
+export function statScale(stage) {
+  // 결승/국제전 임시 단계("pro1_final" 등)는 베이스 단계 스케일로 매핑.
+  const base = typeof stage === "string" ? stage.replace(/_final$/, "") : stage;
+  return STAT_SCALE_BY_STAGE[base] ?? 1.0;
+}
+
 // stat 을 주면 해당 스탯의 캡(= stage base + 스탯별 영구 +5 보너스), 생략하면 stage base 만.
 export function getPlayerStatCap(player, stat = null) {
   const base = PLAYER_STAT_CAP_BY_STAGE[player?.stage] ?? 150;
@@ -648,6 +663,7 @@ export function nationalTeamRating(player) {
   const { bat, pit } = roleOVRs(player);
   const hi = Math.max(bat, pit);
   const lo = Math.min(bat, pit);
+  // 주인공 능력치는 캡과 무관하게 훈련 한계로 ~옛 스케일에 머무므로 정규화하지 않는다(고정 임계 그대로 유효).
   return +(hi + lo * 0.25).toFixed(1);
 }
 

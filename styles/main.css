@@ -207,6 +207,7 @@ html, body {
   position: relative;   /* 시작화면(.start-screen) absolute inset 기준 */
 }
 
+
 /* 시작 화면 — 배경 이미지 풀블리드 + 하단 버튼, 한 화면 무스크롤.
    view-root 의 padding(18px 0) 을 무시하고 inset:0 으로 정확히 채워 스크롤이 없도록. */
 .start-screen {

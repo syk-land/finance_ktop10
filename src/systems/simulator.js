@@ -4,7 +4,12 @@
 
 import { getTeamById } from "./league.js";
 import { npcOverall } from "./npc.js";
-import { getEffectiveBatter, getEffectivePitcher, BATTER_STATS, PITCHER_STATS, emptyStats, MAIN_INJURY_LUCK, conditionInjuryMultiplier } from "./player.js";
+import { getEffectiveBatter, getEffectivePitcher, BATTER_STATS, PITCHER_STATS, emptyStats, MAIN_INJURY_LUCK, conditionInjuryMultiplier, statScale } from "./player.js";
+
+// 현재 시뮬 중인 경기의 능력치 스케일(=statScale(league.stage)). simulateGame 시작 시 설정.
+// 타석/도루/투수피로 공식이 스탯을 이 값으로 나눠 원래 0~150 스케일에서 동작(공식 재튜닝 불필요).
+// 경기는 순차 실행이라 모듈 변수로 안전.
+let SIM_SCALE = 1;
 import { effectMultiplier, effectAdd } from "./traitEffects.js";
 import { pickPitch, handMatchupPenalty } from "./pitches.js";
 
@@ -79,6 +84,8 @@ function simulateAtBat(batter, pitcher, opts = {}) {
   const { walkoffMult = 1, walkoffAddPct = 0, handPenalty = 0, leverage = 0, pitcherPA = 0 } = opts;
   const b = batter;
   const p = pitcher;
+  // 매치업 스탯(타자 vs 투수 격차)은 raw 유지 — NPC 능력치가 실제로 커진 만큼 더 강한 상대가 됨.
+  // (큰 격차는 softDiff 가 옛날부터 평탄화. 깨지는 건 절대기준 stamina/mental 뿐 → 아래서만 정규화.)
   const contact = (b.contact ?? 50) + handPenalty;  // 같은 손이면 contact 살짝 감쇄
   const power   = b.power ?? 50;
   const eye     = b.eye ?? 50;
@@ -90,14 +97,16 @@ function simulateAtBat(batter, pitcher, opts = {}) {
   // 투수 stamina(지구력) — 등판 후 누적 타자수가 스태미나 기반 용량을 넘으면 구위·제구 저하.
   //   capacity: stamina 50=18타자, 100=27, 150=36. 초과분 12타자에 걸쳐 overwork 0→1.
   //   fatiguePenalty: stuffAvg·control 에서 최대 -12 (지친 투수는 안타·볼넷·사구 ↑).
-  const stamina = p.stamina ?? 50;
+  // stamina 절대기준(용량) — 스케일업분 정규화해야 캡 커져도 적정 타자수에서 지침.
+  const stamina = (p.stamina ?? 50) / SIM_SCALE;
   const capacity = 18 + (stamina - 50) * 0.18;
   const overwork = clamp((pitcherPA - capacity) / 12, 0, 1);
   const fatiguePenalty = overwork * 12;
 
   // 투수 mental(클러치) — 고압 상황(leverage)에서만 위기관리로 작동.
   //   고멘탈: 안타/홈런/볼넷 억제(침착). 저멘탈: 멘탈붕괴로 실점↑. leverage=0 이면 무영향.
-  const mental = p.mental ?? 50;
+  // mental 절대기준(클러치) — 스케일업분 정규화.
+  const mental = (p.mental ?? 50) / SIM_SCALE;
   const mentalEdge = leverage > 0 ? (mental - 50) * leverage : 0;
 
   const stuffAvg   = (velocity + breaking) / 2 - fatiguePenalty;
@@ -153,7 +162,7 @@ function simulateAtBat(batter, pitcher, opts = {}) {
 // opts.errorMult: 실책 확률 곱셈 (메인이 수비 측이고 golden_glove relic 보유 시 0.5).
 function classifyOut(batter, bases, outs, defenseRating, opts = {}) {
   const { errorMult = 1 } = opts;
-  const contact = batter.contact ?? 50;
+  const contact = batter.contact ?? 50;   // 매치업/격차 raw 유지
   const power   = batter.power ?? 50;
   const speed   = batter.speed ?? 50;
 
@@ -341,6 +350,8 @@ function maybePinchRun(ls, bases, ctx) {
 // 양방향 선수: 부상 아니면 매 경기 타자로 라인업 + 선발 투수로 등판.
 // opts.forcedRoles 가 주어지면 그대로 사용 (결승/PO 진입 모달에서 미리 굴린 결과 전달용).
 export function simulateGame(league, gameDef, mainPlayer, opts = {}) {
+  // 이 경기 단계의 능력치 스케일 — 타석/도루/피로 공식이 스탯을 이 값으로 정규화.
+  SIM_SCALE = statScale(league?.stage);
   const home = getTeamById(league, gameDef.home);
   const away = getTeamById(league, gameDef.away);
 
@@ -768,7 +779,7 @@ function shouldReplacePitcher(mound, inning, leadDiff, isWinning, trigger) {
   const s = getPstats(mound);
   // 강판 임계를 stamina(지구력) 용량에 연동 — 고스태미나 투수는 더 오래 던진다.
   //   capacity = simulateAtBat 와 동일식. stamina 50 에서 메인 30·NPC 25 (기존값과 일치).
-  const stam = cur.pitcher?.stamina ?? cur.stamina ?? 50;
+  const stam = (cur.pitcher?.stamina ?? cur.stamina ?? 50) / SIM_SCALE;   // 스케일업분 정규화
   const capacity = 18 + (stam - 50) * 0.18;
   if (cur.isMain) {
     // 메인 강판 — 후하게. PA (capacity+12)+ OR 허용 6점+ OR (PA (capacity+7)+ AND 허용 5점+).

@@ -475,6 +475,12 @@ export const en = {
     noLocalSave:    "No local save to upload",
     signInToSave:   "Sign in with Google to save to the cloud (cross-device sync).",
     signInHint:     "Sign in with Google to sync across devices",
+  },
+
+  // Ads (interstitial)
+  ads: {
+    label:       "Advertisement",
+    continueBtn: "Continue",
     saveFailed:     "Save failed",
     loadFailed:     "Load failed",
     confirmOverwriteLocal: "Local save is newer than cloud. Overwrite with cloud data?",
@@ -843,6 +849,7 @@ export const en = {
     mlbReject:     "Decline (Pro Draft)",
     confirmMlb:    "Confirm signing with {team}?",
     teamStrength:  "Team strength: {strength}",
+    teamAvgOvr:    "Team avg ability {ovr}",
 
     draftPicked:    "Drafted to {stage}!",
     draftUndrafted: "Undrafted — career ends.",

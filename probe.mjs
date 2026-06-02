@@ -122,7 +122,7 @@ state.gameDate = { year: 2026, month: 3, dayOfMonth: 1 };
 state.league = createLeague("univ", univTeam);
 state.season = createSeason("univ");
 ok(state.player.stage === "univ", "stage=univ");
-ok(getNpcStatCap("univ") === 110, "univ NPC cap = 110");
+ok(getNpcStatCap("univ") === 121, "univ NPC cap = 121");
 const univCh = appearanceChance(state.player, getPlayerTeam(state.league));
 ok(univCh.bat === 1 && univCh.pitch > 0, `대학 출장 bat=${univCh.bat*100}% pit=${(univCh.pitch*100).toFixed(0)}%`);
 
@@ -132,14 +132,15 @@ const kboTeam = pickTeam("pro1");
 state.player = makePlayer({
   stage: "pro1", grade: 1, age: 22, fame: 250,
   teamName: kboTeam,
-  batter:  { contact: 110, power: 90, eye: 100, speed: 80, defense: 85 },
-  pitcher: { velocity: 115, control: 105, breaking: 95, stamina: 100, mental: 90 },
+  // 새 스케일(pro1 NPC 평균 ~199) 대비 발달한 1군급 선수 — 등판/출장 판단 검증용.
+  batter:  { contact: 210, power: 180, eye: 195, speed: 160, defense: 170 },
+  pitcher: { velocity: 215, control: 200, breaking: 185, stamina: 195, mental: 175 },
 });
 state.gameDate = { year: 2030, month: 7, dayOfMonth: 12 };
 state.league = createLeague("pro1", kboTeam);
 state.season = createSeason("pro1");
 ok(state.player.stage === "pro1", "stage=pro1");
-ok(getNpcStatCap("pro1") === 160, "pro1 NPC cap = 160");
+ok(getNpcStatCap("pro1") === 256, "pro1 NPC cap = 256");
 ok(t("stageShort.pro1") === "1군", `stageShort.pro1 = "${t("stageShort.pro1")}"`);
 
 // 카드 타이틀 (i18n 키 분기 검증)
@@ -215,7 +216,7 @@ state.gameDate = { year: 2032, month: 7, dayOfMonth: 14 };
 state.league = createLeague("mlb", mlbTeam);
 state.season = createSeason("mlb");
 ok(state.player.stage === "mlb", "stage=mlb");
-ok(getNpcStatCap("mlb") === 200, "mlb NPC cap = 200");
+ok(getNpcStatCap("mlb") === 400, "mlb NPC cap = 400");
 ok(t("stageShort.mlb") === "메이저", `stageShort.mlb = "${t("stageShort.mlb")}"`);
 
 const mlbTitle = t("weekly.titleWithTeamLevel", { name: state.player.name, team: state.player.teamName, level: t("stageShort.mlb") });

@@ -14,7 +14,7 @@ import { ko } from "./ko.js";
 import { en } from "./en.js";
 
 export const SUPPORTED_LOCALES = ["ko", "en"];
-export const DEFAULT_LOCALE = "ko";
+export const DEFAULT_LOCALE = "en";   // 기본 영어 (글로벌 릴리스)
 
 const TABLES = { ko, en };
 const LOCALE_KEY = "ninthinning.locale.v1";

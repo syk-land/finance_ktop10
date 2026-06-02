@@ -12,6 +12,7 @@ import { transitionAfterSeason, transitionToStage, eligibleCareerPaths, kboDraft
 import { getPlayerTeam, standings } from "../systems/league.js";
 import { createFaceSVG } from "../render/avatars.js";
 import { AUTO_PRESETS, autoFillWeek, topWeightStat, isTrainDirectionMaxed } from "../systems/autoTrain.js";
+import { teamAvgOvr } from "../systems/npc.js";
 import { CATEGORY_KEYS, applyCategoryAndPickEvent, applyEventChoice, getAvailableCategories, isTournamentEvent } from "../systems/offseason.js";
 import { appearanceChance, batterOVR, pitcherOVR, decideRolesForGame } from "../systems/simulator.js";
 import { createRadarSVG } from "../render/radar.js";
@@ -3244,7 +3245,7 @@ function showMLBChallengeModal(challenge, route, onDecline) {
   for (const team of challenge.offers) {
     const btn = document.createElement("button");
     btn.style.cssText = "display:block; width:100%; padding:10px; margin-bottom:6px; text-align:left; background:var(--panel-2); border:1px solid var(--accent); color:inherit; font-family:inherit; cursor:pointer; border-radius:6px;";
-    btn.innerHTML = `<div style="font-weight:700; color:var(--accent); font-size:13px">${team.name}</div><div style="font-size:10px; color:var(--muted); margin-top:2px">${t("careerPath.teamStrength", { strength: team.strength })}</div>`;
+    btn.innerHTML = `<div style="font-weight:700; color:var(--accent); font-size:13px">${team.name}</div><div style="font-size:10px; color:var(--muted); margin-top:2px">${t("careerPath.teamAvgOvr", { ovr: teamAvgOvr(team.strength, "mlb") })}</div>`;
     btn.addEventListener("pointerdown", e => {
       e.preventDefault();
       if (!confirm(t("mlbChallenge.confirm", { team: team.name }))) return;
@@ -3350,7 +3351,7 @@ function openMLBOfferModal(offers, onChoose) {
   for (const team of offers) {
     const btn = document.createElement("button");
     btn.style.cssText = "display:block; width:100%; padding:10px; margin-bottom:6px; text-align:left; background:var(--panel-2); border:1px solid var(--accent); color:inherit; font-family:inherit; cursor:pointer; border-radius:6px;";
-    btn.innerHTML = `<div style="font-weight:700; color:var(--accent); font-size:13px">${team.name}</div><div style="font-size:10px; color:var(--muted); margin-top:2px">${t("careerPath.teamStrength", { strength: team.strength })}</div>`;
+    btn.innerHTML = `<div style="font-weight:700; color:var(--accent); font-size:13px">${team.name}</div><div style="font-size:10px; color:var(--muted); margin-top:2px">${t("careerPath.teamAvgOvr", { ovr: teamAvgOvr(team.strength, "mlb") })}</div>`;
     btn.addEventListener("pointerdown", e => {
       e.preventDefault();
       if (!confirm(t("careerPath.confirmMlb", { team: team.name }))) return;

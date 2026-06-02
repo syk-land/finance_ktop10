@@ -478,6 +478,12 @@ export const ko = {
     noLocalSave:    "저장할 로컬 세이브가 없습니다",
     signInToSave:   "Google 로그인 후 클라우드 저장이 가능합니다 (기기 간 동기화).",
     signInHint:     "기기 간 동기화하려면 Google 로그인이 필요합니다",
+  },
+
+  // 광고 (인터스티셜)
+  ads: {
+    label:       "광고",
+    continueBtn: "계속하기",
     saveFailed:     "저장 실패",
     loadFailed:     "불러오기 실패",
     confirmOverwriteLocal: "로컬 세이브가 클라우드보다 더 최근입니다. 클라우드 데이터로 덮어쓰시겠습니까?",
@@ -847,6 +853,7 @@ export const ko = {
     mlbReject:     "거절 (KBO 드래프트로)",
     confirmMlb:    "{team} 입단을 확정하시겠습니까?",
     teamStrength:  "팀 전력: {strength}",
+    teamAvgOvr:    "팀 평균 능력치 {ovr}",
 
     draftPicked:    "{stage} 지명!",
     draftUndrafted: "드래프트 미지명 — 야구 인생을 마감합니다.",

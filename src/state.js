@@ -12,7 +12,7 @@ export const state = {
   paused: true,          // true면 시간 정지
   tickSpeed: 500,        // ms / 1일
   gameDate: null,        // { year, day, month, dayOfMonth, dayOfWeek }
-  locale: "ko",          // "ko" | "en" — i18n/index.js 에서 별도 localStorage 키로 영속화
+  locale: "en",          // "ko" | "en" — 기본 영어. i18n/index.js 에서 별도 localStorage 키로 영속화
   offseason: null,       // null | { randomEventKey, selected, outcomeKind, changes[] } — 시즌 종료 후 휴식기 단계
   pendingFinal: null,    // null | { tournamentKey, opponent, status, result, processedWeek } — 토너먼트 결승전 대기
   pendingPostseason: null, // null | { bracket, round, opponent, status, completedRounds[] } — 포스트시즌(pro1/mlb)

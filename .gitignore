@@ -32,3 +32,6 @@ gemini_images/
 
 # BGM 원본 WAV (대용량 — 가공본만 assets/audio 에 커밋)
 aibgm/
+
+# 배포 번들 (재생성 가능 — 커밋 안 함)
+ninthinning-web.zip
