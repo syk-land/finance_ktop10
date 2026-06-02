@@ -17,9 +17,11 @@
       "DEVELOPMENT.md",
       "EVENTS.md",
       "README.md",
+      "MONETIZATION.md",
       "package*.json",
       "firestore.rules",
-      "probe*.mjs"
+      "probe*.mjs",
+      "ninthinning-web.zip"
     ],
     "headers": [
       {
