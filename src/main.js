@@ -18,6 +18,7 @@ import {
 import { openSettingsModal } from "./views/settingsModal.js";
 import { initAudioUnlock, playBgm, sfx } from "./assets/audio.js";
 import { preloadImages } from "./assets/images.js";
+import { showInterstitialAd } from "./systems/ads.js";
 
 // 뷰별 BGM 매핑 — 시작/메뉴/상점은 menu 곡, 경기는 game 곡.
 const VIEW_BGM = { start: "menu", menu: "menu", shop: "menu", weekly: "game" };
@@ -310,6 +311,8 @@ function init() {
   }, true);
   route("start");
   scheduleTick();
+  // 광고 — 시작 시점 1회(앱 진입). 로딩 연출 위로 전면 광고.
+  showInterstitialAd();
 }
 
 document.addEventListener("DOMContentLoaded", init);

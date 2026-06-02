@@ -143,12 +143,21 @@ export function promotionScore(player) {
 //   120+  → 8~20위 중 랜덤 2팀
 //   100+  → 15~30위 중 랜덤 1팀
 //   < 100 → 빈 배열 (오퍼 없음)
+// 팀 명성 — strength 에서 도출(주인공 fame 스케일에 맞춤, 계수 4는 튜닝값).
+// 명성 높은(강한) 팀은 명성 낮은 선수를 드래프트/영입하지 않는다(아래 게이트).
+export function teamFame(team) {
+  return Math.round((team?.strength ?? 60) * 4);
+}
+
 export function getMLBOffers(player) {
   const score = nationalTeamRating(player);
   if (score < 110) return [];                       // 자격 — 역할기반 rating 110+
   const pool = getTeamPool("mlb", getLocale());
   if (!pool || pool.length === 0) return [];
-  const sorted = [...pool].sort((a, b) => b.strength - a.strength);
+  // 팀 명성 > 주인공 명성이면 오퍼 안 함(콧대 높은 명문은 무명을 안 부름).
+  const pfame = player.fame ?? 0;
+  const sorted = [...pool].filter(t => teamFame(t) <= pfame).sort((a, b) => b.strength - a.strength);
+  if (sorted.length === 0) return [];
   // 풀 크기에 비례한 구간 (MLB 풀이 작아도 동작) — rating 높을수록 상위팀.
   const n = sorted.length;
   if (score >= 165) return pickRandom(sorted.slice(0, Math.max(1, Math.ceil(n * 0.4))), 3);  // 상위권 강팀
@@ -320,7 +329,9 @@ export function checkFreeAgency(player) {
   // FA 오퍼: compositeScore + fame 으로 결정. 점수 낮으면 잔류 권장 (오퍼 없음).
   const pool = getTeamPool(player.stage, getLocale());
   if (!pool || pool.length === 0) return { offers: [], canStay: true };
-  const sorted = [...pool].filter(t => t.name !== player.teamName)
+  // 팀 명성 > 주인공 명성이면 오퍼 제외(명문은 무명을 영입하지 않음).
+  const pfame = player.fame ?? 0;
+  const sorted = [...pool].filter(t => t.name !== player.teamName && teamFame(t) <= pfame)
                           .sort((a, b) => b.strength - a.strength);
   // 오퍼 수 제한 없음 — 점수가 높을수록 관심 구단이 늘고, 최상위는 전 구단이 오퍼.
   // 모달은 max-height+스크롤이라 오퍼가 많아도 표시 가능.

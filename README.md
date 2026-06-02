@@ -613,6 +613,16 @@ KBO에서 MLB로 가는 경로가 없던 것 → 실제 규정 모델로 추가.
 
 검증: `node --check` 통과·`probe.mjs` 전체 통과·NPC-vs-NPC MLB 시뮬 정상. 밸런스 실기 확인 대기(특히 발달 전 선수 출장감). 훈련 성장률 미변경.
 
+### v0.7.20 추가 ✓ — 광고 트리거 배선 + 팀 명성 드래프트/오퍼 게이팅
+
+| 영역 | 작업 |
+|---|---|
+| **전면 광고 트리거** (`main.js`·`weekly.js`) | 시작 시점(`init`), **3시즌마다 새 시즌 시작**(`maybeShowSeasonAd`, `careerHistory.length%3`), **은퇴**(시즌종료/강등 은퇴 버튼) 에 `showInterstitialAd` 호출. index.html 주석을 인터스티셜 방식으로 정정. |
+| **팀 명성 게이팅** (`career.js teamFame`) | 팀 명성 = strength×4(튜닝값). `getMLBOffers`·`checkFreeAgency` 에서 **팀 명성 > 주인공 명성이면 오퍼 제외** — 명문은 무명을 부르지 않고, 주인공 명성이 오를수록 상위 팀이 영입 제안. (KBO 신인 드래프트는 팀별 호명 구조가 아니라 미적용.) |
+| 배포 번들 | `ninthinning-web.zip` 재생성(인터스티셜 반영·배너 제거, 82파일). `.gitignore` 에 추가(빌드 산출물). |
+
+검증: `node --check` 통과·`probe.mjs` 전체 통과. 광고 표시(placeholder ID라 빈 모달)·명성 게이트 체감은 실기 확인. teamFame 계수(×4)는 튜닝 가능.
+
 **자동 검증** (회귀·밸런스): `node probe.mjs` + `node probe-career.mjs` — 실행 방법 §시뮬레이션 돌려보기 참고.
 
 **수동 시나리오** (브라우저 UX 확인):

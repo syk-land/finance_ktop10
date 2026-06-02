@@ -11,9 +11,9 @@
   <meta http-equiv="Expires" content="0" />
 
   <!-- ───────────────────────────────────────────────────────────────
-       광고(모네타이즈) — Google AdSense.
-       ⚠ 아래 ca-pub-XXXXXXXXXXXXXXXX 를 본인 AdSense 퍼블리셔 ID로,
-         #ad-banner 의 data-ad-slot 을 발급받은 광고 단위 ID로 교체하세요.
+       광고(모네타이즈) — Google AdSense. 전면(인터스티셜) 광고로 시작/3시즌마다/은퇴 시점에 노출.
+       ⚠ 아래 client=ca-pub-XXXXXXXXXXXXXXXX 를 본인 AdSense 퍼블리셔 ID로,
+         src/systems/ads.js 의 AD_CLIENT/AD_SLOT_INTERSTITIAL 을 같은 ID/광고단위로 교체하세요.
          (placeholder 상태에선 광고가 표시되지 않습니다 — 콘솔 경고 정상.)
        AdSense 가입·사이트 승인 후 ID 가 활성화됩니다.
   ──────────────────────────────────────────────────────────────── -->
@@ -34,6 +34,6 @@
     </footer>
   </div>
   <!-- 광고는 전면(인터스티셜)으로 시작/3시즌마다/은퇴 시점에 노출 — src/systems/ads.js -->
-  <script type="module" src="src/main.js?v=42"></script>
+  <script type="module" src="src/main.js?v=43"></script>
 </body>
 </html>
