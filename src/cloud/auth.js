@@ -4,8 +4,9 @@
 //   - 앱 첫 진입 시 anon 로그인 자동 (uid 생성, 기기 종속).
 //   - state.cloudUser = { uid, isAnonymous, displayName?, email? } 에 attach.
 //   - onAuthStateChanged 리스너로 로그아웃/로그인 변화 추적.
-//   - Google 연동은 redirect 방식 (popup 대신) — COOP 차단/팝업 차단 회피.
-//     linkWithRedirect/signInWithRedirect → 페이지 전체 리로드 → getRedirectResult 로 복귀 후 결과 처리.
+//   - Google 연동: 모바일은 redirect 우선(팝업 불안정·차단·COOP 회피), 데스크톱은 popup 우선
+//     (리로드 없이 즉시 결과). authDomain 이 서빙 도메인과 일치(first-party)해 redirect 결과 유실 없음.
+//     redirect 경로: linkWithRedirect/signInWithRedirect → 페이지 리로드 → getRedirectResult 로 복귀 후 처리.
 
 import {
   signInAnonymously, onAuthStateChanged, signOut as fbSignOut,
@@ -94,12 +95,17 @@ function isUserCancel(e) {
     || e?.code === "auth/cancelled-popup-request"
     || e?.code === "auth/user-cancelled";
 }
+// 모바일(안드로이드/iOS) — 팝업이 막히거나 깨지기 쉬워 redirect 를 우선한다.
+// 데스크톱은 popup 이 리로드 없이 즉시 결과를 주므로 그대로 유지.
+function prefersRedirect() {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "");
+}
 
 // 익명 → Google 계정 연동.
-// 1차: popup 방식 (linkWithPopup) — 즉시 결과 반환. 서드파티 쿠키 차단 환경에서도
-//      redirect 와 달리 로그인 상태 유실이 없다 (redirect 가 "갔다 와도 로그인 안 됨"의 원인).
-// 폴백: 팝업 차단 시에만 linkWithRedirect 로 전환.
-// 그 Google 계정이 이미 다른 익명 uid 에 연결돼 있으면 그 계정으로 signInWithPopup (익명 데이터 포기).
+// 모바일: redirect 우선 (linkWithRedirect) — 팝업 불안정 회피. 결과는 getRedirectResult 에서 처리.
+// 데스크톱: popup 방식 (linkWithPopup) — 즉시 결과 반환, 리로드 없음. 팝업 차단 시 redirect 폴백.
+// 그 Google 계정이 이미 다른 익명 uid 에 연결돼 있으면 그 계정으로 로그인 (익명 데이터 포기).
 export async function linkAnonToGoogle() {
   if (!isFirebaseReady()) return { ok: false, reason: "firebase_not_ready" };
   const auth = getFirebaseAuth();
@@ -111,6 +117,9 @@ export async function linkAnonToGoogle() {
     return { ok: true, user, alreadyLinked: true };
   }
 
+  // 모바일: 팝업 불안정 → redirect 우선.
+  if (prefersRedirect()) return linkViaRedirect(auth, user, provider);
+
   try {
     const result = await linkWithPopup(user, provider);
     return { ok: true, user: result.user, linked: true };
@@ -121,53 +130,61 @@ export async function linkAnonToGoogle() {
         const r2 = await signInWithPopup(auth, provider);
         return { ok: true, user: r2.user, linked: true, switched: true };
       } catch (e2) {
-        if (isPopupBlocked(e2)) return linkRedirectFallback(auth, user, provider);
+        if (isPopupBlocked(e2)) return linkViaRedirect(auth, user, provider);
         if (isUserCancel(e2)) return { ok: false, reason: "cancelled" };
         console.error("[cloud] signInWithPopup 폴백 실패", e2);
         return { ok: false, reason: "link_failed", code: e2.code, error: e2.message };
       }
     }
-    if (isPopupBlocked(e)) return linkRedirectFallback(auth, user, provider);
+    if (isPopupBlocked(e)) return linkViaRedirect(auth, user, provider);
     if (isUserCancel(e)) return { ok: false, reason: "cancelled" };
     console.error("[cloud] linkAnonToGoogle 실패", e);
     return { ok: false, reason: "link_failed", code: e.code, error: e.message };
   }
 }
 
-// 팝업이 막힌 환경에서만 쓰는 redirect 폴백. 결과는 initAuth 의 getRedirectResult 에서 처리.
-async function linkRedirectFallback(auth, user, provider) {
+// redirect 로 연동 — 모바일 1차 경로이자 데스크톱 팝업 차단 시 폴백.
+// 결과는 initAuth 의 getRedirectResult 에서 처리 (credential-already-in-use 면 signin 으로 자동 전환).
+async function linkViaRedirect(auth, user, provider) {
   try {
     sessionStorage.setItem(REDIRECT_INTENT_KEY, "link");
     await linkWithRedirect(user, provider);
     return { ok: true, redirecting: true };
   } catch (e) {
     sessionStorage.removeItem(REDIRECT_INTENT_KEY);
-    console.error("[cloud] linkWithRedirect 폴백 실패", e);
+    console.error("[cloud] linkWithRedirect 실패", e);
     return { ok: false, reason: "link_failed", code: e.code, error: e.message };
   }
 }
 
-// Google 로그인 (link 실패 또는 다른 계정 진입). popup 우선, 차단 시 redirect 폴백.
+// redirect 로 로그인 — 모바일 1차 경로이자 데스크톱 팝업 차단 시 폴백. 익명 데이터는 잃음.
+async function signInViaRedirect(auth, provider) {
+  try {
+    sessionStorage.setItem(REDIRECT_INTENT_KEY, "signin");
+    await signInWithRedirect(auth, provider);
+    return { ok: true, redirecting: true };
+  } catch (e) {
+    sessionStorage.removeItem(REDIRECT_INTENT_KEY);
+    console.error("[cloud] signInWithRedirect 실패", e);
+    return { ok: false, reason: "signin_failed", code: e.code, error: e.message };
+  }
+}
+
+// Google 로그인 (link 실패 또는 다른 계정 진입). 모바일 redirect 우선, 데스크톱 popup 우선(차단 시 redirect).
 // 익명 데이터는 잃음.
 export async function signInWithGoogle() {
   if (!isFirebaseReady()) return { ok: false, reason: "firebase_not_ready" };
   const auth = getFirebaseAuth();
   const provider = new GoogleAuthProvider();
+
+  // 모바일: 팝업 불안정 → redirect 우선.
+  if (prefersRedirect()) return signInViaRedirect(auth, provider);
+
   try {
     const r = await signInWithPopup(auth, provider);
     return { ok: true, user: r.user };
   } catch (e) {
-    if (isPopupBlocked(e)) {
-      try {
-        sessionStorage.setItem(REDIRECT_INTENT_KEY, "signin");
-        await signInWithRedirect(auth, provider);
-        return { ok: true, redirecting: true };
-      } catch (e2) {
-        sessionStorage.removeItem(REDIRECT_INTENT_KEY);
-        console.error("[cloud] signInWithRedirect 폴백 실패", e2);
-        return { ok: false, reason: "signin_failed", code: e2.code, error: e2.message };
-      }
-    }
+    if (isPopupBlocked(e)) return signInViaRedirect(auth, provider);
     if (isUserCancel(e)) return { ok: false, reason: "cancelled" };
     console.error("[cloud] signInWithGoogle 실패", e);
     return { ok: false, reason: "signin_failed", code: e.code, error: e.message };

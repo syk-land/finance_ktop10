@@ -530,8 +530,9 @@ KBO에서 MLB로 가는 경로가 없던 것 → 실제 규정 모델로 추가.
 |---|---|
 | **fix(auth) — 구글 로그인 authDomain 서빙 도메인 정렬** (`firebaseConfig.js`) | 배포 사이트(web.app)에서 로그인이 "계정 선택만 반복하다 실패". 페이지 오리진(web.app) ≠ `authDomain`(firebaseapp.com) 크로스 오리진 로그인 핸들러(`/__/auth/handler`) + Chrome 서드파티 저장소 차단으로 결과 릴레이가 끊긴 게 원인. `authDomain` → `baseball-alone.web.app` 으로 정렬해 핸들러를 first-party 화. (web.app 배포 한정 해결 — localhost 는 여전히 크로스 오리진. 배포 후 실기 확인 대기. redirect URI 미승인 시 `redirect_uri_mismatch` 가능 → Google Cloud OAuth 클라이언트에 `https://baseball-alone.web.app/__/auth/handler` 추가.) |
 | **fix(auth) — 시작화면 로그인 카드 비동기 인증 레이스** (`auth.js` + `main.js`) | 첫 진입 시 익명 로그인(네트워크 왕복)이 메뉴 최초 렌더보다 늦게 끝나 로그인 카드가 안 뜨고 새로고침해야 보이던 문제. `initAuth(onAuthChange)` 콜백 추가 → 인증 상태 도착 시 `start` 뷰 재렌더(같은 뷰라 스크롤 유지). |
+| **모바일 redirect-first 전환** (`auth.js`) | 안드로이드 타깃에서 팝업 로그인은 차단·COOP·인앱 브라우저로 불안정. `prefersRedirect()`(모바일 UA) 추가 → 모바일은 `linkWithRedirect`/`signInWithRedirect` 우선, 데스크톱은 기존 popup 우선(차단 시 redirect 폴백) 유지. authDomain 정렬(first-party)로 redirect 결과 유실 없음. redirect 헬퍼 `linkViaRedirect`/`signInViaRedirect` 로 정리(폴백·모바일 1차 공유). |
 
-검증: `node --check` 3파일 통과. authDomain·로그인 카드 노출은 배포/런타임 실기 확인 대기.
+검증: `node --check` 4파일(`auth.js`/`main.js`/`firebaseConfig.js` + 무변경 확인) 통과. authDomain·로그인 카드·모바일 redirect 는 배포/실기 확인 대기.
 
 **자동 검증** (회귀·밸런스): `node probe.mjs` + `node probe-career.mjs` — 실행 방법 §시뮬레이션 돌려보기 참고.
 
