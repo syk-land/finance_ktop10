@@ -792,7 +792,8 @@ function renderPreview() {
   ensureSpinnerStyle();
   const battingLeft = draft.hand === "left" || draft.hand === "mixed";
   // 높이 70px 고정 — 생성 화면 1스크린 맞춤(이전 96px도 살짝 넘쳐 더 축소). width:auto 로 비율 보존.
-  const charImg = createImage("charBat" + draft.faceId.toUpperCase(), {
+  const presetKey = mapCustomToPreset(draft.faceId).toUpperCase();
+  const charImg = createImage("charBat" + presetKey, {
     style: "animation:nir-idle 3.2s ease-in-out infinite;",
     imgStyle: `height:70px; width:auto; margin:0 auto;${battingLeft ? " transform:scaleX(-1);" : ""}`,
     fallback: () => createCharacterSVG(draft.faceId, draft.hand, { w: 60, h: 72 }, draft.talent),
@@ -853,6 +854,23 @@ function syncPresetToCustom(faceId) {
     ];
   }
   return [0, 0, 0, 0, 0, 0];
+}
+
+function mapCustomToPreset(faceId) {
+  if (!faceId) return "f1";
+  if (!faceId.startsWith("f_")) return faceId;
+  const parts = faceId.split("_");
+  const hairStyleIdx = parseInt(parts[3]) || 0; // hairStyle
+  const accIdx = parseInt(parts[4]) || 0;       // accessory
+
+  // ACCESSORIES = ["none", "cap", "glasses", "helmet", "scar", "blush"]
+  // HAIR_STYLES = ["short", "curly", "neat", "long", "bald", "spiky"]
+  if (accIdx === 3) return "f2"; // helmet -> f2
+  if (accIdx === 1) return "f4"; // cap -> f4
+  if (accIdx === 2) return "f5"; // glasses -> f5
+  if (hairStyleIdx === 1) return "f3"; // curly -> f3
+  if (hairStyleIdx === 3) return "f6"; // long -> f6
+  return "f1"; // default -> f1
 }
 
 function renderFaceGallery() {
