@@ -6,7 +6,9 @@
 import { state, saveGame, pushToast } from "../state.js";
 import {
   BATTER_STATS, PITCHER_STATS, TALENTS, overallScore, nationalTeamRating, getStatLabels, getPlayerStatCap, getPlayerMaxStatCap, applyGameExperience,
+  getEquipmentStats,
 } from "../systems/player.js";
+import { getEquipmentSpec } from "../data/shopCatalog.js";
 import { advanceToNextSeason, mergeSeasonStats } from "../systems/week.js";
 import { transitionAfterSeason, transitionToStage, eligibleCareerPaths, kboDraft, determineMLBStartStage, compositeScore, checkFreeAgency, applyFreeAgencyDecision, maybeTradeOffer, applyTradeAccept, checkMLBChallenge, TRADE_CONSENT_FAME } from "../systems/career.js";
 import { getPlayerTeam, standings } from "../systems/league.js";
@@ -1727,6 +1729,7 @@ function renderAttributesBody(player) {
   const wrap = document.createElement("div");
   const chances = appearanceChance(player, getPlayerTeam(state.league));
   const statLabels = getStatLabels();
+  const eqStats = getEquipmentStats(player);
 
   const row = document.createElement("div");
   row.style.display = "flex";
@@ -1737,8 +1740,8 @@ function renderAttributesBody(player) {
   radarBox.style.flex = "0 0 auto";
   const labels = [...BATTER_STATS, ...PITCHER_STATS];
   const values = {};
-  for (const s of BATTER_STATS) values[s] = player.batter[s];
-  for (const s of PITCHER_STATS) values[s] = player.pitcher[s];
+  for (const s of BATTER_STATS) values[s] = player.batter[s] + (eqStats[s] ?? 0);
+  for (const s of PITCHER_STATS) values[s] = player.pitcher[s] + (eqStats[s] ?? 0);
   // 그래프 max — stage base cap + 스탯별 영구 캡 보너스 반영해 동적 조정.
   // 레이다는 전 축 공통 max 라서 가장 큰 스탯 캡(getPlayerMaxStatCap)에 맞춤 — 한 축도 안 넘치게.
   // 막대는 각 스탯의 개별 캡으로 채움률 표시.
@@ -1755,13 +1758,58 @@ function renderAttributesBody(player) {
   barsCol.style.flexDirection = "column";
   barsCol.style.gap = "3px";
   for (const s of BATTER_STATS) {
-    barsCol.appendChild(statBarRow(statLabels[s], player.batter[s], "var(--accent)", getPlayerStatCap(player, s)));
+    const bonus = eqStats[s] ?? 0;
+    barsCol.appendChild(statBarRow(statLabels[s], player.batter[s], "var(--accent)", getPlayerStatCap(player, s), bonus));
   }
   for (const s of PITCHER_STATS) {
-    barsCol.appendChild(statBarRow(statLabels[s], player.pitcher[s], "var(--accent-2)", getPlayerStatCap(player, s)));
+    const bonus = eqStats[s] ?? 0;
+    barsCol.appendChild(statBarRow(statLabels[s], player.pitcher[s], "var(--accent-2)", getPlayerStatCap(player, s), bonus));
   }
   row.appendChild(barsCol);
   wrap.appendChild(row);
+
+  // 장비 장착 현황 카드 섹션 추가
+  const eqTitle = document.createElement("div");
+  eqTitle.style.cssText = "font-weight:700; font-size:12px; margin:12px 0 6px; color:var(--accent-2); border-bottom:1px solid var(--border); padding-bottom:3px;";
+  eqTitle.textContent = t("weekly.equippedTitle");
+  wrap.appendChild(eqTitle);
+
+  const eqRow = document.createElement("div");
+  eqRow.style.cssText = "display:grid; grid-template-columns:repeat(3, 1fr); gap:6px;";
+
+  const types = ["bat", "glove", "cleats"];
+  const eqMeta = state.regression?.permanentPurchases?.equipment ?? { bat: 0, glove: 0, cleats: 0 };
+  
+  for (const type of types) {
+    const lvl = eqMeta[type] ?? 0;
+    const spec = getEquipmentSpec(type, lvl);
+    
+    const card = document.createElement("div");
+    card.style.cssText = "background:var(--panel-2); border:1px solid var(--border); border-radius:6px; padding:6px; text-align:center; min-height:55px; display:flex; flex-direction:column; justify-content:center;";
+    
+    const label = document.createElement("div");
+    label.style.cssText = "font-size:9.5px; color:var(--muted); font-weight:600; margin-bottom:2px;";
+    label.textContent = t(`shop.eqTitle.${type}`);
+    card.appendChild(label);
+
+    const name = document.createElement("div");
+    name.style.cssText = "font-size:11px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;";
+    name.textContent = spec ? t(spec.nameKey) : t("shop.noEquipment");
+    if (lvl > 0) {
+      name.style.color = "var(--accent)";
+    }
+    card.appendChild(name);
+
+    if (lvl > 0 && spec && spec.stats) {
+      const buffs = document.createElement("div");
+      buffs.style.cssText = "font-size:8.5px; color:var(--accent-2); margin-top:2px; font-weight:600;";
+      buffs.textContent = Object.entries(spec.stats).map(([k, v]) => `+${v}`).join(", ");
+      card.appendChild(buffs);
+    }
+    eqRow.appendChild(card);
+  }
+  wrap.appendChild(eqRow);
+
   return wrap;
 }
 
@@ -1931,7 +1979,7 @@ function drainPendingToasts() {
 function showCriticalToast(msg) { showToast(msg, "good"); }
 
 // 능력치 1개 행 — 라벨 + 막대 그래프 + 수치. STAT_CAP(150) 기준.
-function statBarRow(label, value, color, max = 150) {
+function statBarRow(label, value, color, max = 150, bonus = 0) {
   const row = document.createElement("div");
   row.className = "stat-row";
 
@@ -1944,21 +1992,38 @@ function statBarRow(label, value, color, max = 150) {
   const fill = document.createElement("div");
   fill.className = "stat-fill";
   fill.style.background = color;
-  fill.style.width = `${Math.min(100, (value / max) * 100)}%`;
+  const totalVal = value + bonus;
+  fill.style.width = `${Math.min(100, (totalVal / max) * 100)}%`;
   bar.appendChild(fill);
 
   const v = document.createElement("div");
   v.className = "stat-val";
   v.style.color = color;
   v.style.fontWeight = "600";
-  // 소수 1자리 — 훈련 1회 +0.2 같은 작은 증가도 보이게 (정수 반올림은 누적돼야 변함).
-  v.textContent = (Math.round(value * 10) / 10).toFixed(1);
+  v.style.fontSize = "11px";
+  v.style.display = "flex";
+  v.style.gap = "4px";
+  v.style.alignItems = "center";
+  
+  const baseSpan = document.createElement("span");
+  baseSpan.textContent = (Math.round(value * 10) / 10).toFixed(1);
+  v.appendChild(baseSpan);
+  
+  if (bonus > 0) {
+    const bonusSpan = document.createElement("span");
+    bonusSpan.style.color = "var(--accent-2)";
+    bonusSpan.style.fontSize = "9px";
+    bonusSpan.style.fontWeight = "bold";
+    bonusSpan.textContent = `(+${bonus})`;
+    v.appendChild(bonusSpan);
+  }
 
   row.appendChild(n);
   row.appendChild(bar);
   row.appendChild(v);
   return row;
 }
+
 
 // 시즌성적 좌/우 컬럼 — 컬러 상단 보더 + 패널2 배경으로 영역 시각 구분
 function statBlock(title, accent) {

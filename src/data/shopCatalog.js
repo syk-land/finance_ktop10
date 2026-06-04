@@ -137,3 +137,32 @@ export function isTraitUnlocked(traitKey, unlockedItems) {
   if (tr.unlock === "default") return true;
   return (unlockedItems ?? []).includes(tr.unlock);
 }
+
+// ── 6. 장비 상점 카탈로그 (은퇴/회귀 영구 업그레이드) ──────────────────
+export const EQUIPMENT_CATALOG = {
+  bat: [
+    { level: 0, nameKey: "equipment.bat.lvl0", cost: 0, stats: {} },
+    { level: 1, nameKey: "equipment.bat.lvl1", cost: 300, stats: { contact: 3, power: 2 } },
+    { level: 2, nameKey: "equipment.bat.lvl2", cost: 800, stats: { contact: 6, power: 5 } },
+    { level: 3, nameKey: "equipment.bat.lvl3", cost: 2000, stats: { contact: 12, power: 10, eye: 5 } },
+  ],
+  glove: [
+    { level: 0, nameKey: "equipment.glove.lvl0", cost: 0, stats: {} },
+    { level: 1, nameKey: "equipment.glove.lvl1", cost: 300, stats: { defense: 3, control: 2 } },
+    { level: 2, nameKey: "equipment.glove.lvl2", cost: 800, stats: { defense: 6, control: 5, breaking: 3 } },
+    { level: 3, nameKey: "equipment.glove.lvl3", cost: 2000, stats: { defense: 12, control: 10, breaking: 8, mental: 5 } },
+  ],
+  cleats: [
+    { level: 0, nameKey: "equipment.cleats.lvl0", cost: 0, stats: {} },
+    { level: 1, nameKey: "equipment.cleats.lvl1", cost: 300, stats: { speed: 3, stamina: 2 } },
+    { level: 2, nameKey: "equipment.cleats.lvl2", cost: 800, stats: { speed: 7, stamina: 5, velocity: 2 } },
+    { level: 3, nameKey: "equipment.cleats.lvl3", cost: 2000, stats: { speed: 15, stamina: 10, velocity: 5 } },
+  ]
+};
+
+export function getEquipmentSpec(type, level) {
+  const list = EQUIPMENT_CATALOG[type];
+  if (!list) return null;
+  return list.find(item => item.level === level) || list[0];
+}
+

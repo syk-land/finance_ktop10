@@ -552,6 +552,7 @@ export const ko = {
     tabStart:        "시작",
     tabTrait:        "특성",
     tabRelic:        "유물",
+    tabEquipment:    "장비",
     cost:            "{cost}점",
     owned:           "보유",
     equipped:        "장착됨",
@@ -590,7 +591,41 @@ export const ko = {
     relicEquip:      "장착",
     relicUnequip:    "장착 해제",
     relicEquipFull:  "장착 꽉 참 (2/2)",
+
+    equipmentDesc:   "회귀 포인트를 사용하여 영구적으로 장비를 업그레이드합니다. 장비 효과는 다음 모든 캐릭터에 적용됩니다.",
+    eqTitle: {
+      bat: "방망이",
+      glove: "글러브",
+      cleats: "야구화",
+    },
+    current: "현재",
+    nextUpgrade: "다음 단계",
+    noEquipment: "장착 없음",
+    maxLevelReached: "최대 업그레이드 완료",
+    noStatBuff: "스탯 보너스 없음",
   },
+
+  equipment: {
+    bat: {
+      lvl0: "없음",
+      lvl1: "나무 배트",
+      lvl2: "컴포지트 배트",
+      lvl3: "주문 제작 단풍나무 배트",
+    },
+    glove: {
+      lvl0: "없음",
+      lvl1: "기본 미트",
+      lvl2: "프로 가죽 글러브",
+      lvl3: "골드 라벨 맞춤 글러브",
+    },
+    cleats: {
+      lvl0: "없음",
+      lvl1: "일반 야구화",
+      lvl2: "경량 스파이크",
+      lvl3: "엘리트 프로 스파이크",
+    },
+  },
+
 
   trait: {
     steel_mental:  { name: "강철멘탈",   desc: "부상 확률 50% 감소" },
@@ -930,6 +965,7 @@ export const ko = {
   },
 
   weekly: {
+    equippedTitle: "장착 중인 장비",
     scheduleTitle: "{week}주차 일정",
     settingsTitle: "설정",
     yearLabel: "{year}년",

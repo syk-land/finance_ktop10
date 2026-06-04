@@ -549,6 +549,7 @@ export const en = {
     tabStart:        "Start",
     tabTrait:        "Trait",
     tabRelic:        "Relic",
+    tabEquipment:    "Equipment",
     cost:            "{cost} pts",
     owned:           "Owned",
     equipped:        "Equipped",
@@ -587,7 +588,41 @@ export const en = {
     relicEquip:      "Equip",
     relicUnequip:    "Unequip",
     relicEquipFull:  "Slots full (2/2)",
+
+    equipmentDesc:   "Upgrade equipment using regression points. Buffs apply to all your subsequent careers.",
+    eqTitle: {
+      bat: "Bat",
+      glove: "Glove",
+      cleats: "Cleats",
+    },
+    current: "Current",
+    nextUpgrade: "Next",
+    noEquipment: "None",
+    maxLevelReached: "Max upgraded",
+    noStatBuff: "No stat buff",
   },
+
+  equipment: {
+    bat: {
+      lvl0: "None",
+      lvl1: "Wooden Bat",
+      lvl2: "Composite Bat",
+      lvl3: "Custom Maple Bat",
+    },
+    glove: {
+      lvl0: "None",
+      lvl1: "Basic Mitt",
+      lvl2: "Pro Leather Glove",
+      lvl3: "Custom Gold Label Glove",
+    },
+    cleats: {
+      lvl0: "None",
+      lvl1: "Standard Cleats",
+      lvl2: "Lightweight Spikes",
+      lvl3: "Elite Pro Spikes",
+    },
+  },
+
 
   trait: {
     steel_mental:  { name: "Steel Mental",  desc: "Injury chance ×0.5" },
@@ -926,6 +961,7 @@ export const en = {
   },
 
   weekly: {
+    equippedTitle: "Equipped Items",
     scheduleTitle: "Week {week}",
     settingsTitle: "Settings",
     yearLabel: "{year}",

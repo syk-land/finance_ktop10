@@ -6,10 +6,15 @@
 
 import { pushLog, pushToast, state } from "../state.js";
 import { t } from "../i18n/index.js";
-import { capBonusForStat, maxCapBonus, STARTING_STAT_PRESETS, TRAITS as REGRESSION_TRAITS, RELICS as REGRESSION_RELICS } from "../data/shopCatalog.js";
+import {
+  capBonusForStat, maxCapBonus, STARTING_STAT_PRESETS,
+  TRAITS as REGRESSION_TRAITS, RELICS as REGRESSION_RELICS,
+  EQUIPMENT_CATALOG, getEquipmentSpec,
+} from "../data/shopCatalog.js";
 import { effectMultiplier, effectAdd, hasTraitFlag } from "./traitEffects.js";
 import { assignPitches, decodeMainHand } from "./pitches.js";
-import { unlockItem } from "./regression.js";
+import { unlockItem, loadRegressionMeta } from "./regression.js";
+
 
 // severe 부상 회복 시 회귀 도전과제 해금 (severe_recovered).
 function unlockSevereRecoveredIf(player, justHealedSeverity) {
@@ -673,13 +678,33 @@ function conditionModifier(condition) {
   return (condition - 70) / 70;
 }
 
+export function getEquipmentStats(player) {
+  if (!state.regression) loadRegressionMeta();
+  const eq = state.regression?.permanentPurchases?.equipment ?? { bat: 0, glove: 0, cleats: 0 };
+  const bonuses = {};
+  for (const type of ["bat", "glove", "cleats"]) {
+    const lvl = eq[type] ?? 0;
+    const spec = getEquipmentSpec(type, lvl);
+    if (spec && spec.stats) {
+      for (const [stat, val] of Object.entries(spec.stats)) {
+        bonuses[stat] = (bonuses[stat] ?? 0) + val;
+      }
+    }
+  }
+  return bonuses;
+}
+
 export function getEffectiveBatter(player) {
   const condMod = conditionModifier(player.condition);
   const fatigueMod = player.stamina < 50 ? -(50 - player.stamina) * 0.003 : 0;
   const injuryMod = player.injury ? -0.25 : 0;
   const total = 1 + condMod * 0.3 + fatigueMod + injuryMod;
   const out = {};
-  for (const stat of BATTER_STATS) out[stat] = player.batter[stat] * total;
+  const eqStats = getEquipmentStats(player);
+  for (const stat of BATTER_STATS) {
+    const base = player.batter[stat] + (eqStats[stat] ?? 0);
+    out[stat] = base * total;
+  }
   return out;
 }
 
@@ -689,9 +714,14 @@ export function getEffectivePitcher(player) {
   const injuryMod = player.injury ? -0.25 : 0;
   const total = 1 + condMod * 0.3 + fatigueMod + injuryMod;
   const out = {};
-  for (const stat of PITCHER_STATS) out[stat] = player.pitcher[stat] * total;
+  const eqStats = getEquipmentStats(player);
+  for (const stat of PITCHER_STATS) {
+    const base = player.pitcher[stat] + (eqStats[stat] ?? 0);
+    out[stat] = base * total;
+  }
   return out;
 }
+
 
 // 컨디션에 따른 부상 확률 보정. <50 ×1.5, >80 ×0.7, 그 외 ×1.
 export function conditionInjuryMultiplier(condition) {

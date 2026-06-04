@@ -19,12 +19,14 @@ import {
   loadRegressionMeta, saveRegressionMeta,
   spendBalance, addBalance,
   purchasePermanent, setStartingStat, setTraits, setRelics,
-  purchaseTrait, purchaseRelic,
+  purchaseTrait, purchaseRelic, purchaseEquipment,
 } from "../systems/regression.js";
 import {
   TALENT_SLOTS_TIERS, STAT_KEYS, STAT_CAP_STEP, statCapCost,
   STARTING_STAT_PRESETS, TRAITS, RELICS, isTraitUnlocked, relicCost, relicEffectValue,
+  EQUIPMENT_CATALOG, getEquipmentSpec,
 } from "../data/shopCatalog.js";
+
 
 let activeTab = "talent";
 let routeRef = null;
@@ -92,7 +94,7 @@ function renderTabBar() {
   panel.style.padding = "6px";
 
   const row = document.createElement("div");
-  row.style.cssText = "display:grid; grid-template-columns:repeat(5, 1fr); gap:3px;";
+  row.style.cssText = "display:grid; grid-template-columns:repeat(6, 1fr); gap:3px;";
 
   const tabs = [
     { key: "talent", labelKey: "shop.tabTalent" },
@@ -100,12 +102,13 @@ function renderTabBar() {
     { key: "start",  labelKey: "shop.tabStart" },
     { key: "trait",  labelKey: "shop.tabTrait" },
     { key: "relic",  labelKey: "shop.tabRelic" },
+    { key: "equipment", labelKey: "shop.tabEquipment" },
   ];
   for (const tab of tabs) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.textContent = t(tab.labelKey);
-    btn.style.cssText = "padding:8px 2px; font-size:11px; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;";
+    btn.style.cssText = "padding:8px 2px; font-size:10px; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;";
     if (activeTab === tab.key) btn.classList.add("primary");
     btn.addEventListener("click", () => {
       activeTab = tab.key;
@@ -123,8 +126,10 @@ function renderTabContent() {
   if (activeTab === "start")  return renderStartTab();
   if (activeTab === "trait")  return renderTraitTab();
   if (activeTab === "relic")  return renderRelicTab();
+  if (activeTab === "equipment") return renderEquipmentTab();
   return renderTalentTab();
 }
+
 
 // ── 재능 슬롯 탭 ──────────────────────────────────────────────────
 function renderTalentTab() {
@@ -365,6 +370,81 @@ function renderRelicTab() {
   }
   return panel;
 }
+
+// ── 장비 탭 ────────────────────────────────────────────────────────
+function renderEquipmentTab() {
+  const panel = document.createElement("section");
+  panel.className = "panel";
+  panel.style.padding = "10px";
+
+  const m = state.regression;
+  const eq = m.permanentPurchases.equipment ?? { bat: 0, glove: 0, cleats: 0 };
+
+  const desc = document.createElement("div");
+  desc.className = "muted small";
+  desc.style.cssText = "font-size:11px; margin-bottom:8px; line-height:1.4;";
+  desc.textContent = t("shop.equipmentDesc");
+  panel.appendChild(desc);
+
+  const types = ["bat", "glove", "cleats"];
+  for (const type of types) {
+    const curLevel = eq[type] ?? 0;
+    const catalog = EQUIPMENT_CATALOG[type];
+    const currentSpec = getEquipmentSpec(type, curLevel);
+    
+    // 다음 등급 장비 정보
+    const nextSpec = catalog.find(item => item.level === curLevel + 1);
+    
+    // 카드 구성
+    const title = t(`shop.eqTitle.${type}`);
+    let specDesc = "";
+    
+    if (curLevel > 0 && currentSpec) {
+      specDesc += `${t("shop.current")}: ${t(currentSpec.nameKey)} (${formatStats(currentSpec.stats)})\n`;
+    } else {
+      specDesc += `${t("shop.current")}: ${t("shop.noEquipment")}\n`;
+    }
+
+    if (nextSpec) {
+      specDesc += `${t("shop.nextUpgrade")}: ${t(nextSpec.nameKey)} (${formatStats(nextSpec.stats)})`;
+      
+      const isAffordable = m.balance >= nextSpec.cost;
+      const cardState = isAffordable ? "buyable" : "insufficient";
+      
+      panel.appendChild(makeShopCard({
+        title,
+        desc: specDesc,
+        cost: nextSpec.cost,
+        state: cardState,
+        onClick: () => {
+          const res = purchaseEquipment(type);
+          if (res.ok) {
+            renderShop(document.getElementById("view-root"), routeRef);
+          }
+        }
+      }));
+    } else {
+      specDesc += `${t("shop.maxLevelReached")}`;
+      panel.appendChild(makeShopCard({
+        title,
+        desc: specDesc,
+        cost: 0,
+        state: "owned",
+        onClick: null
+      }));
+    }
+  }
+
+  return panel;
+}
+
+function formatStats(stats) {
+  if (!stats || Object.keys(stats).length === 0) return t("shop.noStatBuff");
+  return Object.entries(stats)
+    .map(([k, v]) => `${t("stat." + k)} +${v}`)
+    .join(", ");
+}
+
 
 // 유물 효과값 표시 형식 — multiplier ×N / flatAddPct +N% / boost +N.
 function fmtRelicVal(key, v) {

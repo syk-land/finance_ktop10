@@ -16,6 +16,7 @@ import { state } from "../state.js";
 import {
   TALENT_SLOTS_TIERS, STAT_KEYS, STAT_CAP_STEP, statCapCost,
   STARTING_STAT_PRESETS, TRAITS, RELICS, isTraitUnlocked, relicCost,
+  EQUIPMENT_CATALOG, getEquipmentSpec,
 } from "../data/shopCatalog.js";
 
 export const REGRESSION_KEY = "ninthinning.regression.v1";
@@ -32,6 +33,7 @@ export function defaultRegressionMeta() {
       ownedTraits: [],                              // 영구 소유 trait 키 — 장착/해제와 무관, 한 번 사면 보존
       ownedRelics: [],                              // 영구 소유 relic 키 (relicLevels 와 동기 — 키 존재 = 보유)
       relicLevels: {},                              // 유물 레벨 { relicKey: level(>=1) } — 재구매 시 +1, 효과 점증
+      equipment: { bat: 0, glove: 0, cleats: 0 },   // 영구 소유 장비 레벨 (0~3)
     },
     unlockedItems: [],                              // 도전과제 해금 키
     loadout: {
@@ -54,6 +56,13 @@ function migrateMeta(data) {
     ? [...data.permanentPurchases.ownedTraits] : [];
   out.permanentPurchases.ownedRelics = Array.isArray(data?.permanentPurchases?.ownedRelics)
     ? [...data.permanentPurchases.ownedRelics] : [];
+  
+  // 장비 스키마 승계 / 초기화
+  out.permanentPurchases.equipment = {
+    ...base.permanentPurchases.equipment,
+    ...(data?.permanentPurchases?.equipment ?? {})
+  };
+
   out.unlockedItems = Array.isArray(data?.unlockedItems) ? [...data.unlockedItems] : [];
   out.loadout = { ...base.loadout, ...(data?.loadout ?? {}) };
   out.loadout.traits = Array.isArray(data?.loadout?.traits) ? [...data.loadout.traits] : [];
@@ -98,6 +107,7 @@ export function saveRegressionMeta() {
     console.error("regression save failed", e);
     return false;
   }
+
 }
 
 function ensureMeta() {
@@ -280,9 +290,28 @@ export function consumeLoadoutForCharacter() {
   return snapshot;
 }
 
+export function purchaseEquipment(type) {
+  const m = ensureMeta();
+  if (!m.permanentPurchases.equipment) {
+    m.permanentPurchases.equipment = { bat: 0, glove: 0, cleats: 0 };
+  }
+  const currentLvl = m.permanentPurchases.equipment[type] ?? 0;
+  const catalog = EQUIPMENT_CATALOG[type];
+  if (!catalog) return { ok: false, reason: "invalid_type" };
+  const nextItem = catalog.find(item => item.level === currentLvl + 1);
+  if (!nextItem) return { ok: false, reason: "max_tier" };
+  if (m.balance < nextItem.cost) return { ok: false, reason: "insufficient_balance" };
+
+  m.balance -= nextItem.cost;
+  m.permanentPurchases.equipment[type] = nextItem.level;
+  saveRegressionMeta();
+  return { ok: true, type, level: nextItem.level, cost: nextItem.cost };
+}
+
 // 디버그/probe 용 — 전체 메타 초기화.
 export function resetRegressionMeta() {
   state.regression = defaultRegressionMeta();
   saveRegressionMeta();
   return state.regression;
 }
+
