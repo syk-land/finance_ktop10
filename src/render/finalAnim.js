@@ -629,7 +629,7 @@ function playPitchSequenceManual({ svg, fxHost, ball, labelHost, swingRef, event
             });
         }, duration * 1.1);
       });
-    }
+    });
   });
 }
 
