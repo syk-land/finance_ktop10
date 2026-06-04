@@ -301,279 +301,316 @@ function playPitchSequenceAuto({ svg, fxHost, ball, labelHost, swingRef, event, 
     });
 }
 
+function showPreparationOverlay(container, mode) {
+  return new Promise(resolve => {
+    const overlay = document.createElement("div");
+    overlay.style.cssText = "position:absolute; inset:0; z-index:10; background:rgba(10, 15, 26, 0.88); backdrop-filter:blur(2px); display:flex; flex-direction:column; justify-content:center; align-items:center; gap:12px; color:#ffffff; font-family:sans-serif; text-align:center; padding:16px; box-sizing:border-box;";
+
+    const title = document.createElement("div");
+    title.style.cssText = "font-size:15px; font-weight:700; color:var(--accent); letter-spacing:0.5px; margin-bottom:2px;";
+    title.textContent = mode === "bat" ? t("weekly.startBattingNotice") : t("weekly.startPitchingNotice");
+
+    const desc = document.createElement("div");
+    desc.style.cssText = "font-size:11px; color:var(--muted); max-width:240px; line-height:1.5; margin-bottom:8px;";
+    desc.textContent = mode === "bat" 
+      ? t("weekly.startBattingDesc")
+      : t("weekly.startPitchingDesc");
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = t("weekly.confirmBtn");
+    btn.style.cssText = "padding:6px 20px; font-size:12px; font-weight:700; border-radius:4px; cursor:pointer; background:var(--accent-2); color:#000000; border:none;";
+    btn.classList.add("primary");
+    
+    btn.addEventListener("click", () => {
+      sfx("click");
+      overlay.remove();
+      resolve();
+    });
+
+    overlay.appendChild(title);
+    overlay.appendChild(desc);
+    overlay.appendChild(btn);
+    container.appendChild(overlay);
+  });
+}
+
 function playPitchSequenceManual({ svg, fxHost, ball, labelHost, swingRef, event, mode }) {
   isInteractiveActive = true;
 
-  const start = { x: 160, y: 58, r: 3 };
-  ball.style.opacity = "1";
-  ball.setAttribute("cx", start.x.toString());
-  ball.setAttribute("cy", start.y.toString());
-  ball.setAttribute("r", start.r.toString());
+  const container = svg.parentElement;
+  return showPreparationOverlay(container, mode).then(() => {
+    const start = { x: 160, y: 58, r: 3 };
+    ball.style.opacity = "1";
+    ball.setAttribute("cx", start.x.toString());
+    ball.setAttribute("cy", start.y.toString());
+    ball.setAttribute("r", start.r.toString());
 
-  if (mode === "bat") {
-    // ────────────── 타자 모드 (직접 타격 조작) ──────────────
-    const duration = 900; // 수동 조작용 여유 속도 (0.9초)
-    showLabel(labelHost, t("homerunDerby.swingBtn") || "SWING!", "var(--accent)");
+    if (mode === "bat") {
+      // ────────────── 타자 모드 (직접 타격 조작) ──────────────
+      const duration = 900; // 수동 조작용 여유 속도 (0.9초)
+      showLabel(labelHost, t("homerunDerby.swingBtn") || "SWING!", "var(--accent)");
 
-    sfx("pitch");
-    const pitchStartTime = Date.now();
-    let swingTriggered = false;
-    let clickTime = 0;
+      sfx("pitch");
+      const pitchStartTime = Date.now();
+      let swingTriggered = false;
+      let clickTime = 0;
 
-    // 타격 애니메이션 루프 (수동 구동)
-    const activeFrame = () => {
-      if (!isInteractiveActive || swingTriggered) return;
-      const elapsed = Date.now() - pitchStartTime;
-      const p = Math.min(1.0, elapsed / duration);
-      const cy = start.y + (195 - start.y) * p;
-      const r = start.r + (15 - start.r) * p;
-      ball.setAttribute("cy", cy.toFixed(1));
-      ball.setAttribute("r", r.toFixed(1));
-      if (p < 1.0) {
-        requestAnimationFrame(activeFrame);
-      }
-    };
-    requestAnimationFrame(activeFrame);
-
-    return new Promise(resolve => {
-      const onSwing = (e) => {
-        if (swingTriggered) return;
-        swingTriggered = true;
-        clickTime = Date.now();
-        svg.removeEventListener("click", onSwing);
-
-        const elapsed = clickTime - pitchStartTime;
-        const p = elapsed / duration;
-
-        // 능력치 반영 타이밍 윈도우 계산
-        const contactStat = state.player?.contact ?? 50;
-        const powerStat = state.player?.power ?? 50;
-        const perfectWin = 0.05 + (contactStat - 50) * 0.0003;
-        const goodWin = 0.14 + (contactStat - 50) * 0.0006;
-
-        let finalResult = "K";
-        let feedbackText = t("homerunDerby.miss") || "MISS!";
-        let feedbackColor = "var(--bad)";
-
-        if (Math.abs(p - 0.82) <= perfectWin / 2) {
-          finalResult = Math.random() < (powerStat / 140) ? "HR" : "3B";
-          feedbackText = t("homerunDerby.perfect") || "PERFECT!";
-          feedbackColor = "var(--accent-2)";
-        } else if (Math.abs(p - 0.82) <= goodWin / 2) {
-          finalResult = Math.random() < 0.5 ? "1B" : "2B";
-          feedbackText = t("homerunDerby.good") || "GOOD!";
-          feedbackColor = "var(--accent)";
-        } else if (p >= 0.58 && p <= 1.04) {
-          finalResult = "OUT";
-          feedbackText = p < 0.82 ? (t("homerunDerby.early") || "EARLY") : (t("homerunDerby.late") || "LATE");
-          feedbackColor = "var(--warn)";
-        } else {
-          finalResult = "K";
-          feedbackText = t("homerunDerby.miss") || "MISS!";
-          feedbackColor = "var(--bad)";
+      // 타격 애니메이션 루프 (수동 구동)
+      const activeFrame = () => {
+        if (!isInteractiveActive || swingTriggered) return;
+        const elapsed = Date.now() - pitchStartTime;
+        const p = Math.min(1.0, elapsed / duration);
+        const cy = start.y + (195 - start.y) * p;
+        const r = start.r + (15 - start.r) * p;
+        ball.setAttribute("cy", cy.toFixed(1));
+        ball.setAttribute("r", r.toFixed(1));
+        if (p < 1.0) {
+          requestAnimationFrame(activeFrame);
         }
-
-        updateEventResult(event, finalResult);
-        hideLabel(labelHost);
-        showLabel(labelHost, feedbackText, feedbackColor);
-
-        // 스윙 기동
-        if (swingRef.fg) {
-          swingRef.fg.style.transition = "transform 140ms ease-out";
-          swingRef.fg.style.transform = fgBaseTransform(swingRef) + " rotate(-85deg)";
-        } else if (swingRef.bat) {
-          swingRef.bat.setAttribute("transform", "rotate(90 14 -32)");
-        }
-
-        playResultSfx(finalResult);
-        const spec = PLAYBOOK[finalResult] ?? PLAYBOOK.OUT;
-        const { contact, final } = pickEndPoint(spec);
-
-        animateBall(ball, { x: 160, y: parseFloat(ball.getAttribute("cy")), r: parseFloat(ball.getAttribute("r")) }, final, 700)
-          .then(() => {
-            if (spec.firework) {
-              spawnFireworks(fxHost ?? svg);
-              return waitMs(900);
-            }
-            return waitMs(220);
-          })
-          .then(() => {
-            ball.style.opacity = "0";
-            hideLabel(labelHost);
-            isInteractiveActive = false;
-            resolve();
-          });
       };
+      requestAnimationFrame(activeFrame);
 
-      svg.addEventListener("click", onSwing);
+      return new Promise(resolve => {
+        const onSwing = (e) => {
+          if (swingTriggered) return;
+          swingTriggered = true;
+          clickTime = Date.now();
+          svg.removeEventListener("click", onSwing);
 
-      // 미타격 스트라이크 타임아웃
-      setTimeout(() => {
-        if (swingTriggered) return;
-        swingTriggered = true;
-        svg.removeEventListener("click", onSwing);
+          const elapsed = clickTime - pitchStartTime;
+          const p = elapsed / duration;
 
-        updateEventResult(event, "K");
-        hideLabel(labelHost);
-        showLabel(labelHost, t("homerunDerby.miss") || "MISS!", "var(--bad)");
-        sfx("strikeout");
+          // 능력치 반영 타이밍 윈도우 계산
+          const contactStat = state.player?.contact ?? 50;
+          const powerStat = state.player?.power ?? 50;
+          const perfectWin = 0.05 + (contactStat - 50) * 0.0003;
+          const goodWin = 0.14 + (contactStat - 50) * 0.0006;
 
-        waitMs(800).then(() => {
-          ball.style.opacity = "0";
+          let finalResult = "K";
+          let feedbackText = t("homerunDerby.miss") || "MISS!";
+          let feedbackColor = "var(--bad)";
+
+          if (Math.abs(p - 0.82) <= perfectWin / 2) {
+            finalResult = Math.random() < (powerStat / 140) ? "HR" : "3B";
+            feedbackText = t("homerunDerby.perfect") || "PERFECT!";
+            feedbackColor = "var(--accent-2)";
+          } else if (Math.abs(p - 0.82) <= goodWin / 2) {
+            finalResult = Math.random() < 0.5 ? "1B" : "2B";
+            feedbackText = t("homerunDerby.good") || "GOOD!";
+            feedbackColor = "var(--accent)";
+          } else if (p >= 0.58 && p <= 1.04) {
+            finalResult = "OUT";
+            feedbackText = p < 0.82 ? (t("homerunDerby.early") || "EARLY") : (t("homerunDerby.late") || "LATE");
+            feedbackColor = "var(--warn)";
+          } else {
+            finalResult = "K";
+            feedbackText = t("homerunDerby.miss") || "MISS!";
+            feedbackColor = "var(--bad)";
+          }
+
+          updateEventResult(event, finalResult);
           hideLabel(labelHost);
-          isInteractiveActive = false;
-          resolve();
-        });
-      }, duration * 1.12);
-    });
+          showLabel(labelHost, feedbackText, feedbackColor);
 
-  } else {
-    // ────────────── 투수 모드 (직접 타이밍 투구 조작) ──────────────
-    const duration = 1000;
-    
-    // 타이밍 링 생성 및 오버레이 렌더
-    const ring = svgEl("circle", {
-      cx: 160, cy: ZONE.y + ZONE.h / 2, r: 60, fill: "none",
-      stroke: "var(--accent-2)", "stroke-width": 3, opacity: 0.8,
-      style: "transition: r 1000ms linear;"
-    });
-    svg.appendChild(ring);
-    
-    showLabel(labelHost, "RELEASE!", "var(--accent)");
+          // 스윙 기동
+          if (swingRef.fg) {
+            swingRef.fg.style.transition = "transform 140ms ease-out";
+            swingRef.fg.style.transform = fgBaseTransform(swingRef) + " rotate(-85deg)";
+          } else if (swingRef.bat) {
+            swingRef.bat.setAttribute("transform", "rotate(90 14 -32)");
+          }
 
-    const pitchStartTime = Date.now();
-    let releaseTriggered = false;
-    let clickTime = 0;
+          playResultSfx(finalResult);
+          const spec = PLAYBOOK[finalResult] ?? PLAYBOOK.OUT;
+          const { contact, final } = pickEndPoint(spec);
 
-    // 링 크기 축소 애니메이션 프레임
-    const ringFrame = () => {
-      if (!isInteractiveActive || releaseTriggered) return;
-      const elapsed = Date.now() - pitchStartTime;
-      const p = Math.min(1.0, elapsed / duration);
-      const r = 60 - (60 - 15) * p;
-      ring.setAttribute("r", r.toFixed(1));
-      if (p < 1.0) {
-        requestAnimationFrame(ringFrame);
-      }
-    };
-    requestAnimationFrame(ringFrame);
+          animateBall(ball, { x: 160, y: parseFloat(ball.getAttribute("cy")), r: parseFloat(ball.getAttribute("r")) }, final, 700)
+            .then(() => {
+              if (spec.firework) {
+                spawnFireworks(fxHost ?? svg);
+                return waitMs(900);
+              }
+              return waitMs(220);
+            })
+            .then(() => {
+              ball.style.opacity = "0";
+              hideLabel(labelHost);
+              isInteractiveActive = false;
+              resolve();
+            });
+        };
 
-    return new Promise(resolve => {
-      const onRelease = () => {
-        if (releaseTriggered) return;
-        releaseTriggered = true;
-        clickTime = Date.now();
-        svg.removeEventListener("click", onRelease);
-        ring.remove();
+        svg.addEventListener("click", onSwing);
 
-        const elapsed = clickTime - pitchStartTime;
-        const p = elapsed / duration;
+        // 미타격 스트라이크 타임아웃
+        setTimeout(() => {
+          if (swingTriggered) return;
+          swingTriggered = true;
+          svg.removeEventListener("click", onSwing);
 
-        const controlStat = state.player?.control ?? 50;
-        const perfectWin = 0.05 + (controlStat - 50) * 0.0003;
-        const groupWin = 0.14 + (controlStat - 50) * 0.0006;
+          updateEventResult(event, "K");
+          hideLabel(labelHost);
+          showLabel(labelHost, t("homerunDerby.miss") || "MISS!", "var(--bad)");
+          sfx("strikeout");
 
-        let finalResult = "1B";
-        let feedbackText = "MEATBALL!";
-        let feedbackColor = "var(--bad)";
+          waitMs(800).then(() => {
+            ball.style.opacity = "0";
+            hideLabel(labelHost);
+            isInteractiveActive = false;
+            resolve();
+          });
+        }, duration * 1.12);
+      });
 
-        if (Math.abs(p - 0.82) <= perfectWin / 2) {
-          finalResult = Math.random() < 0.65 ? "K" : "OUT";
-          feedbackText = "PERFECT PITCH!";
-          feedbackColor = "var(--accent-2)";
-          sfx("good");
-        } else if (Math.abs(p - 0.82) <= groupWin / 2) {
-          finalResult = Math.random() < 0.65 ? "OUT" : "1B";
-          feedbackText = "GOOD PITCH!";
-          feedbackColor = "var(--accent)";
-        } else if (p >= 0.58 && p <= 1.04) {
-          finalResult = Math.random() < 0.5 ? "1B" : "2B";
-          feedbackText = p < 0.82 ? "EARLY RELEASE!" : "LATE RELEASE!";
-          feedbackColor = "var(--warn)";
-        } else {
-          finalResult = Math.random() < 0.4 ? "HR" : "1B";
-          feedbackText = "MEATBALL!";
-          feedbackColor = "var(--bad)";
+    } else {
+      // ────────────── 투수 모드 (직접 타이밍 투구 조작) ──────────────
+      const duration = 1000;
+      
+      // 타이밍 링 생성 및 오버레이 렌더
+      const ring = svgEl("circle", {
+        cx: 160, cy: ZONE.y + ZONE.h / 2, r: 60, fill: "none",
+        stroke: "var(--accent-2)", "stroke-width": 3, opacity: 0.8,
+        style: "transition: r 1000ms linear;"
+      });
+      svg.appendChild(ring);
+      
+      showLabel(labelHost, "RELEASE!", "var(--accent)");
+
+      const pitchStartTime = Date.now();
+      let releaseTriggered = false;
+      let clickTime = 0;
+
+      // 링 크기 축소 애니메이션 프레임
+      const ringFrame = () => {
+        if (!isInteractiveActive || releaseTriggered) return;
+        const elapsed = Date.now() - pitchStartTime;
+        const p = Math.min(1.0, elapsed / duration);
+        const r = 60 - (60 - 15) * p;
+        ring.setAttribute("r", r.toFixed(1));
+        if (p < 1.0) {
+          requestAnimationFrame(ringFrame);
         }
-
-        updateEventResult(event, finalResult);
-        hideLabel(labelHost);
-        showLabel(labelHost, feedbackText, feedbackColor);
-
-        // 투구 시작
-        sfx("pitch");
-        if (swingRef.fg) throwPush(swingRef);
-
-        const spec = PLAYBOOK[finalResult] ?? PLAYBOOK.OUT;
-        const { contact, final } = pickEndPoint(spec);
-
-        animateBall(ball, start, { x: contact.x, y: contact.y, r: 5 }, 380)
-          .then(() => {
-            if (spec.swing && (swingRef.fg || swingRef.bat)) {
-              swingBat(swingRef);
-            }
-            playResultSfx(finalResult);
-            return animateBall(ball, { x: contact.x, y: contact.y, r: 5 }, final, 700);
-          })
-          .then(() => {
-            if (spec.firework) {
-              spawnFireworks(fxHost ?? svg);
-              return waitMs(900);
-            }
-            return waitMs(220);
-          })
-          .then(() => {
-            ball.style.opacity = "0";
-            hideLabel(labelHost);
-            isInteractiveActive = false;
-            resolve();
-          });
       };
+      requestAnimationFrame(ringFrame);
 
-      svg.addEventListener("click", onRelease);
+      return new Promise(resolve => {
+        const onRelease = () => {
+          if (releaseTriggered) return;
+          releaseTriggered = true;
+          clickTime = Date.now();
+          svg.removeEventListener("click", onRelease);
+          ring.remove();
 
-      // 미조작 시 자동 실투
-      setTimeout(() => {
-        if (releaseTriggered) return;
-        releaseTriggered = true;
-        svg.removeEventListener("click", onRelease);
-        ring.remove();
+          const elapsed = clickTime - pitchStartTime;
+          const p = elapsed / duration;
 
-        const finalResult = Math.random() < 0.4 ? "HR" : "1B";
-        updateEventResult(event, finalResult);
-        hideLabel(labelHost);
-        showLabel(labelHost, "MEATBALL!", "var(--bad)");
+          const controlStat = state.player?.control ?? 50;
+          const perfectWin = 0.05 + (controlStat - 50) * 0.0003;
+          const groupWin = 0.14 + (controlStat - 50) * 0.0006;
 
-        sfx("pitch");
-        if (swingRef.fg) throwPush(swingRef);
+          let finalResult = "1B";
+          let feedbackText = "MEATBALL!";
+          let feedbackColor = "var(--bad)";
 
-        const spec = PLAYBOOK[finalResult] ?? PLAYBOOK.OUT;
-        const { contact, final } = pickEndPoint(spec);
+          if (Math.abs(p - 0.82) <= perfectWin / 2) {
+            finalResult = Math.random() < 0.65 ? "K" : "OUT";
+            feedbackText = "PERFECT PITCH!";
+            feedbackColor = "var(--accent-2)";
+            sfx("good");
+          } else if (Math.abs(p - 0.82) <= groupWin / 2) {
+            finalResult = Math.random() < 0.65 ? "OUT" : "1B";
+            feedbackText = "GOOD PITCH!";
+            feedbackColor = "var(--accent)";
+          } else if (p >= 0.58 && p <= 1.04) {
+            finalResult = Math.random() < 0.5 ? "1B" : "2B";
+            feedbackText = p < 0.82 ? "EARLY RELEASE!" : "LATE RELEASE!";
+            feedbackColor = "var(--warn)";
+          } else {
+            finalResult = Math.random() < 0.4 ? "HR" : "1B";
+            feedbackText = "MEATBALL!";
+            feedbackColor = "var(--bad)";
+          }
 
-        animateBall(ball, start, { x: contact.x, y: contact.y, r: 5 }, 380)
-          .then(() => {
-            if (spec.swing && (swingRef.fg || swingRef.bat)) {
-              swingBat(swingRef);
-            }
-            playResultSfx(finalResult);
-            return animateBall(ball, { x: contact.x, y: contact.y, r: 5 }, final, 700);
-          })
-          .then(() => {
-            if (spec.firework) {
-              spawnFireworks(fxHost ?? svg);
-              return waitMs(900);
-            }
-            return waitMs(220);
-          })
-          .then(() => {
-            ball.style.opacity = "0";
-            hideLabel(labelHost);
-            isInteractiveActive = false;
-            resolve();
-          });
-      }, duration * 1.1);
-    });
-  }
+          updateEventResult(event, finalResult);
+          hideLabel(labelHost);
+          showLabel(labelHost, feedbackText, feedbackColor);
+
+          // 투구 시작
+          sfx("pitch");
+          if (swingRef.fg) throwPush(swingRef);
+
+          const spec = PLAYBOOK[finalResult] ?? PLAYBOOK.OUT;
+          const { contact, final } = pickEndPoint(spec);
+
+          animateBall(ball, start, { x: contact.x, y: contact.y, r: 5 }, 380)
+            .then(() => {
+              if (spec.swing && (swingRef.fg || swingRef.bat)) {
+                swingBat(swingRef);
+              }
+              playResultSfx(finalResult);
+              return animateBall(ball, { x: contact.x, y: contact.y, r: 5 }, final, 700);
+            })
+            .then(() => {
+              if (spec.firework) {
+                spawnFireworks(fxHost ?? svg);
+                return waitMs(900);
+              }
+              return waitMs(220);
+            })
+            .then(() => {
+              ball.style.opacity = "0";
+              hideLabel(labelHost);
+              isInteractiveActive = false;
+              resolve();
+            });
+        };
+
+        svg.addEventListener("click", onRelease);
+
+        // 미조작 시 자동 실투
+        setTimeout(() => {
+          if (releaseTriggered) return;
+          releaseTriggered = true;
+          svg.removeEventListener("click", onRelease);
+          ring.remove();
+
+          const finalResult = Math.random() < 0.4 ? "HR" : "1B";
+          updateEventResult(event, finalResult);
+          hideLabel(labelHost);
+          showLabel(labelHost, "MEATBALL!", "var(--bad)");
+
+          sfx("pitch");
+          if (swingRef.fg) throwPush(swingRef);
+
+          const spec = PLAYBOOK[finalResult] ?? PLAYBOOK.OUT;
+          const { contact, final } = pickEndPoint(spec);
+
+          animateBall(ball, start, { x: contact.x, y: contact.y, r: 5 }, 380)
+            .then(() => {
+              if (spec.swing && (swingRef.fg || swingRef.bat)) {
+                swingBat(swingRef);
+              }
+              playResultSfx(finalResult);
+              return animateBall(ball, { x: contact.x, y: contact.y, r: 5 }, final, 700);
+            })
+            .then(() => {
+              if (spec.firework) {
+                spawnFireworks(fxHost ?? svg);
+                return waitMs(900);
+              }
+              return waitMs(220);
+            })
+            .then(() => {
+              ball.style.opacity = "0";
+              hideLabel(labelHost);
+              isInteractiveActive = false;
+              resolve();
+            });
+        }, duration * 1.1);
+      });
+    }
+  });
 }
 
 // 홈런 폭죽 — 화면에 여러 위치에서 색색의 점들이 방사형으로 퍼지며 페이드
