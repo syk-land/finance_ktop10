@@ -13,9 +13,9 @@ export const FACES = [
 
 export const SKIN_COLORS = ["#ecc7a1", "#e6b889", "#f0c89b", "#e3b07a", "#eccfa9"];
 export const HAIR_COLORS = ["#1a1a1a", "#2a1a0f", "#5a3a1d", "#b03030", "#d8a040"];
-export const HAIR_STYLES = ["short", "curly", "neat", "long"];
-export const ACCESSORIES = ["none", "cap", "glasses", "helmet"];
-export const EYES = ["calm", "sharp", "smile", "cool", "fierce"];
+export const HAIR_STYLES = ["short", "curly", "neat", "long", "bald", "spiky"];
+export const ACCESSORIES = ["none", "cap", "glasses", "helmet", "scar", "blush"];
+export const EYES = ["calm", "sharp", "smile", "cool", "fierce", "blank", "dizzy"];
 
 export function getFace(id) {
   if (typeof id === "string" && id.startsWith("f_")) {
@@ -62,8 +62,8 @@ export function createFaceGroup(faceId) {
 }
 
 function drawFace(parent, face) {
-  // 머리 뒷부분 (머리카락) — 액세서리가 헬멧이면 생략
-  if (face.accessory !== "helmet") {
+  // 머리 뒷부분 (머리카락) — 액세서리가 헬멧이거나 헤어가 대머리(bald)면 생략
+  if (face.accessory !== "helmet" && face.style !== "bald") {
     parent.appendChild(svgEl("ellipse", {
       cx: 50, cy: 42, rx: 32, ry: 32, fill: face.hair,
     }));
@@ -97,6 +97,17 @@ function drawFace(parent, face) {
 
   // 안경
   if (face.accessory === "glasses") drawGlasses(parent);
+
+  // 흉터 또는 볼터치
+  if (face.accessory === "scar") {
+    parent.appendChild(svgEl("path", {
+      d: "M 29 64 L 35 70 M 35 64 L 29 70",
+      stroke: "#b03030", "stroke-width": "2", fill: "none"
+    }));
+  } else if (face.accessory === "blush") {
+    parent.appendChild(svgEl("ellipse", { cx: 33, cy: 68, rx: 3.5, ry: 2, fill: "rgba(244, 63, 94, 0.45)" }));
+    parent.appendChild(svgEl("ellipse", { cx: 67, cy: 68, rx: 3.5, ry: 2, fill: "rgba(244, 63, 94, 0.45)" }));
+  }
 }
 
 function drawHairFront(parent, face) {
@@ -121,6 +132,11 @@ function drawHairFront(parent, face) {
   } else if (face.style === "long") {
     parent.appendChild(svgEl("path", {
       d: "M 22 38 Q 50 16 78 38 L 78 70 Q 70 56 50 60 Q 30 56 22 70 Z",
+      fill: c,
+    }));
+  } else if (face.style === "spiky") {
+    parent.appendChild(svgEl("path", {
+      d: "M 22 38 L 26 20 L 34 26 L 42 12 L 50 22 L 58 10 L 66 22 L 74 12 L 78 26 L 84 20 L 84 38 L 74 34 L 50 36 L 26 34 Z",
       fill: c,
     }));
   }
@@ -171,6 +187,14 @@ function drawEyes(parent, face) {
     // 눈썹
     parent.appendChild(svgEl("rect", { x: 36, y: eyeY - 5, width: 10, height: 2, fill: "#0e1116", transform: `rotate(-10 41 ${eyeY - 4})` }));
     parent.appendChild(svgEl("rect", { x: 54, y: eyeY - 5, width: 10, height: 2, fill: "#0e1116", transform: `rotate(10 59 ${eyeY - 4})` }));
+  } else if (face.eye === "blank") {
+    parent.appendChild(svgEl("circle", { cx: 42, cy: eyeY, r: 2.8, fill: "none", stroke: "#0e1116", "stroke-width": 1.2 }));
+    parent.appendChild(svgEl("circle", { cx: 42, cy: eyeY, r: 0.8, fill: "#0e1116" }));
+    parent.appendChild(svgEl("circle", { cx: 58, cy: eyeY, r: 2.8, fill: "none", stroke: "#0e1116", "stroke-width": 1.2 }));
+    parent.appendChild(svgEl("circle", { cx: 58, cy: eyeY, r: 0.8, fill: "#0e1116" }));
+  } else if (face.eye === "dizzy") {
+    parent.appendChild(svgEl("path", { d: `M 38 ${eyeY} Q 42 ${eyeY - 4} 46 ${eyeY} Q 42 ${eyeY + 4} 38 ${eyeY} Q 42 ${eyeY - 2} 44 ${eyeY}`, stroke: "#0e1116", "stroke-width": 1.5, fill: "none" }));
+    parent.appendChild(svgEl("path", { d: `M 54 ${eyeY} Q 58 ${eyeY - 4} 62 ${eyeY} Q 58 ${eyeY + 4} 54 ${eyeY} Q 58 ${eyeY - 2} 60 ${eyeY}`, stroke: "#0e1116", "stroke-width": 1.5, fill: "none" }));
   } else {
     // calm
     parent.appendChild(svgEl("circle", { cx: 42, cy: eyeY, r: 1.6, fill: "#0e1116" }));

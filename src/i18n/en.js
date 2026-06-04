@@ -1148,12 +1148,16 @@ export const en = {
       curly: "Curly",
       neat: "Neat",
       long: "Long hair",
+      bald: "Bald",
+      spiky: "Spiky",
     },
     acc: {
       none: "None",
       cap: "Cap",
       glasses: "Glasses",
       helmet: "Helmet",
+      scar: "Scar",
+      blush: "Blush",
     },
     eye: {
       calm: "Calm",
@@ -1161,6 +1165,8 @@ export const en = {
       smile: "Smile",
       cool: "Cool",
       fierce: "Fierce",
+      blank: "Blank",
+      dizzy: "Dizzy",
     },
   },
 };

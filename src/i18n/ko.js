@@ -1154,12 +1154,16 @@ export const ko = {
       curly: "곱슬머리",
       neat: "댄디컷",
       long: "장발",
+      bald: "대머리",
+      spiky: "삐침머리",
     },
     acc: {
       none: "없음",
       cap: "모자",
       glasses: "안경",
       helmet: "헬멧",
+      scar: "흉터",
+      blush: "볼터치",
     },
     eye: {
       calm: "보통",
@@ -1167,6 +1171,8 @@ export const ko = {
       smile: "웃음",
       cool: "차분함",
       fierce: "불타오름",
+      blank: "멍한눈",
+      dizzy: "골뱅이눈",
     },
   },
 };
