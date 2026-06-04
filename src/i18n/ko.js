@@ -6,6 +6,26 @@ export const ko = {
     version: "v0.6 · NewGame+ / Cloud Save / Phase 2",
   },
 
+  homerunDerby: {
+    title: "홈런 더비 미니게임",
+    tagline: "타격 타이밍을 맞춰 홈런을 쳐보세요!",
+    startBtn: "홈런 더비 시작",
+    highScore: "최고 기록: {score}개",
+    score: "홈런: {score}개",
+    outs: "아웃: {outs} / 10",
+    swingBtn: "타격 (SWING)",
+    perfect: "PERFECT! 홈런!",
+    good: "GOOD! 안타!",
+    early: "EARLY! 범타!",
+    late: "LATE! 범타!",
+    miss: "MISS! 스트라이크!",
+    gameOver: "게임 종료",
+    finalScore: "최종 점수: {score}개",
+    newRecord: "★ 최고 기록 갱신! ★",
+    restartBtn: "다시 도전",
+    backToMenu: "메인 메뉴로",
+  },
+
   nav: {
     topbarFormat: "{name} · {team} · {level} · {age}세",
     gradeLabel:   "{grade}학년",

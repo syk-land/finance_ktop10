@@ -7,6 +7,7 @@ import { state, loadGame, hasSave, saveGame } from "./state.js";
 import { renderMenu, renderStart } from "./views/menu.js";
 import { renderWeekly } from "./views/weekly.js";
 import { renderShop } from "./views/shop.js";
+import { renderHomerunDerby } from "./views/homerunDerby.js";
 import { advanceOneDay } from "./systems/tick.js";
 import { loadRegressionMeta } from "./systems/regression.js";
 import { loadSettings } from "./systems/settings.js";
@@ -21,13 +22,14 @@ import { preloadImages } from "./assets/images.js";
 import { showInterstitialAd } from "./systems/ads.js";
 
 // 뷰별 BGM 매핑 — 시작/메뉴/상점은 menu 곡, 경기는 game 곡.
-const VIEW_BGM = { start: "menu", menu: "menu", shop: "menu", weekly: "game" };
+const VIEW_BGM = { start: "menu", menu: "menu", shop: "menu", weekly: "game", homerunderby: "game" };
 
 const VIEWS = {
   start: renderStart,
   menu: renderMenu,
   weekly: renderWeekly,
   shop: renderShop,
+  homerunderby: renderHomerunDerby,
 };
 
 function getRoot() {

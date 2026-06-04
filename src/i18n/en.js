@@ -6,6 +6,26 @@ export const en = {
     version: "v0.6 · NewGame+ / Cloud Save / Phase 2",
   },
 
+  homerunDerby: {
+    title: "Home Run Derby Minigame",
+    tagline: "Time your swings to hit home runs!",
+    startBtn: "Play Home Run Derby",
+    highScore: "High Score: {score}",
+    score: "Home Runs: {score}",
+    outs: "Outs: {outs} / 10",
+    swingBtn: "SWING!",
+    perfect: "PERFECT! HOME RUN!",
+    good: "GOOD! HIT!",
+    early: "TOO EARLY! OUT!",
+    late: "TOO LATE! OUT!",
+    miss: "MISS! STRIKE!",
+    gameOver: "Game Over",
+    finalScore: "Final Score: {score}",
+    newRecord: "★ New High Score! ★",
+    restartBtn: "Try Again",
+    backToMenu: "Back to Menu",
+  },
+
   nav: {
     topbarFormat: "{name} · {team} · {level} · Age {age}",
     gradeLabel:   "Year {grade}",

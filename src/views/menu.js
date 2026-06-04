@@ -214,6 +214,12 @@ function renderStartButtons(route) {
     startBtn.style.cssText = "width:100%; padding:13px; font-size:16px; font-weight:700;";
     startPanel.appendChild(startBtn);
   }
+
+  // 홈런 더비 미니게임 진입 버튼 (직접 조작 플레이성 보장)
+  const hrBtn = button(t("homerunDerby.startBtn"), "", () => { sfx("click"); route("homerunderby"); });
+  hrBtn.style.cssText = "width:100%; padding:11px; font-size:14px; margin-top:10px; border-color:var(--accent-2); color:var(--accent-2); font-weight:700;";
+  startPanel.appendChild(hrBtn);
+
   return startPanel;
 }
 
