@@ -65,9 +65,9 @@ html, body {
   background-attachment: fixed;
   color: var(--text);
   font-family: 'Outfit', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 13px; /* Slightly reduced base font size to fit more content */
+  font-size: 14px; /* Restored back to 14px standard readability */
   min-height: 100vh;
-  letter-spacing: -0.2px;
+  letter-spacing: -0.3px; /* Slightly tightened tracking to keep letters compact but legible */
   overflow: hidden; /* Avoid html scrolling */
 }
 
@@ -79,7 +79,7 @@ html, body {
   overflow: hidden;
   max-width: 412px;
   margin: 0 auto;
-  padding: 0 10px; /* Reduced side padding */
+  padding: 0 12px; /* Balanced side padding */
   box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
   background: rgba(7, 9, 14, 0.4);
   position: relative;
@@ -90,7 +90,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 0; /* Reduced padding from 16px */
+  padding: 8px 0;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   backdrop-filter: blur(8px);
@@ -98,7 +98,7 @@ html, body {
 
 .logo {
   margin: 0;
-  font-size: 17px; /* Reduced from 20px */
+  font-size: 18px; /* Restored to readable 18px */
   font-weight: 800;
   letter-spacing: 0.5px;
   background: linear-gradient(135deg, var(--accent-2) 30%, #fff 100%);
@@ -108,10 +108,10 @@ html, body {
 }
 
 .topbar-info {
-  font-size: 11.5px; /* Reduced from 13px */
+  font-size: 12px; /* Restored to readable 12px */
   color: var(--muted);
   flex: 1;
-  margin-left: 10px;
+  margin-left: 12px;
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -143,7 +143,7 @@ html, body {
   transform: translateY(-1px);
 }
 
-/* Modals with Glass effect - Compact sizes */
+/* Modals with Glass effect */
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -160,7 +160,7 @@ html, body {
   background: var(--grad-panel);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 12px;
-  padding: 16px; /* Reduced from 22px */
+  padding: 16px;
   width: 100%;
   max-width: 330px;
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
@@ -172,7 +172,7 @@ html, body {
 .modal-dialog h2 {
   margin: 0 0 8px;
   color: var(--accent-2);
-  font-size: 16px;
+  font-size: 17px; /* Restored to readable 17px */
   font-weight: 800;
   letter-spacing: -0.2px;
 }
@@ -229,7 +229,7 @@ html, body {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 6px 0; /* Reduced from 12px */
+  padding: 6px 0;
   border-top: 1px solid var(--border);
   color: var(--muted);
   font-size: 11px;
@@ -259,7 +259,7 @@ html, body {
   min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 6px 0; /* Reduced from 16px to save vertical space */
+  padding: 6px 0; /* Minimized padding to maximize vertical space */
   position: relative;
 }
 
@@ -297,11 +297,11 @@ html, body {
   position: relative;
   z-index: 2;
   text-align: center;
-  padding: 20px 16px 0; /* Reduced from 30px */
+  padding: 20px 16px 0;
   flex-shrink: 0;
 }
 .start-title .logo-text {
-  font-size: 28px; /* Reduced from 32px */
+  font-size: 28px;
   font-weight: 800;
   background: linear-gradient(135deg, #00f0ff 0%, #a855f7 100%);
   -webkit-background-clip: text;
@@ -311,7 +311,7 @@ html, body {
 }
 .start-title .tagline {
   margin-top: 4px;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--text);
   opacity: 0.9;
   font-weight: 500;
@@ -320,10 +320,10 @@ html, body {
   position: relative;
   z-index: 2;
   margin-top: auto;
-  padding: 10px; /* Reduced from 16px */
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 6px; /* Tighter gap */
+  gap: 6px;
   max-height: 75%;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -341,8 +341,8 @@ button {
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 7px 14px; /* Reduced padding from 10px 18px */
-  font-size: 12.5px; /* Reduced from 14px */
+  padding: 7px 14px;
+  font-size: 13px; /* Legible 13px */
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
@@ -392,7 +392,7 @@ button.danger:hover:not(:disabled) {
   background: var(--grad-panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 10px 12px; /* Tight padding to reduce height */
+  padding: 10px 12px;
   box-shadow: var(--shadow);
   position: relative;
   overflow: hidden;
@@ -405,16 +405,16 @@ button.danger:hover:not(:disabled) {
   pointer-events: none;
 }
 .panel h2 {
-  margin: 0 0 6px; /* Reduced from 12px */
-  font-size: 14px; /* Reduced from 16px */
+  margin: 0 0 6px;
+  font-size: 15px; /* Restored to readable 15px */
   font-weight: 800;
   color: var(--accent-2);
   letter-spacing: -0.2px;
   text-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
 .panel h3 {
-  margin: 8px 0 4px; /* Reduced from 14px */
-  font-size: 11px; /* Reduced from 12px */
+  margin: 8px 0 4px;
+  font-size: 11.5px; /* Readable 11.5px */
   font-weight: 700;
   color: var(--muted);
   text-transform: uppercase;
@@ -423,7 +423,7 @@ button.danger:hover:not(:disabled) {
 
 .row { display: flex; gap: 8px; flex-wrap: wrap; }
 .col { flex: 1; min-width: 0; }
-.stack { display: flex; flex-direction: column; gap: 6px; } /* Reduced gap from 12px */
+.stack { display: flex; flex-direction: column; gap: 6px; }
 .center { display: flex; align-items: center; justify-content: center; }
 
 /* Tight Forms */
@@ -432,8 +432,8 @@ input[type="text"], select {
   border: 1px solid var(--border);
   color: var(--text);
   border-radius: 6px;
-  padding: 6px 10px; /* Reduced padding */
-  font-size: 12.5px;
+  padding: 6px 10px;
+  font-size: 13px; /* Legible 13px */
   font-family: inherit;
   font-weight: 500;
   transition: all 180ms ease;
@@ -459,17 +459,17 @@ label {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 4px; /* Reduced vertical margins */
+  margin-bottom: 4px;
 }
 .stat-name {
-  width: 50px; /* Reduced width */
-  font-size: 11px;
+  width: 52px;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--muted);
 }
 .stat-bar {
   flex: 1;
-  height: 8px; /* Thinner bar to save space */
+  height: 8px;
   background: rgba(0, 0, 0, 0.4);
   border-radius: 4px;
   overflow: hidden;
@@ -485,10 +485,10 @@ label {
   transition: width 400ms cubic-bezier(0.1, 0.8, 0.2, 1);
 }
 .stat-val {
-  width: 26px;
+  width: 28px;
   text-align: right;
   font-variant-numeric: tabular-nums;
-  font-size: 11.5px;
+  font-size: 12px; /* Restored to readable 12px */
   font-weight: 700;
   color: var(--text);
 }
@@ -497,15 +497,15 @@ label {
 .actions {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px; /* Reduced gap */
-  margin-top: 8px; /* Reduced margin */
+  gap: 8px;
+  margin-top: 8px;
 }
 .action-card {
   cursor: pointer;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 8px; /* Reduced padding from 12px */
+  padding: 8px;
   transition: all 220ms cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
 }
@@ -532,13 +532,13 @@ label {
   box-shadow: none;
 }
 .action-card .title {
-  font-size: 12.5px; /* Smaller */
+  font-size: 13px; /* Restored to readable 13px */
   font-weight: 700;
   color: #fff;
   margin-bottom: 2px;
 }
 .action-card .desc {
-  font-size: 10px; /* Smaller */
+  font-size: 11px; /* Restored to readable 11px */
   color: var(--muted);
   line-height: 1.35;
 }
@@ -553,14 +553,14 @@ label {
 .daystrip {
   display: flex;
   gap: 3px;
-  margin-top: 6px; /* Tight scheduling header */
+  margin-top: 6px;
 }
 .daycell {
   flex: 1;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 4px 2px; /* Super compact cells */
+  padding: 4px 2px;
   text-align: center;
   transition: all 150ms ease;
 }
@@ -574,7 +574,7 @@ label {
 }
 .daycell .label { 
   color: var(--muted); 
-  font-size: 8.5px; 
+  font-size: 9px; /* Readable 9px */
   font-weight: 700;
   text-transform: uppercase; 
   letter-spacing: 0.3px; 
@@ -582,7 +582,7 @@ label {
 }
 .daycell .val {
   font-weight: 700;
-  font-size: 9px;
+  font-size: 10px; /* Readable 10px */
   line-height: 1.1;
   white-space: nowrap;
   overflow: hidden;
@@ -611,17 +611,17 @@ label {
 table { 
   width: 100%; 
   border-collapse: collapse; 
-  font-size: 12.5px; 
+  font-size: 13px; /* Restored to readable 13px */
 }
 th, td { 
-  padding: 6px 8px; /* Tighter table cell padding */
+  padding: 6px 8px; 
   text-align: left; 
   border-bottom: 1px solid var(--border); 
 }
 th { 
   color: var(--muted); 
   font-weight: 700; 
-  font-size: 9.5px; 
+  font-size: 10px; 
   text-transform: uppercase; 
   letter-spacing: 0.6px; 
 }
@@ -655,7 +655,7 @@ tr.me td {
 
 /* Compact Notice banners */
 .notice {
-  padding: 8px 12px; /* Tight banner */
+  padding: 8px 12px;
   background: rgba(255, 255, 255, 0.02);
   border-left: 3px solid var(--accent);
   border-radius: 0 6px 6px 0;
