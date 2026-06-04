@@ -50,6 +50,8 @@ export const en = {
     cancel: "Cancel",
     confirm: "OK",
     close: "Close",
+    next: "Next Step",
+    back: "Go Back",
   },
 
   stage: {

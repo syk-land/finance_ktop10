@@ -715,57 +715,91 @@ function renderCreatePanel(route) {
   const h = panel.querySelector("h2");
   if (h) h.style.cssText = "margin:0 0 2px; font-size:14px;";
 
-  // 안드로이드 portrait(~412px) 기준 — 세로 stack
-  // 순서: 이름 → 얼굴 → 자세 → 재능 → 캐릭터 미리보기 → 시작
   const col = document.createElement("div");
   col.className = "stack";
   col.style.gap = "4px"; // 한 화면 안에 들어오도록 간격 축소
 
-  col.appendChild(renderNameField());
-  col.appendChild(renderFaceGallery());
-  col.appendChild(renderHandField());
-  col.appendChild(renderTalentField());
+  let step = 1;
 
-  // 캐릭터 미리보기 (선택 결과를 한 눈에 — refreshPreview 가 갱신)
-  const previewWrap = document.createElement("div");
-  previewWrap.id = "preview-col";
-  previewWrap.appendChild(renderPreview());
-  col.appendChild(previewWrap);
+  // 단계별 콘텐츠 컨테이너
+  const stepContainer = document.createElement("div");
+  stepContainer.className = "stack";
+  stepContainer.style.gap = "6px";
+  col.appendChild(stepContainer);
 
-  // 시작 버튼 (가로 100%)
-  const startBtn = button(t("menu.startBtn"), "primary", () => {
-    const name = draft.name.trim() || t("menu.defaultName");
-    syncDraftTalents();
-    // 회귀 로드아웃 — 캐릭터당 1회용. 생성 직전 snapshot 뜨고 resetLoadout 실행.
-    const loadout = state.regression
-      ? consumeLoadoutForCharacter()
-      : { startingStat: null, traits: [], relics: [] };
-    resetState();
-    state.player = createPlayer({
-      name,
-      talent: draft.talent,
-      talents: draft.talents,
-      hand: draft.hand,
-      faceId: draft.faceId,
-      startingStat: loadout.startingStat,
-      traits: loadout.traits,
-      relics: loadout.relics,
-      relicLevels: loadout.relicLevels,
-      equipment: loadout.equipment,
-    });
-    startHighSchoolCareer(name, draft.talent, null);
-    state.gameDate = createGameDate();
-    state.autoMode = "two_way";
-    state.paused = true;
-    resetWeeklyCarousel();
-    saveGame();
-    route("weekly");
-  });
-  startBtn.style.marginTop = "4px";
-  startBtn.style.width = "100%";
-  startBtn.style.padding = "9px";
-  startBtn.style.fontSize = "15px";
-  col.appendChild(startBtn);
+  function refreshStep() {
+    stepContainer.innerHTML = "";
+
+    if (step === 1) {
+      // 1단계: 이름, 재능, 좌우투타
+      stepContainer.appendChild(renderNameField());
+      stepContainer.appendChild(renderTalentField());
+      stepContainer.appendChild(renderHandField());
+
+      // 다음 단계 버튼
+      const nextBtn = button(t("common.next"), "primary", () => {
+        step = 2;
+        refreshStep();
+      });
+      nextBtn.style.cssText = "margin-top:8px; width:100%; padding:10px; font-size:15px; font-weight:700;";
+      stepContainer.appendChild(nextBtn);
+    } else {
+      // 2단계: 커스터마이징 및 캐릭터 미리보기
+      stepContainer.appendChild(renderFaceGallery());
+
+      // 캐릭터 미리보기
+      const previewWrap = document.createElement("div");
+      previewWrap.id = "preview-col";
+      previewWrap.appendChild(renderPreview());
+      stepContainer.appendChild(previewWrap);
+
+      // 하단 버튼 그리드 (이전 / 시작)
+      const btnGrid = document.createElement("div");
+      btnGrid.style.cssText = "display:grid; grid-template-columns:1fr 1.5fr; gap:6px; margin-top:8px;";
+
+      const prevBtn = button(t("common.back"), "", () => {
+        step = 1;
+        refreshStep();
+      });
+      prevBtn.style.cssText = "padding:10px; font-size:14px;";
+      btnGrid.appendChild(prevBtn);
+
+      const startBtn = button(t("menu.startBtn"), "primary", () => {
+        const name = draft.name.trim() || t("menu.defaultName");
+        syncDraftTalents();
+        // 회귀 로드아웃 — 캐릭터당 1회용. 생성 직전 snapshot 뜨고 resetLoadout 실행.
+        const loadout = state.regression
+          ? consumeLoadoutForCharacter()
+          : { startingStat: null, traits: [], relics: [] };
+        resetState();
+        state.player = createPlayer({
+          name,
+          talent: draft.talent,
+          talents: draft.talents,
+          hand: draft.hand,
+          faceId: draft.faceId,
+          startingStat: loadout.startingStat,
+          traits: loadout.traits,
+          relics: loadout.relics,
+          relicLevels: loadout.relicLevels,
+          equipment: loadout.equipment,
+        });
+        startHighSchoolCareer(name, draft.talent, null);
+        state.gameDate = createGameDate();
+        state.autoMode = "two_way";
+        state.paused = true;
+        resetWeeklyCarousel();
+        saveGame();
+        route("weekly");
+      });
+      startBtn.style.cssText = "padding:10px; font-size:15px; font-weight:700;";
+      btnGrid.appendChild(startBtn);
+
+      stepContainer.appendChild(btnGrid);
+    }
+  }
+
+  refreshStep();
 
   panel.appendChild(col);
   return panel;

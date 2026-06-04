@@ -50,6 +50,8 @@ export const ko = {
     cancel: "취소",
     confirm: "확인",
     close: "닫기",
+    next: "다음 단계",
+    back: "이전 단계",
   },
 
   stage: {
