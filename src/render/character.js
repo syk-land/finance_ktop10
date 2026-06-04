@@ -7,7 +7,7 @@ import { createFaceGroup } from "./avatars.js";
 //   우투우타: 오른손 배트, 오른쪽 타석 → 캐릭터는 화면 오른쪽으로 자세
 //   좌투좌타: 왼쪽 타석 → 화면 왼쪽으로 자세 (mirror)
 //   우투좌타: 좌타 자세지만 글러브가 오른손 (배지로 표시)
-export function createCharacterSVG(faceId, hand = "right", size = { w: 180, h: 240 }) {
+export function createCharacterSVG(faceId, hand = "right", size = { w: 180, h: 240 }, talent = "all_round") {
   const root = svg(size.w, size.h, "0 0 180 240");
 
   // 배경 (홈플레이트 느낌)
@@ -29,7 +29,7 @@ export function createCharacterSVG(faceId, hand = "right", size = { w: 180, h: 2
   defs.appendChild(grad);
   root.appendChild(defs);
 
-  const charGroup = drawCharacterBody(faceId, hand);
+  const charGroup = drawCharacterBody(faceId, hand, talent);
   root.appendChild(charGroup);
 
   // 손잡이 라벨
@@ -54,10 +54,27 @@ function handLabel(hand) {
   return hand;
 }
 
-function drawCharacterBody(faceId, hand) {
+function drawCharacterBody(faceId, hand, talent = "all_round") {
   // 좌타 = 화면 기준 mirror (캐릭터 머리/몸은 그대로지만 배트 위치/자세 좌우 반전)
   const battingLeft = hand === "left" || hand === "mixed";
   const g = group([], { transform: `translate(90 30)` });
+
+  // 재능타입에 따른 체형 수치 분기 (기본값 = all_round)
+  let shW = 28;     // shoulder half-width
+  let waistW = 26;  // waist half-width
+  let legW = 22;    // outer leg half-width
+  
+  if (talent === "power") {
+    // 벌크업 체형 (우람한 파워형)
+    shW = 34;
+    waistW = 31;
+    legW = 27;
+  } else if (talent === "speedster" || talent === "finesse" || talent === "breakerz") {
+    // 슬림하고 날렵한 체형
+    shW = 23;
+    waistW = 21;
+    legW = 18;
+  }
 
   // 머리 (얼굴) — 0,0 기준으로 위치
   const head = group([], { transform: "translate(-22 0) scale(0.44)" });
@@ -75,7 +92,7 @@ function drawCharacterBody(faceId, hand) {
   const bodyAccent = "#4ea4ff";
   g.appendChild(svgEl("path", {
     // 어깨 ~ 허리 사다리꼴
-    d: "M -28 52 Q -28 48 -22 48 L 22 48 Q 28 48 28 52 L 26 110 L -26 110 Z",
+    d: `M -${shW} 52 Q -${shW} 48 -${waistW} 48 L ${waistW} 48 Q ${shW} 48 ${shW} 52 L ${waistW} 110 L -${waistW} 110 Z`,
     fill: bodyColor,
     stroke: "#bcc5d1",
     "stroke-width": "1.2",
@@ -94,23 +111,28 @@ function drawCharacterBody(faceId, hand) {
 
   // 벨트
   g.appendChild(svgEl("rect", {
-    x: -26, y: 108, width: 52, height: 6, fill: "#1a1a1a",
+    x: -waistW, y: 108, width: waistW * 2, height: 6, fill: "#1a1a1a",
   }));
 
   // 바지
   g.appendChild(svgEl("path", {
-    d: "M -24 114 L -22 168 L -6 168 L -4 130 L 4 130 L 6 168 L 22 168 L 24 114 Z",
+    d: `M -${waistW-2} 114 L -${legW} 168 L -6 168 L -4 130 L 4 130 L 6 168 L ${legW} 168 L ${waistW-2} 114 Z`,
     fill: "#bfc5d0",
   }));
 
-  // 신발/스파이크
-  g.appendChild(svgEl("ellipse", { cx: -14, cy: 174, rx: 11, ry: 5, fill: "#1a1a1a" }));
-  g.appendChild(svgEl("ellipse", { cx: 14, cy: 174, rx: 11, ry: 5, fill: "#1a1a1a" }));
+  // 신발/스파이크 (체형 너비 연동)
+  const footX = Math.round(legW * 0.65);
+  g.appendChild(svgEl("ellipse", { cx: -footX, cy: 174, rx: 11, ry: 5, fill: "#1a1a1a" }));
+  g.appendChild(svgEl("ellipse", { cx: footX, cy: 174, rx: 11, ry: 5, fill: "#1a1a1a" }));
 
   // 팔 + 배트 자세
   // 기본: 우타 자세 (오른쪽에 배트, 양손이 어깨 위)
-  // 좌타: mirror
-  const armsG = group([], battingLeft ? { transform: "scale(-1 1)" } : {});
+  // 어깨 너비(shW) 변화에 따라 팔 위치 가로 오프셋 이동
+  const dx = shW - 28;
+  const armsTransform = battingLeft 
+    ? `scale(-1 1) translate(${dx} 0)` 
+    : `translate(${dx} 0)`;
+  const armsG = group([], { transform: armsTransform });
 
   // 뒷팔 (어깨에서 살짝 뒤로)
   armsG.appendChild(svgEl("path", {

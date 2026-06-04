@@ -1143,6 +1143,7 @@ export const en = {
     hairStyle: "Hair Style",
     accessory: "Accessory",
     eye: "Eyes",
+    shape: "Face Shape",
     style: {
       short: "Buzz cut",
       curly: "Curly",
@@ -1167,6 +1168,11 @@ export const en = {
       fierce: "Fierce",
       blank: "Blank",
       dizzy: "Dizzy",
+    },
+    shape: {
+      round: "Round",
+      square: "Square",
+      vshape: "V-line",
     },
   },
 };

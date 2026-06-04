@@ -1149,6 +1149,7 @@ export const ko = {
     hairStyle: "머리스타일",
     accessory: "액세서리",
     eye: "눈모양",
+    shape: "얼굴형",
     style: {
       short: "스포츠컷",
       curly: "곱슬머리",
@@ -1173,6 +1174,11 @@ export const ko = {
       fierce: "불타오름",
       blank: "멍한눈",
       dizzy: "골뱅이눈",
+    },
+    shape: {
+      round: "둥근형",
+      square: "각진형",
+      vshape: "V라인",
     },
   },
 };

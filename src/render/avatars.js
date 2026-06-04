@@ -16,6 +16,7 @@ export const HAIR_COLORS = ["#1a1a1a", "#2a1a0f", "#5a3a1d", "#b03030", "#d8a040
 export const HAIR_STYLES = ["short", "curly", "neat", "long", "bald", "spiky"];
 export const ACCESSORIES = ["none", "cap", "glasses", "helmet", "scar", "blush"];
 export const EYES = ["calm", "sharp", "smile", "cool", "fierce", "blank", "dizzy"];
+export const FACE_SHAPES = ["round", "square", "vshape"];
 
 export function getFace(id) {
   if (typeof id === "string" && id.startsWith("f_")) {
@@ -25,12 +26,14 @@ export function getFace(id) {
     const styleIdx = parseInt(parts[3]) ?? 0;
     const accIdx = parseInt(parts[4]) ?? 0;
     const eyeIdx = parseInt(parts[5]) ?? 0;
+    const shapeIdx = parseInt(parts[6]) ?? 0;
 
     const skin = SKIN_COLORS[skinIdx] ?? SKIN_COLORS[0];
     const hair = HAIR_COLORS[hairIdx] ?? HAIR_COLORS[0];
     const style = HAIR_STYLES[styleIdx] ?? HAIR_STYLES[0];
     const accessory = ACCESSORIES[accIdx] ?? "none";
     const eye = EYES[eyeIdx] ?? EYES[0];
+    const shape = FACE_SHAPES[shapeIdx] ?? FACE_SHAPES[0];
 
     return {
       id,
@@ -39,9 +42,11 @@ export function getFace(id) {
       style,
       accessory: accessory === "none" ? null : accessory,
       eye,
+      shape,
     };
   }
-  return FACES.find(f => f.id === id) ?? FACES[0];
+  const found = FACES.find(f => f.id === id) ?? FACES[0];
+  return { ...found, shape: "round" };
 }
 
 // faceId → SVG element (viewBox 0 0 100 100 기준)
@@ -69,9 +74,21 @@ function drawFace(parent, face) {
     }));
   }
   // 얼굴 (피부)
-  parent.appendChild(svgEl("ellipse", {
-    cx: 50, cy: 52, rx: 24, ry: 28, fill: face.skin,
-  }));
+  if (face.shape === "square") {
+    parent.appendChild(svgEl("rect", {
+      x: 26, y: 24, width: 48, height: 56, rx: 8, ry: 8, fill: face.skin
+    }));
+  } else if (face.shape === "vshape") {
+    parent.appendChild(svgEl("path", {
+      d: "M 26 38 C 26 24, 74 24, 74 38 C 74 52, 60 74, 50 80 C 40 74, 26 52, 26 38 Z",
+      fill: face.skin
+    }));
+  } else {
+    // round (default)
+    parent.appendChild(svgEl("ellipse", {
+      cx: 50, cy: 52, rx: 24, ry: 28, fill: face.skin,
+    }));
+  }
   // 귀
   parent.appendChild(svgEl("ellipse", { cx: 25, cy: 54, rx: 4, ry: 6, fill: face.skin }));
   parent.appendChild(svgEl("ellipse", { cx: 75, cy: 54, rx: 4, ry: 6, fill: face.skin }));

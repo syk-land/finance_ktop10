@@ -11,7 +11,7 @@ import { saveToCloud, loadFromCloud, getCloudSaveMeta, deleteFromCloud } from ".
 import { isSignedIn, isAnonymousUser, linkAnonToGoogle, signOutCloud } from "../cloud/auth.js";
 import {
   FACES, createFaceSVG,
-  SKIN_COLORS, HAIR_COLORS, HAIR_STYLES, ACCESSORIES, EYES,
+  SKIN_COLORS, HAIR_COLORS, HAIR_STYLES, ACCESSORIES, EYES, FACE_SHAPES,
 } from "../render/avatars.js";
 import { createCharacterSVG } from "../render/character.js";
 import { createGameDate } from "../systems/tick.js";
@@ -795,7 +795,7 @@ function renderPreview() {
   const charImg = createImage("charBat" + draft.faceId.toUpperCase(), {
     style: "animation:nir-idle 3.2s ease-in-out infinite;",
     imgStyle: `height:70px; width:auto; margin:0 auto;${battingLeft ? " transform:scaleX(-1);" : ""}`,
-    fallback: () => createCharacterSVG(draft.faceId, draft.hand, { w: 60, h: 72 }),
+    fallback: () => createCharacterSVG(draft.faceId, draft.hand, { w: 60, h: 72 }, draft.talent),
   });
   card.appendChild(charImg);
 
@@ -835,12 +835,12 @@ function renderNameField() {
 }
 
 function syncPresetToCustom(faceId) {
-  if (faceId === "f1") return [0, 0, 0, 0, 0];
-  if (faceId === "f2") return [1, 1, 1, 3, 1];
-  if (faceId === "f3") return [2, 3, 1, 0, 2];
-  if (faceId === "f4") return [3, 0, 0, 1, 3];
-  if (faceId === "f5") return [4, 0, 2, 2, 0];
-  if (faceId === "f6") return [1, 2, 3, 0, 4];
+  if (faceId === "f1") return [0, 0, 0, 0, 0, 0];
+  if (faceId === "f2") return [1, 1, 1, 3, 1, 0];
+  if (faceId === "f3") return [2, 3, 1, 0, 2, 0];
+  if (faceId === "f4") return [3, 0, 0, 1, 3, 0];
+  if (faceId === "f5") return [4, 0, 2, 2, 0, 0];
+  if (faceId === "f6") return [1, 2, 3, 0, 4, 0];
   if (faceId.startsWith("f_")) {
     const p = faceId.split("_");
     return [
@@ -848,10 +848,11 @@ function syncPresetToCustom(faceId) {
       parseInt(p[2]) || 0,
       parseInt(p[3]) || 0,
       parseInt(p[4]) || 0,
-      parseInt(p[5]) || 0
+      parseInt(p[5]) || 0,
+      parseInt(p[6]) || 0
     ];
   }
-  return [0, 0, 0, 0, 0];
+  return [0, 0, 0, 0, 0, 0];
 }
 
 function renderFaceGallery() {
@@ -925,7 +926,8 @@ function renderFaceGallery() {
       { name: t("custom.hairColor"), options: HAIR_COLORS, current: parts[1], colorType: true, idx: 1 },
       { name: t("custom.hairStyle"), options: HAIR_STYLES, current: parts[2], transPrefix: "custom.style.", idx: 2 },
       { name: t("custom.accessory"), options: ACCESSORIES, current: parts[3], transPrefix: "custom.acc.", idx: 3 },
-      { name: t("custom.eye"), options: EYES, current: parts[4], transPrefix: "custom.eye.", idx: 4 }
+      { name: t("custom.eye"), options: EYES, current: parts[4], transPrefix: "custom.eye.", idx: 4 },
+      { name: t("custom.shape"), options: FACE_SHAPES, current: parts[5], transPrefix: "custom.shape.", idx: 5 }
     ];
 
     for (const pt of partTypes) {
@@ -956,7 +958,7 @@ function renderFaceGallery() {
 
         btn.addEventListener("click", () => {
           parts[pt.idx] = oIdx;
-          const newFaceId = `f_${parts[0]}_${parts[1]}_${parts[2]}_${parts[3]}_${parts[4]}`;
+          const newFaceId = `f_${parts[0]}_${parts[1]}_${parts[2]}_${parts[3]}_${parts[4]}_${parts[5]}`;
           draft.faceId = newFaceId;
           refreshPreview();
           // 프리셋 얼굴 하이라이트 초기화
