@@ -630,7 +630,8 @@ function playPitchSequenceManual({ svg, fxHost, ball, labelHost, swingRef, event
         }, duration * 1.1);
       });
     });
-  });
+  }
+});
 }
 
 // 홈런 폭죽 — 화면에 여러 위치에서 색색의 점들이 방사형으로 퍼지며 페이드
