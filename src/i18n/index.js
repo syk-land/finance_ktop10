@@ -52,7 +52,12 @@ export function loadLocaleFromStorage() {
     if (SUPPORTED_LOCALES.includes(v)) {
       state.locale = v;
     } else {
-      state.locale = DEFAULT_LOCALE;
+      const browserLang = (navigator.language || navigator.userLanguage || "").toLowerCase();
+      if (browserLang.startsWith("ko")) {
+        state.locale = "ko";
+      } else {
+        state.locale = DEFAULT_LOCALE;
+      }
     }
   } catch (_) {
     state.locale = DEFAULT_LOCALE;

@@ -1,7 +1,8 @@
-// 3등신 캐릭터 (배팅 자세) — 카툰 일러스트 하이브리드 오버레이 아바타 시스템
+// 3등신 캐릭터 (배팅 자세) — 로컬 file:// 프로토콜 호환 카툰 일러스트 하이브리드 아바타 시스템
 import { svg, svgEl, group } from "./svg.js";
 import { createFaceGroup, getFace } from "./avatars.js";
 import { IMAGES } from "../assets/manifest.js";
+import { t } from "../i18n/index.js";
 
 function mapCustomToPreset(faceId) {
   if (!faceId) return "f1";
@@ -20,89 +21,149 @@ function mapCustomToPreset(faceId) {
   return "f1"; // default -> f1
 }
 
+function handLabel(hand) {
+  return t("hand." + hand);
+}
+
 // hand: "right" (우투우타) | "left" (좌투좌타) | "mixed" (우투좌타)
+// 반환: HTML div 컨테이너 (file:// 프로토콜 보안 정책 회피용 <img> + SVG 오버레이 구조)
 export function createCharacterSVG(faceId, hand = "right", size = { w: 180, h: 240 }, talent = "all_round", equipment = { bat: 0, glove: 0, cleats: 0 }) {
-  const root = svg(size.w, size.h, "0 0 180 240");
+  const container = document.createElement("div");
+  container.style.position = "relative";
+  container.style.width = size.w + "px";
+  container.style.height = size.h + "px";
+  container.style.overflow = "hidden";
 
-  // 배경 (홈플레이트 느낌)
-  root.appendChild(svgEl("ellipse", {
-    cx: 90, cy: 226, rx: 60, ry: 8,
-    fill: "rgba(255,255,255,0.06)",
-  }));
-  // 흙
-  root.appendChild(svgEl("rect", {
-    x: 0, y: 220, width: 180, height: 20,
-    fill: "url(#dirtGrad)",
-  }));
+  // 발 밑 그림자 및 흙바닥 등 배경 장식용 백그라운드 SVG
+  const bgSVG = svg(size.w, size.h, "0 0 180 240");
+  bgSVG.style.position = "absolute";
+  bgSVG.style.left = "0";
+  bgSVG.style.top = "0";
+  bgSVG.style.width = "100%";
+  bgSVG.style.height = "100%";
+  bgSVG.style.pointerEvents = "none";
 
-  // 그래디언트 정의
   const defs = svgEl("defs", {}, []);
-  
-  // 흙바닥 그래디언트
   const grad = svgEl("linearGradient", { id: "dirtGrad", x1: "0%", y1: "0%", x2: "0%", y2: "100%" });
   grad.appendChild(svgEl("stop", { offset: "0%", "stop-color": "rgba(120,80,40,0.0)" }));
   grad.appendChild(svgEl("stop", { offset: "100%", "stop-color": "rgba(120,80,40,0.3)" }));
   defs.appendChild(grad);
+  bgSVG.appendChild(defs);
 
-  // 황금 장비용 리치 금색 그라데이션
-  const goldGrad = svgEl("linearGradient", { id: "goldBatGrad", x1: "0%", y1: "0%", x2: "100%", y2: "100%" });
-  goldGrad.appendChild(svgEl("stop", { offset: "0%", "stop-color": "#ffe680" }));
-  goldGrad.appendChild(svgEl("stop", { offset: "40%", "stop-color": "#fbbf24" }));
-  goldGrad.appendChild(svgEl("stop", { offset: "80%", "stop-color": "#d97706" }));
-  goldGrad.appendChild(svgEl("stop", { offset: "100%", "stop-color": "#78350f" }));
-  defs.appendChild(goldGrad);
-
-  // 나무 배트용 우드 그라데이션
-  const woodGrad = svgEl("linearGradient", { id: "woodBatGrad", x1: "0%", y1: "0%", x2: "100%", y2: "100%" });
-  woodGrad.appendChild(svgEl("stop", { offset: "0%", "stop-color": "#b48a53" }));
-  woodGrad.appendChild(svgEl("stop", { offset: "70%", "stop-color": "#8a5a2a" }));
-  woodGrad.appendChild(svgEl("stop", { offset: "100%", "stop-color": "#5c3a17" }));
-  defs.appendChild(woodGrad);
-
-  // 실버 메탈릭 그라데이션
-  const silverGrad = svgEl("linearGradient", { id: "silverGrad", x1: "0%", y1: "0%", x2: "100%", y2: "100%" });
-  silverGrad.appendChild(svgEl("stop", { offset: "0%", "stop-color": "#f1f5f9" }));
-  silverGrad.appendChild(svgEl("stop", { offset: "50%", "stop-color": "#cbd5e1" }));
-  silverGrad.appendChild(svgEl("stop", { offset: "100%", "stop-color": "#64748b" }));
-  defs.appendChild(silverGrad);
-
-  root.appendChild(defs);
-
-  // 발 밑 그림자
-  root.appendChild(svgEl("ellipse", {
+  bgSVG.appendChild(svgEl("ellipse", {
+    cx: 90, cy: 226, rx: 60, ry: 8,
+    fill: "rgba(255,255,255,0.06)",
+  }));
+  bgSVG.appendChild(svgEl("rect", {
+    x: 0, y: 220, width: 180, height: 20,
+    fill: "url(#dirtGrad)",
+  }));
+  bgSVG.appendChild(svgEl("ellipse", {
     cx: 90, cy: 206, rx: 42, ry: 6,
     fill: "rgba(0,0,0,0.35)",
   }));
+  container.appendChild(bgSVG);
 
-  // 하이브리드 모드 선택: 일러스트 에셋이 존재하면 일러스트 이미지 뼈대 + 장비/안경 레이어 오버레이
   const presetKey = mapCustomToPreset(faceId);
   const imgDef = IMAGES["charBat" + presetKey.toUpperCase()];
 
   if (imgDef) {
     const battingLeft = hand === "left" || hand === "mixed";
     
-    // 1. 고화질 카툰 일러스트 캐릭터 뼈대 (이미지 얹기 - 브라우저 호환성을 위한 네임스페이스 수동 처리 추가)
-    const mainImg = svgEl("image", {
-      x: 0,
-      y: 10,
-      width: 180,
-      height: 240,
-      transform: battingLeft ? "scale(-1 1) translate(-180 0)" : "",
-    });
-    mainImg.setAttributeNS("http://www.w3.org/1999/xlink", "href", imgDef.src);
-    mainImg.setAttribute("href", imgDef.src);
-    root.appendChild(mainImg);
+    // 1. 일반 <img> 엘리먼트 (배경 일러스트 뼈대) - file:// 프로토콜에서 100% 정상 로드
+    const img = document.createElement("img");
+    img.src = imgDef.src;
+    img.style.position = "absolute";
+    img.style.left = "0";
+    img.style.top = "4.16%"; // 10/240 오프셋 보정
+    img.style.width = "100%";
+    img.style.height = "auto";
+    img.style.display = "block";
+    img.style.pointerEvents = "none";
+    if (battingLeft) {
+      img.style.transform = "scaleX(-1)";
+    }
+    container.appendChild(img);
     
-    // 2. 그 위에 안경, 장비(배트, 장갑, 스파이크, 배지)를 덮어씌워 얹기
+    // 2. 그 위에 얹어지는 투명 SVG 오버레이 (안경, 커스텀얼굴, 장비 레이어)
+    const overlaySVG = svg(size.w, size.h, "0 0 180 240");
+    overlaySVG.style.position = "absolute";
+    overlaySVG.style.left = "0";
+    overlaySVG.style.top = "0";
+    overlaySVG.style.width = "100%";
+    overlaySVG.style.height = "100%";
+    overlaySVG.style.pointerEvents = "none";
+
+    // 장비 그라데이션 정의
+    const overlayDefs = svgEl("defs", {}, []);
+    const goldGrad = svgEl("linearGradient", { id: "goldBatGrad", x1: "0%", y1: "0%", x2: "100%", y2: "100%" });
+    goldGrad.appendChild(svgEl("stop", { offset: "0%", "stop-color": "#ffe680" }));
+    goldGrad.appendChild(svgEl("stop", { offset: "40%", "stop-color": "#fbbf24" }));
+    goldGrad.appendChild(svgEl("stop", { offset: "80%", "stop-color": "#d97706" }));
+    goldGrad.appendChild(svgEl("stop", { offset: "100%", "stop-color": "#78350f" }));
+    overlayDefs.appendChild(goldGrad);
+
+    const woodGrad = svgEl("linearGradient", { id: "woodBatGrad", x1: "0%", y1: "0%", x2: "100%", y2: "100%" });
+    woodGrad.appendChild(svgEl("stop", { offset: "0%", "stop-color": "#b48a53" }));
+    woodGrad.appendChild(svgEl("stop", { offset: "70%", "stop-color": "#8a5a2a" }));
+    woodGrad.appendChild(svgEl("stop", { offset: "100%", "stop-color": "#5c3a17" }));
+    overlayDefs.appendChild(woodGrad);
+
+    const silverGrad = svgEl("linearGradient", { id: "silverGrad", x1: "0%", y1: "0%", x2: "100%", y2: "100%" });
+    silverGrad.appendChild(svgEl("stop", { offset: "0%", "stop-color": "#f1f5f9" }));
+    silverGrad.appendChild(svgEl("stop", { offset: "50%", "stop-color": "#cbd5e1" }));
+    silverGrad.appendChild(svgEl("stop", { offset: "100%", "stop-color": "#64748b" }));
+    overlayDefs.appendChild(silverGrad);
+    overlaySVG.appendChild(overlayDefs);
+
     const overlay = drawEquipmentOverlay(faceId, hand, talent, equipment);
-    root.appendChild(overlay);
+    overlaySVG.appendChild(overlay);
+    
+    container.appendChild(overlaySVG);
   } else {
-    // 폴백 모드: 에셋이 없을 땐 기존 전체 SVG 뼈대 그리기
+    // 폴백 모드: 일러스트 자산이 아예 정의되지 않았을 때
+    const fallbackSVG = svg(size.w, size.h, "0 0 180 240");
+    fallbackSVG.style.position = "absolute";
+    fallbackSVG.style.left = "0";
+    fallbackSVG.style.top = "0";
+    fallbackSVG.style.width = "100%";
+    fallbackSVG.style.height = "100%";
+
+    const fallbackDefs = svgEl("defs", {}, []);
+    const fGold = svgEl("linearGradient", { id: "goldBatGrad", x1: "0%", y1: "0%", x2: "100%", y2: "100%" });
+    fGold.appendChild(svgEl("stop", { offset: "0%", "stop-color": "#ffe680" }));
+    fGold.appendChild(svgEl("stop", { offset: "40%", "stop-color": "#fbbf24" }));
+    fGold.appendChild(svgEl("stop", { offset: "80%", "stop-color": "#d97706" }));
+    fGold.appendChild(svgEl("stop", { offset: "100%", "stop-color": "#78350f" }));
+    fallbackDefs.appendChild(fGold);
+
+    const fWood = svgEl("linearGradient", { id: "woodBatGrad", x1: "0%", y1: "0%", x2: "100%", y2: "100%" });
+    fWood.appendChild(svgEl("stop", { offset: "0%", "stop-color": "#b48a53" }));
+    fWood.appendChild(svgEl("stop", { offset: "70%", "stop-color": "#8a5a2a" }));
+    fWood.appendChild(svgEl("stop", { offset: "100%", "stop-color": "#5c3a17" }));
+    fallbackDefs.appendChild(fWood);
+
+    const fSilver = svgEl("linearGradient", { id: "silverGrad", x1: "0%", y1: "0%", x2: "100%", y2: "100%" });
+    fSilver.appendChild(svgEl("stop", { offset: "0%", "stop-color": "#f1f5f9" }));
+    fSilver.appendChild(svgEl("stop", { offset: "50%", "stop-color": "#cbd5e1" }));
+    fSilver.appendChild(svgEl("stop", { offset: "100%", "stop-color": "#64748b" }));
+    fallbackDefs.appendChild(fSilver);
+    fallbackSVG.appendChild(fallbackDefs);
+
     const charGroup = drawCharacterBody(faceId, hand, talent, equipment);
-    root.appendChild(charGroup);
+    fallbackSVG.appendChild(charGroup);
+    container.appendChild(fallbackSVG);
   }
 
-  // 손잡이 라벨
+  // 손잡이 라벨은 최상단에 겹쳐 그림
+  const labelSVG = svg(size.w, size.h, "0 0 180 240");
+  labelSVG.style.position = "absolute";
+  labelSVG.style.left = "0";
+  labelSVG.style.top = "0";
+  labelSVG.style.width = "100%";
+  labelSVG.style.height = "100%";
+  labelSVG.style.pointerEvents = "none";
+  
   const label = svgEl("text", {
     x: 90, y: 22,
     "text-anchor": "middle",
@@ -112,12 +173,13 @@ export function createCharacterSVG(faceId, hand = "right", size = { w: 180, h: 2
     "font-family": "monospace",
   });
   label.textContent = handLabel(hand);
-  root.appendChild(label);
+  labelSVG.appendChild(label);
+  container.appendChild(labelSVG);
 
-  return root;
+  return container;
 }
 
-// 일러스트 뼈대 위에 안경, 헬멧, 장비 등을 정확히 겹쳐 덮어씌우는 오버레이 드로잉
+// 일러스트 뼈대 위에 안경, 헬멧, 장비, 그리고 커스텀 얼굴(실시간)을 정확히 겹쳐 덮어씌우는 오버레이 드로잉
 function drawEquipmentOverlay(faceId, hand, talent, equipment) {
   const battingLeft = hand === "left" || hand === "mixed";
   const g = group([]);
@@ -127,7 +189,7 @@ function drawEquipmentOverlay(faceId, hand, talent, equipment) {
     : "";
   const innerG = group([], { transform });
 
-  // 0. 커스텀 얼굴 오버레이 (일러스트 뼈대 머리 부분에 정확히 얹기)
+  // 0. 커스텀 얼굴 오버레이 (일러스트 뼈대 머리 부분에 실시간 조작 덮어씌우기)
   const headG = group([], { transform: "translate(68 30) scale(0.44)" });
   headG.appendChild(createFaceGroup(faceId));
   innerG.appendChild(headG);
