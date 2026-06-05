@@ -5,7 +5,8 @@ def clean_project():
     files_to_remove = [
         "probe-career.mjs",
         "probe-regression.mjs",
-        "probe.mjs"
+        "probe.mjs",
+        "create_sample_assets.py"
     ]
     
     cleaned_count = 0
