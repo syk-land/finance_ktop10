@@ -76,8 +76,8 @@ export function createPlayer({
 }) {
   const talentList = Array.isArray(talents) && talents.length > 0 ? [...talents] : [talent];
   // 시작 스탯: 평균(50) 살짝 위 — 16세 유망주가 동급 또래보다 약간 두각. 회귀 시스템으로 더 높은 값에서 시작하는 안도 지원.
-  const baseBatter = { contact: 50, power: 44, eye: 50, speed: 52, defense: 50 };
-  const basePitcher = { velocity: 50, control: 46, breaking: 42, stamina: 52, mental: 50 };
+  const baseBatter = { contact: 65, power: 54, eye: 65, speed: 60, defense: 60 };
+  const basePitcher = { velocity: 65, control: 60, breaking: 54, stamina: 62, mental: 60 };
   const batter = { ...baseBatter };
   const pitcher = { ...basePitcher };
   // 재능들의 boost 합산 — 동일 stat 에 다중 적용 시 곱연산.

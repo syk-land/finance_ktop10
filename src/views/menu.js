@@ -768,6 +768,48 @@ function renderCreatePanel(route) {
       equipment: loadout.equipment,
     });
     startHighSchoolCareer(name, draft.talent, null);
+
+    // 동기화: 랜덤 생성된 상대 고교 팀들의 1학년(16세) 중 가장 능력치가 낮은 선수의 평균치를 구함
+    let minBatter = 999, minPitcher = 999;
+    for (const team of state.league.teams) {
+      if (team.isPlayerTeam) continue;
+      for (const npc of team.roster) {
+        if (npc.age === 16) {
+          if (npc.role === "batter") {
+            const b = npc.batter;
+            const ovr = (b.contact + b.power + b.eye + b.speed + b.defense) / 5;
+            if (ovr < minBatter) minBatter = ovr;
+          } else {
+            const p = npc.pitcher;
+            const ovr = (p.velocity + p.control + p.breaking + p.stamina + p.mental) / 5;
+            if (ovr < minPitcher) minPitcher = ovr;
+          }
+        }
+      }
+    }
+    
+    // 주인공의 재능 분포 획득
+    const talentList = Array.isArray(draft.talents) && draft.talents.length > 0 ? draft.talents : [draft.talent];
+    const boostsCombined = {};
+    for (const tKey of talentList) {
+      const b = TALENTS[tKey]?.boost || {};
+      for (const [stat, m] of Object.entries(b)) {
+        boostsCombined[stat] = (boostsCombined[stat] || 1) * m;
+      }
+    }
+
+    // 주인공의 초기 능력치를 '가장 낮은 선수'의 평균치를 베이스로 하여 재능 분포에 맞게 재설정
+    if (minBatter !== 999) {
+      for (const stat of ["contact", "power", "eye", "speed", "defense"]) {
+        state.player.batter[stat] = Math.round(minBatter * (boostsCombined[stat] || 1.0));
+      }
+    }
+    if (minPitcher !== 999) {
+      for (const stat of ["velocity", "control", "breaking", "stamina", "mental"]) {
+        state.player.pitcher[stat] = Math.round(minPitcher * (boostsCombined[stat] || 1.0));
+      }
+    }
+
     state.gameDate = createGameDate();
     state.autoMode = "two_way";
     state.paused = true;

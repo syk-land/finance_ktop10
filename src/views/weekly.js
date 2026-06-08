@@ -1937,18 +1937,31 @@ function showInjuryToastIfNeeded() {
   if (!inj?._isNew) return;
 
   // 부상 발생 시 게임 진행 일시정지 및 상태 저장 (자동 진행 중 부상 정보 미인지 방지)
-  state.paused = true;
-  saveGame();
+  const isX4 = state.tickSpeed <= 125;
 
   if (inj.surgery) {
-    showInjuryModal(t("injury.surgery", { weeks: inj.weeksLeft }));   // 큰 부상(수술)은 컷 모달
+    if (!isX4) {
+      state.paused = true;
+      saveGame();
+      showInjuryModal(t("injury.surgery", { weeks: inj.weeksLeft }));   // 큰 부상(수술)은 컷 모달
+    } else {
+      showToast(t("injury.surgery", { weeks: inj.weeksLeft }), "bad");
+    }
   } else if (inj.bodyPart) {
+    if (!state.autoMode && !isX4) {
+      state.paused = true;
+      saveGame();
+    }
     showToast(t("injury.detectedWithPart", {
       part: t("bodyPart." + inj.bodyPart),
       type: t("injury." + inj.severity),
       weeks: inj.weeksLeft,
     }), "bad");
   } else {
+    if (!state.autoMode && !isX4) {
+      state.paused = true;
+      saveGame();
+    }
     showToast(t("injury.detected", {
       type: t("injury." + inj.severity),
       weeks: inj.weeksLeft,
@@ -1983,10 +1996,25 @@ function showInjuryModal(msg) {
   btn.className = "primary";
   btn.style.cssText = "width:100%; padding:11px; font-weight:700;";
   btn.textContent = t("common.confirm");
-  btn.addEventListener("pointerdown", e => { e.preventDefault(); backdrop.remove(); });
+  btn.addEventListener("pointerdown", e => { 
+    e.preventDefault(); 
+    backdrop.remove(); 
+    if (state.autoMode) {
+      state.paused = false;
+      saveGame();
+    }
+  });
   dialog.appendChild(btn);
   backdrop.appendChild(dialog);
-  backdrop.addEventListener("click", e => { if (e.target === backdrop) backdrop.remove(); });
+  backdrop.addEventListener("click", e => { 
+    if (e.target === backdrop) {
+      backdrop.remove();
+      if (state.autoMode) {
+        state.paused = false;
+        saveGame();
+      }
+    }
+  });
   document.body.appendChild(backdrop);
 }
 
