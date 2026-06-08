@@ -197,10 +197,10 @@ function renderStartButtons(route) {
   startPanel.className = "panel";
   startPanel.style.padding = "12px";
   if (hasSave()) {
-    const cont = button(t("menu.continueBtn"), "primary", () => {
+    const cont = button(t("menu.continueBtn"), "primary", async () => {
       sfx("good");
       if (loadGame()) { resetWeeklyCarousel(); route("weekly"); }
-      else alert(t("cloud.loadFailed"));   // 세이브 손상 등으로 로드 실패 시 안내
+      else await window.showAlertModal(t("cloud.loadFailed"));   // 세이브 손상 등으로 로드 실패 시 안내
     });
     cont.style.cssText = "width:100%; padding:13px; font-size:16px; font-weight:700; margin-bottom:8px;";
     startPanel.appendChild(cont);
@@ -285,7 +285,7 @@ function renderAuthPanel(route) {
       }
       linkBtn.disabled = false;
       linkBtn.textContent = t("auth.linkGoogle");
-      if (result.reason !== "cancelled") alert(t("auth.linkFailed"));   // 사용자가 닫은 경우는 조용히.
+      if (result.reason !== "cancelled") showAlertModal(t("auth.linkFailed"));   // 사용자가 닫은 경우는 조용히.
     });
     row.appendChild(linkBtn);
   } else {
@@ -293,11 +293,13 @@ function renderAuthPanel(route) {
     signOutBtn.type = "button";
     signOutBtn.textContent = t("auth.signOut");
     signOutBtn.style.cssText = "padding:8px 10px; font-size:11px; flex-shrink:0;";
-    signOutBtn.addEventListener("click", async () => {
-      if (!confirm(t("auth.confirmSignOut"))) return;
-      signOutBtn.disabled = true;
-      await signOutCloud();
-      location.reload();
+    signOutBtn.addEventListener("click", () => {
+      showConfirmModal(t("auth.confirmSignOut")).then(async (confirmed) => {
+        if (!confirmed) return;
+        signOutBtn.disabled = true;
+        await signOutCloud();
+        location.reload();
+      });
     });
     row.appendChild(signOutBtn);
   }
@@ -329,8 +331,8 @@ function renderCloudPanel(route) {
   saveBtn.style.cssText = "padding:10px 8px; font-size:12px; font-weight:700;";
   saveBtn.disabled = !hasSave() || anon;
   saveBtn.addEventListener("click", async () => {
-    if (anon) { alert(t("cloud.signInToSave")); return; }
-    if (!hasSave()) { alert(t("cloud.noLocalSave")); return; }
+    if (anon) { await window.showAlertModal(t("cloud.signInToSave")); return; }
+    if (!hasSave()) { await window.showAlertModal(t("cloud.noLocalSave")); return; }
     saveBtn.disabled = true;
     saveBtn.textContent = t("cloud.saving");
     saveGame();
@@ -347,7 +349,7 @@ function renderCloudPanel(route) {
         firebase_not_ready: t("cloud.notReady"),
         not_signed_in: t("cloud.notSignedIn"),
       };
-      alert(reasonMap[r.reason] ?? t("cloud.saveFailed"));
+      await window.showAlertModal(reasonMap[r.reason] ?? t("cloud.saveFailed"));
     }
   });
   row.appendChild(saveBtn);
@@ -362,25 +364,32 @@ function renderCloudPanel(route) {
     const meta = cloudMetaCache ?? await getCloudSaveMeta();
     cloudMetaCache = meta;
     const localTs = getLocalSavedAt();
+    const doLoad = async () => {
+      loadBtn.disabled = true;
+      loadBtn.textContent = t("cloud.loading");
+      const result = await loadFromCloud();
+      if (result.ok) {
+        // 클라우드 → 로컬 기록 후, 새로고침만 하지 말고 바로 게임으로 진입.
+        if (loadGame()) { resetWeeklyCarousel(); route("weekly"); }
+        else location.reload();   // 로드 실패 시에만 새로고침 폴백
+      } else {
+        loadBtn.disabled = false;
+        loadBtn.textContent = t("cloud.loadBtn");
+        const reasonMap = {
+          not_found: t("cloud.notFound"),
+          firebase_not_ready: t("cloud.notReady"),
+          not_signed_in: t("cloud.notSignedIn"),
+        };
+        showAlertModal(reasonMap[result.reason] ?? t("cloud.loadFailed"));
+      }
+    };
+
     if (meta?.exists && localTs && meta.clientLastSaved && localTs > meta.clientLastSaved + 60000) {
-      if (!confirm(t("cloud.confirmOverwriteLocal"))) return;
-    }
-    loadBtn.disabled = true;
-    loadBtn.textContent = t("cloud.loading");
-    const result = await loadFromCloud();
-    if (result.ok) {
-      // 클라우드 → 로컬 기록 후, 새로고침만 하지 말고 바로 게임으로 진입.
-      if (loadGame()) { resetWeeklyCarousel(); route("weekly"); }
-      else location.reload();   // 로드 실패 시에만 새로고침 폴백
+      showConfirmModal(t("cloud.confirmOverwriteLocal")).then(confirmed => {
+        if (confirmed) doLoad();
+      });
     } else {
-      loadBtn.disabled = false;
-      loadBtn.textContent = t("cloud.loadBtn");
-      const reasonMap = {
-        not_found: t("cloud.notFound"),
-        firebase_not_ready: t("cloud.notReady"),
-        not_signed_in: t("cloud.notSignedIn"),
-      };
-      alert(reasonMap[result.reason] ?? t("cloud.loadFailed"));
+      doLoad();
     }
   });
   row.appendChild(loadBtn);
@@ -592,7 +601,7 @@ function renderLoadModal(route) {
       const meta = cloudMetaCache ?? await getCloudSaveMeta();
       const localTs = getLocalSavedAt();
       if (meta?.exists && localTs && meta.clientLastSaved && localTs > meta.clientLastSaved + 60000) {
-        if (!confirm(t("cloud.confirmOverwriteLocal"))) return;
+        if (!await window.showConfirmModal(t("cloud.confirmOverwriteLocal"))) return;
       }
       cloudBtn.disabled = true;
       cloudBtn.textContent = t("cloud.loading");
@@ -607,7 +616,7 @@ function renderLoadModal(route) {
           not_signed_in: t("cloud.notSignedIn"),
           firebase_not_ready: t("cloud.notReady"),
         };
-        alert(reasonMap[result.reason] ?? t("cloud.loadFailed"));
+        await window.showAlertModal(reasonMap[result.reason] ?? t("cloud.loadFailed"));
       }
     });
     cloudBtn.style.width = "100%";

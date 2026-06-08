@@ -556,12 +556,16 @@ export function applyGameExperience(player, mainPlayerResult, targets = null) {
   if (!mainPlayerResult) return { gained: {} };
   const gained = {};
   const ageMult = ageMultiplier(player.age);
+  // 재능 부스트 — 훈련과 동일하게 경기 경험치에도 반영
+  const talentBoost = combinedTalentBoost(player);
 
   function bump(group, stat, amount) {
     if (player[group][stat] === undefined) return;
+    // 재능 부스트: 양수 경험치에만 적용 (페널티는 재능과 무관)
+    const talent = amount > 0 ? (talentBoost[stat] ?? 1.0) : 1.0;
     // 경기 경험치 효율 축소 — 옛 ×1.5 는 매 시즌 stat +10~20 으로 노화 감쇄를 압도.
     // ×0.7 로 낮춰 30대 후반에 노화 감쇄가 우세해지도록 (실제 야구 곡선).
-    const adj = amount * ageMult * 0.7;
+    const adj = amount * talent * ageMult * 0.7;
     const curr = player[group][stat];
     // 방향 목표 초과 시 양(+) 경험치 차단 (페널티는 통과).
     if (adj > 0 && targets) {

@@ -352,7 +352,6 @@ export function getAvailableCategories(player) {
     return ["intl_tournament"];
   }
 
-  const list = [...CATEGORY_KEYS];
   const year = state.gameDate?.year;
   const isWorldCupYear = year != null && year % 2 === 1;
   if (
@@ -360,9 +359,10 @@ export function getAvailableCategories(player) {
     && nationalTeamRating(player) >= YOUTH_WORLDCUP_RATING_THRESHOLD
     && isWorldCupYear
   ) {
-    list.push("youth_worldcup");
+    return ["youth_worldcup"];
   }
-  return list;
+
+  return [...CATEGORY_KEYS];
 }
 
 // pendingTournament.key → 해당 국제대회 이벤트 매핑

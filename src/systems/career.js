@@ -7,7 +7,7 @@ import { createSeason } from "./week.js";
 import { getTeamPool } from "../data/teams.js";
 import { t, getLocale } from "../i18n/index.js";
 import { resetGameDateForNewSeason } from "./tick.js";
-import { overallScore, addFame, nationalTeamRating } from "./player.js";
+import { overallScore, addFame, nationalTeamRating, roleOVRs } from "./player.js";
 import { effectAdd } from "./traitEffects.js";
 
 export function startHighSchoolCareer(playerName, talent, schoolName) {
@@ -397,36 +397,64 @@ export function applyTradeAccept(player, newTeamName) {
   addFame(player, 5);
 }
 
-// 콜업 사다리 — 시즌 종료 시 역할기반 rating(nationalTeamRating)이 임계 넘으면 다음 단계 승격.
-// flat 평균 대신 "강한 포지션 + 양방향 프리미엄" — 특화 선수(한쪽만 탁월)도 강점으로 승격.
-// rating 궤적: pro2 ~102-112 / pro1 115→174 / 마이너는 단계별로 더 높은 벽.
+// 콜업 사다리 — AND 조건: (OVR 임계 만족) AND (성적 임계 만족)
 const PROMOTION_LADDER = {
-  pro2:    { next: "pro1",    minScore: 113 },  // 1군 — 쓸만한 수준이면 콜업
-  mlb_a:   { next: "mlb_aa",  minScore: 128 },
-  mlb_aa:  { next: "mlb_aaa", minScore: 145 },
-  mlb_aaa: { next: "mlb",     minScore: 165 },  // 메이저 — 특출난 수준
+  pro2:    { next: "pro1",    minOVR: 138, minOPS: 0.900, maxERA: 3.00 },
+  mlb_a:   { next: "mlb_aa",  minOVR: 130, minOPS: 0.850, maxERA: 3.50 },
+  mlb_aa:  { next: "mlb_aaa", minOVR: 145, minOPS: 0.880, maxERA: 3.20 },
+  mlb_aaa: { next: "mlb",     minOVR: 160, minOPS: 0.900, maxERA: 2.80 },
 };
 
-// 강등 사다리 — 노쇠 등으로 rating 이 "유지 임계" 아래로 떨어지면 한 단계 강등.
-// 핑퐁 방지: 유지 임계(minKeep) < 콜업 임계(PROMOTION_LADDER.minScore) — 둘 사이는 정체(유지).
-//   예: 1군은 113 이상이어야 콜업되고, 95 미만으로 떨어져야 2군 강등 (113↔95 hysteresis).
-// 최하위(pro2 / mlb_a)는 강등 없음 (방출 대신 은퇴는 사용자 선택).
+// 강등 사다리 — 유지 임계 OVR 미달 시 강등 (콜업 OVR과의 hysteresis 유지)
 const DEMOTION_LADDER = {
-  pro1:    { down: "pro2",    minKeep: 95  },
-  mlb:     { down: "mlb_aaa", minKeep: 147 },
-  mlb_aaa: { down: "mlb_aa",  minKeep: 127 },
-  mlb_aa:  { down: "mlb_a",   minKeep: 110 },
+  pro1:    { down: "pro2",    minKeepOVR: 118 },
+  mlb:     { down: "mlb_aaa", minKeepOVR: 140 },
+  mlb_aaa: { down: "mlb_aa",  minKeepOVR: 125 },
+  mlb_aa:  { down: "mlb_a",   minKeepOVR: 110 },
 };
 
 export function checkDemotion(player) {
   const rule = DEMOTION_LADDER[player.stage];
   if (!rule) return null;
-  return nationalTeamRating(player) < rule.minKeep ? rule.down : null;
+  const { bat, pit } = roleOVRs(player);
+  const belowKeep = bat < rule.minKeepOVR && pit < rule.minKeepOVR;
+  return belowKeep ? rule.down : null;
+}
+
+export function checkPromotion(player) {
+  const rule = PROMOTION_LADDER[player.stage];
+  if (!rule) return null;
+
+  const { bat, pit } = roleOVRs(player);
+  const ovrOk = bat >= rule.minOVR || pit >= rule.minOVR;
+  if (!ovrOk) return null;
+
+  const ss = player.seasonStats;
+  if (!ss) return null;
+
+  let statsOk = false;
+
+  // 타자 성적 만족 여부 판정 (최소 50타수)
+  if ((ss.ab ?? 0) >= 50) {
+    const obpNum = (ss.h ?? 0) + (ss.bb ?? 0) + (ss.hbp ?? 0);
+    const obpDen = (ss.ab ?? 0) + (ss.bb ?? 0) + (ss.hbp ?? 0) + (ss.sf ?? 0);
+    const obp = obpDen > 0 ? obpNum / obpDen : 0;
+    const slg = ss.ab > 0 ? (ss.tb ?? 0) / ss.ab : 0;
+    const ops = obp + slg;
+    if (ops >= rule.minOPS) statsOk = true;
+  }
+
+  // 투수 성적 만족 여부 판정 (최소 5경기, 1이닝 이상)
+  if (!statsOk && (ss.pitchG ?? 0) >= 5 && (ss.ip ?? 0) >= 1) {
+    const era = (ss.er ?? 0) * 9 / ss.ip;
+    if (era <= rule.maxERA) statsOk = true;
+  }
+
+  return statsOk ? rule.next : null;
 }
 
 // 강제 은퇴(방출) — 최하위 단계(pro2/mlb_a)에서 노쇠로 기량이 떨어진 베테랑이 더 받아줄 팀이 없어 은퇴.
 //   ★ 어린 유망주(2군에서 성장 중)는 제외 — 만 34세 이상 + 해당 단계 floor 미만일 때만.
-//     (예전엔 age 게이트가 없어 만 21세 신예도 평균 이하라며 방출되던 버그.)
 //   + 연령 한계: 만 41세 이상은 기량과 무관히 현역 마감(NPC 도 40 전후 은퇴).
 const FORCED_RETIRE_FLOOR = { pro2: 90, mlb_a: 100 };
 const FORCED_RETIRE_MIN_AGE = 34;
@@ -437,10 +465,4 @@ export function checkForcedRetirement(player) {
   if (age >= 41) return true;
   const floor = FORCED_RETIRE_FLOOR[player.stage];
   return floor != null && age >= FORCED_RETIRE_MIN_AGE && nationalTeamRating(player) < floor;
-}
-
-export function checkPromotion(player) {
-  const rule = PROMOTION_LADDER[player.stage];
-  if (!rule) return null;
-  return nationalTeamRating(player) >= rule.minScore ? rule.next : null;
 }

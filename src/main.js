@@ -350,3 +350,84 @@ document.addEventListener("DOMContentLoaded", init);
 // 디버그용 노출
 window.__gameState = state;
 window.__route = route;
+
+// 전역 alert 및 confirm 대체 모달
+window.showConfirmModal = function(message) {
+  return new Promise(resolve => {
+    const backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop";
+    backdrop.style.zIndex = "2000";
+    
+    const dialog = document.createElement("div");
+    dialog.className = "modal-dialog";
+    dialog.style.maxWidth = "320px";
+    dialog.style.textAlign = "center";
+    dialog.style.position = "relative";
+    
+    const msg = document.createElement("p");
+    msg.style.cssText = "font-size:13px; line-height:1.5; margin:10px 0 20px; color:#ffffff;";
+    msg.textContent = message;
+    dialog.appendChild(msg);
+    
+    const btnRow = document.createElement("div");
+    btnRow.style.cssText = "display:grid; grid-template-columns:1fr 1fr; gap:8px;";
+    
+    const yesBtn = document.createElement("button");
+    yesBtn.className = "primary";
+    yesBtn.textContent = t("offseason.btnYes") || "Yes";
+    yesBtn.style.padding = "8px";
+    yesBtn.style.fontSize = "12px";
+    yesBtn.addEventListener("click", () => {
+      backdrop.remove();
+      resolve(true);
+    });
+    
+    const noBtn = document.createElement("button");
+    noBtn.textContent = t("offseason.btnNo") || "No";
+    noBtn.style.padding = "8px";
+    noBtn.style.fontSize = "12px";
+    noBtn.addEventListener("click", () => {
+      backdrop.remove();
+      resolve(false);
+    });
+    
+    btnRow.appendChild(yesBtn);
+    btnRow.appendChild(noBtn);
+    dialog.appendChild(btnRow);
+    
+    backdrop.appendChild(dialog);
+    document.body.appendChild(backdrop);
+  });
+};
+
+window.showAlertModal = function(message) {
+  return new Promise(resolve => {
+    const backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop";
+    backdrop.style.zIndex = "2000";
+    
+    const dialog = document.createElement("div");
+    dialog.className = "modal-dialog";
+    dialog.style.maxWidth = "320px";
+    dialog.style.textAlign = "center";
+    dialog.style.position = "relative";
+    
+    const msg = document.createElement("p");
+    msg.style.cssText = "font-size:13px; line-height:1.5; margin:10px 0 20px; color:#ffffff;";
+    msg.textContent = message;
+    dialog.appendChild(msg);
+    
+    const btn = document.createElement("button");
+    btn.className = "primary";
+    btn.textContent = t("weekly.confirmBtn") || "Confirm";
+    btn.style.cssText = "width:100%; padding:8px; font-size:12px;";
+    btn.addEventListener("click", () => {
+      backdrop.remove();
+      resolve();
+    });
+    
+    dialog.appendChild(btn);
+    backdrop.appendChild(dialog);
+    document.body.appendChild(backdrop);
+  });
+};

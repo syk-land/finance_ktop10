@@ -372,217 +372,349 @@ function playPitchSequenceManual({ svg, fxHost, ball, labelHost, swingRef, event
   const container = svg.parentElement;
   return showPreparationOverlay(container, mode).then(() => {
     const start = { x: 160, y: 58, r: 3 };
-    ball.style.opacity = "1";
-    ball.setAttribute("cx", start.x.toString());
-    ball.setAttribute("cy", start.y.toString());
-    ball.setAttribute("r", start.r.toString());
 
     if (mode === "bat") {
-      // ────────────── 타자 모드 (직접 타격 조작) ──────────────
-      const duration = 900; // 수동 조작용 여유 속도 (0.9초)
-      showLabel(labelHost, t("homerunDerby.swingBtn") || "SWING!", "var(--accent)");
-
-      sfx("pitch");
-      const pitchStartTime = Date.now();
-      let swingTriggered = false;
-      let clickTime = 0;
-
-      // 타격 애니메이션 루프 (수동 구동)
-      const activeFrame = () => {
-        if (!isInteractiveActive || swingTriggered) return;
-        const elapsed = Date.now() - pitchStartTime;
-        const p = Math.min(1.0, elapsed / duration);
-        const cy = start.y + (195 - start.y) * p;
-        const r = start.r + (15 - start.r) * p;
-        ball.setAttribute("cy", cy.toFixed(1));
-        ball.setAttribute("r", r.toFixed(1));
-        if (p < 1.0) {
-          requestAnimationFrame(activeFrame);
-        }
-      };
-      requestAnimationFrame(activeFrame);
+      // ────────────── 타자 모드 (직접 타격 조작 + 피치 바이 피치) ──────────────
+      let strikes = 0;
 
       return new Promise(resolve => {
-        const onSwing = (e) => {
-          if (swingTriggered) return;
-          swingTriggered = true;
-          clickTime = Date.now();
-          container.removeEventListener("click", onSwing);
-
-          const elapsed = clickTime - pitchStartTime;
-          const p = elapsed / duration;
-
-          // 능력치 반영 타이밍 윈도우 계산
-          const contactStat = state.player?.contact ?? 50;
-          const powerStat = state.player?.power ?? 50;
-          const perfectWin = 0.05 + (contactStat - 50) * 0.0003;
-          const goodWin = 0.14 + (contactStat - 50) * 0.0006;
-
-          let finalResult = "K";
-          let feedbackText = t("homerunDerby.miss") || "MISS!";
-          let feedbackColor = "var(--bad)";
-
-          if (Math.abs(p - 0.82) <= perfectWin / 2) {
-            finalResult = Math.random() < (powerStat / 140) ? "HR" : "3B";
-            feedbackText = t("homerunDerby.perfect") || "PERFECT!";
-            feedbackColor = "var(--accent-2)";
-          } else if (Math.abs(p - 0.82) <= goodWin / 2) {
-            finalResult = Math.random() < 0.5 ? "1B" : "2B";
-            feedbackText = t("homerunDerby.good") || "GOOD!";
-            feedbackColor = "var(--accent)";
-          } else if (p >= 0.58 && p <= 1.04) {
-            finalResult = "OUT";
-            feedbackText = p < 0.82 ? (t("homerunDerby.early") || "EARLY") : (t("homerunDerby.late") || "LATE");
-            feedbackColor = "var(--warn)";
-          } else {
-            finalResult = "K";
-            feedbackText = t("homerunDerby.miss") || "MISS!";
-            feedbackColor = "var(--bad)";
-          }
-
-          updateEventResult(event, finalResult);
-          hideLabel(labelHost);
-          showLabel(labelHost, feedbackText, feedbackColor);
-
-          // 스윙 기동
+        const nextPitch = () => {
+          if (!isInteractiveActive) return resolve();
+          
+          // 공 리셋
+          ball.style.opacity = "1";
+          ball.setAttribute("cx", start.x.toString());
+          ball.setAttribute("cy", start.y.toString());
+          ball.setAttribute("r", start.r.toString());
+          
           if (swingRef.fg) {
-            swingRef.fg.style.transition = "transform 140ms ease-out";
-            swingRef.fg.style.transform = fgBaseTransform(swingRef) + " rotate(-85deg)";
+            swingRef.fg.style.transition = "";
+            swingRef.fg.style.transform = fgBaseTransform(swingRef);
           } else if (swingRef.bat) {
-            swingRef.bat.setAttribute("transform", "rotate(90 14 -32)");
+            swingRef.bat.setAttribute("transform", "rotate(20 14 -32)");
           }
 
-          playResultSfx(finalResult);
-          const spec = PLAYBOOK[finalResult] ?? PLAYBOOK.OUT;
-          const { contact, final } = pickEndPoint(spec);
+          const duration = 900;
+          showLabel(labelHost, `S: ${strikes}`, "var(--accent)");
 
-          animateBall(ball, { x: 160, y: parseFloat(ball.getAttribute("cy")), r: parseFloat(ball.getAttribute("r")) }, final, 700)
-            .then(() => {
-              if (spec.firework) {
-                spawnFireworks(fxHost ?? svg);
-                return waitMs(900);
+          sfx("pitch");
+          const pitchStartTime = Date.now();
+          let swingTriggered = false;
+          let clickTime = 0;
+
+          const activeFrame = () => {
+            if (!isInteractiveActive || swingTriggered) return;
+            const elapsed = Date.now() - pitchStartTime;
+            const p = Math.min(1.0, elapsed / duration);
+            const cy = start.y + (195 - start.y) * p;
+            const r = start.r + (15 - start.r) * p;
+            ball.setAttribute("cy", cy.toFixed(1));
+            ball.setAttribute("r", r.toFixed(1));
+            if (p < 1.0) {
+              requestAnimationFrame(activeFrame);
+            }
+          };
+          requestAnimationFrame(activeFrame);
+
+          const onSwing = (e) => {
+            if (swingTriggered) return;
+            swingTriggered = true;
+            clickTime = Date.now();
+            container.removeEventListener("click", onSwing);
+            clearTimeout(strikeTimeout);
+
+            const elapsed = clickTime - pitchStartTime;
+            const p = elapsed / duration;
+
+            const contactStat = state.player?.contact ?? 50;
+            const powerStat = state.player?.power ?? 50;
+            const perfectWin = 0.05 + (contactStat - 50) * 0.0003;
+            const goodWin = 0.14 + (contactStat - 50) * 0.0006;
+
+            let finalResult = "K";
+            let feedbackText = t("homerunDerby.miss") || "MISS!";
+            let feedbackColor = "var(--bad)";
+            let isFoul = false;
+            const rand = Math.random();
+
+            if (Math.abs(p - 0.82) <= perfectWin / 2) {
+              finalResult = Math.random() < (powerStat / 140) ? "HR" : "3B";
+              feedbackText = t("homerunDerby.perfect") || "PERFECT!";
+              feedbackColor = "var(--accent-2)";
+            } else if (Math.abs(p - 0.82) <= goodWin / 2) {
+              finalResult = Math.random() < 0.5 ? "1B" : "2B";
+              feedbackText = t("homerunDerby.good") || "GOOD!";
+              feedbackColor = "var(--accent)";
+            } else if (p >= 0.58 && p <= 1.04) {
+              if (rand < 0.65) {
+                isFoul = true;
+                feedbackText = "FOUL!";
+                feedbackColor = "var(--warn)";
+              } else {
+                finalResult = "OUT";
+                feedbackText = p < 0.82 ? (t("homerunDerby.early") || "EARLY") : (t("homerunDerby.late") || "LATE");
+                feedbackColor = "var(--warn)";
               }
-              return waitMs(220);
-            })
-            .then(() => {
-              ball.style.opacity = "0";
-              hideLabel(labelHost);
-              isInteractiveActive = false;
-              resolve();
+            } else {
+              feedbackText = t("homerunDerby.miss") || "MISS!";
+              feedbackColor = "var(--bad)";
+            }
+
+            if (swingRef.fg) {
+              swingRef.fg.style.transition = "transform 140ms ease-out";
+              swingRef.fg.style.transform = fgBaseTransform(swingRef) + " rotate(-85deg)";
+            } else if (swingRef.bat) {
+              swingRef.bat.setAttribute("transform", "rotate(90 14 -32)");
+            }
+
+            if (isFoul) {
+              sfx("out");
+              if (strikes < 2) strikes++;
+              showLabel(labelHost, feedbackText, feedbackColor);
+              const foulLeft = Math.random() < 0.5;
+              const foulFinal = { x: foulLeft ? -40 : W + 40, y: 130 + Math.random() * 40, r: 4, opacity: 0.4 };
+              
+              animateBall(ball, { x: 160, y: parseFloat(ball.getAttribute("cy")), r: parseFloat(ball.getAttribute("r")) }, foulFinal, 600)
+                .then(() => waitMs(600))
+                .then(() => {
+                  nextPitch();
+                });
+            } else {
+              if (feedbackText === (t("homerunDerby.miss") || "MISS!")) {
+                strikes++;
+              }
+              if (strikes >= 3) {
+                finalResult = "K";
+                feedbackText = "STRIKE THREE!";
+                feedbackColor = "var(--bad)";
+              }
+
+              if (finalResult === "K" && feedbackText !== "STRIKE THREE!") {
+                sfx("strikeout");
+                showLabel(labelHost, feedbackText, feedbackColor);
+                waitMs(800).then(() => nextPitch());
+              } else {
+                updateEventResult(event, finalResult);
+                hideLabel(labelHost);
+                showLabel(labelHost, feedbackText, feedbackColor);
+                playResultSfx(finalResult);
+
+                const spec = PLAYBOOK[finalResult] ?? PLAYBOOK.OUT;
+                const { contact, final } = pickEndPoint(spec);
+
+                animateBall(ball, { x: 160, y: parseFloat(ball.getAttribute("cy")), r: parseFloat(ball.getAttribute("r")) }, final, 700)
+                  .then(() => {
+                    if (spec.firework) {
+                      spawnFireworks(fxHost ?? svg);
+                      return waitMs(900);
+                    }
+                    return waitMs(220);
+                  })
+                  .then(() => {
+                    ball.style.opacity = "0";
+                    hideLabel(labelHost);
+                    isInteractiveActive = false;
+                    resolve();
+                  });
+              }
+            }
+          };
+
+          container.addEventListener("click", onSwing);
+
+          const strikeTimeout = setTimeout(() => {
+            if (swingTriggered) return;
+            swingTriggered = true;
+            container.removeEventListener("click", onSwing);
+
+            strikes++;
+            showLabel(labelHost, "STRIKE!", "var(--bad)");
+            sfx("strikeout");
+
+            waitMs(800).then(() => {
+              if (strikes >= 3) {
+                updateEventResult(event, "K");
+                hideLabel(labelHost);
+                showLabel(labelHost, "STRIKE THREE!", "var(--bad)");
+                playResultSfx("K");
+                waitMs(800).then(() => {
+                  ball.style.opacity = "0";
+                  hideLabel(labelHost);
+                  isInteractiveActive = false;
+                  resolve();
+                });
+              } else {
+                nextPitch();
+              }
             });
+          }, duration * 1.12);
         };
 
-        container.addEventListener("click", onSwing);
-
-        // 미타격 스트라이크 타임아웃
-        setTimeout(() => {
-          if (swingTriggered) return;
-          swingTriggered = true;
-          container.removeEventListener("click", onSwing);
-
-          updateEventResult(event, "K");
-          hideLabel(labelHost);
-          showLabel(labelHost, t("homerunDerby.miss") || "MISS!", "var(--bad)");
-          sfx("strikeout");
-
-          waitMs(800).then(() => {
-            ball.style.opacity = "0";
-            hideLabel(labelHost);
-            isInteractiveActive = false;
-            resolve();
-          });
-        }, duration * 1.12);
+        nextPitch();
       });
 
     } else {
-      // ────────────── 투수 모드 (선택 완료 시 자동 연산) ──────────────
-      return showPitchingSelector(container, state.player).then((selectorResult) => {
-        const pitchObj = selectorResult.pitch;
-        
-        // 심리전 보정치 적용
-        const multiplier = selectorResult.multiplier ?? 1.0;
-        const controlStat = Math.round((state.player?.control ?? 50) * multiplier);
+      // ────────────── 투수 모드 (선택 완료 시 자동 연산 + 피치 바이 피치) ──────────────
+      let strikes = 0;
 
-        // 능력치 기반 확률 계산 (PERFECT, GOOD, EARLY_LATE, MEATBALL)
-        const rand = Math.random();
+      return new Promise(resolve => {
+        const nextPitch = () => {
+          if (!isInteractiveActive) return resolve();
+          
+          ball.style.opacity = "1";
+          ball.setAttribute("cx", "160");
+          ball.setAttribute("cy", "195");
+          ball.setAttribute("r", "8");
+          
+          showLabel(labelHost, `S: ${strikes}`, "var(--accent-2)");
 
-        const pPerfect = Math.max(0.05, Math.min(0.50, 0.15 + (controlStat - 50) * 0.005));
-        const pGood = Math.max(0.20, Math.min(0.70, 0.45 + (controlStat - 50) * 0.004));
-        const pEarlyLate = Math.max(0.05, Math.min(0.50, 0.25 - (controlStat - 50) * 0.003));
+          showPitchingSelector(container, state.player).then((selectorResult) => {
+            const pitchObj = selectorResult.pitch;
+            
+            const multiplier = selectorResult.multiplier ?? 1.0;
+            const controlStat = Math.round((state.player?.control ?? 50) * multiplier);
 
-        const isCorner = [0, 2, 6, 8].includes(selectorResult.zone);
-        const isCenter = selectorResult.zone === 4;
+            const rand = Math.random();
+            const pPerfect = Math.max(0.05, Math.min(0.50, 0.15 + (controlStat - 50) * 0.005));
+            const pGood = Math.max(0.20, Math.min(0.70, 0.45 + (controlStat - 50) * 0.004));
+            const pEarlyLate = Math.max(0.05, Math.min(0.50, 0.25 - (controlStat - 50) * 0.003));
 
-        let finalResult = "1B";
-        let feedbackText = "MEATBALL!";
-        let feedbackColor = "var(--bad)";
-        const pitchLabel = t("pitch." + pitchObj.key) || pitchObj.name;
+            let pitchQuality = "meatball";
+            if (rand < pPerfect) pitchQuality = "perfect";
+            else if (rand < pPerfect + pGood) pitchQuality = "good";
+            else if (rand < pPerfect + pGood + pEarlyLate) pitchQuality = "early_late";
 
-        if (rand < pPerfect) {
-          if (isCorner) {
-            finalResult = Math.random() < 0.85 ? "K" : "OUT";
-          } else if (isCenter) {
-            finalResult = Math.random() < 0.50 ? "K" : (Math.random() < 0.80 ? "OUT" : "1B");
-          } else {
-            finalResult = Math.random() < 0.70 ? "K" : "OUT";
-          }
-          feedbackText = `PERFECT ${pitchLabel.toUpperCase()}!`;
-          feedbackColor = "var(--accent-2)";
-          sfx("good");
-        } else if (rand < pPerfect + pGood) {
-          if (isCorner) {
-            finalResult = Math.random() < 0.75 ? "OUT" : "1B";
-          } else {
-            finalResult = Math.random() < 0.60 ? "OUT" : "1B";
-          }
-          feedbackText = `GOOD ${pitchLabel.toUpperCase()}!`;
-          feedbackColor = "var(--accent)";
-        } else if (rand < pPerfect + pGood + pEarlyLate) {
-          const outChance = isCorner ? 0.30 : 0.45;
-          finalResult = Math.random() < outChance ? "OUT" : (Math.random() < 0.75 ? "1B" : "2B");
-          feedbackText = Math.random() < 0.5 ? "EARLY RELEASE!" : "LATE RELEASE!";
-          feedbackColor = "var(--warn)";
-        } else {
-          const hrChance = isCorner ? 0.45 : 0.30;
-          finalResult = Math.random() < hrChance ? "HR" : "1B";
-          feedbackText = "MEATBALL!";
-          feedbackColor = "var(--bad)";
-        }
+            const isCorner = [0, 2, 6, 8].includes(selectorResult.zone);
+            const isCenter = selectorResult.zone === 4;
+            const pitchLabel = t("pitch." + pitchObj.key) || pitchObj.name;
 
-        updateEventResult(event, finalResult);
-        hideLabel(labelHost);
-        showLabel(labelHost, feedbackText, feedbackColor);
+            let isFoul = false;
+            let isMiss = false;
+            let finalResult = "1B";
+            let feedbackText = "MEATBALL!";
+            let feedbackColor = "var(--bad)";
+            const outcomeRand = Math.random();
 
-        // 투구 시작
-        sfx("pitch");
-        if (swingRef.fg) throwPush(swingRef);
-
-        const spec = PLAYBOOK[finalResult] ?? PLAYBOOK.OUT;
-        const { contact, final } = pickEndPoint(spec);
-
-        return new Promise(resolve => {
-          animateBall(ball, start, { x: contact.x, y: contact.y, r: 5 }, 380)
-            .then(() => {
-              if (spec.swing && (swingRef.fg || swingRef.bat)) {
-                swingBat(swingRef);
+            if (pitchQuality === "perfect") {
+              if (outcomeRand < 0.70) {
+                isMiss = true;
+                feedbackText = `PERFECT STRIKE!`;
+                feedbackColor = "var(--accent-2)";
+              } else {
+                isFoul = true;
+                feedbackText = `PERFECT FOUL!`;
+                feedbackColor = "var(--accent-2)";
               }
-              playResultSfx(finalResult);
-              return animateBall(ball, { x: contact.x, y: contact.y, r: 5 }, final, 700);
-            })
-            .then(() => {
-              if (spec.firework) {
-                spawnFireworks(fxHost ?? svg);
-                return waitMs(900);
+              sfx("good");
+            } else if (pitchQuality === "good") {
+              if (outcomeRand < 0.50) {
+                isFoul = true;
+                feedbackText = `GOOD FOUL!`;
+                feedbackColor = "var(--accent)";
+              } else {
+                finalResult = isCorner ? (Math.random() < 0.8 ? "OUT" : "1B") : (Math.random() < 0.5 ? "OUT" : "1B");
+                feedbackText = `GOOD ${pitchLabel.toUpperCase()}!`;
+                feedbackColor = "var(--accent)";
               }
-              return waitMs(220);
-            })
-            .then(() => {
-              ball.style.opacity = "0";
-              hideLabel(labelHost);
-              isInteractiveActive = false;
-              resolve();
-            });
-        });
+            } else if (pitchQuality === "early_late") {
+              if (outcomeRand < 0.40) {
+                isFoul = true;
+                feedbackText = "FOUL!";
+                feedbackColor = "var(--warn)";
+              } else {
+                const outChance = isCorner ? 0.35 : 0.50;
+                finalResult = Math.random() < outChance ? "OUT" : (Math.random() < 0.75 ? "1B" : "2B");
+                feedbackText = "HIT!";
+                feedbackColor = "var(--warn)";
+              }
+            } else {
+              const hrChance = isCorner ? 0.45 : 0.30;
+              finalResult = Math.random() < hrChance ? "HR" : "1B";
+              feedbackText = "MEATBALL!";
+              feedbackColor = "var(--bad)";
+            }
+
+            if (isMiss || isFoul) {
+              if (isMiss) {
+                strikes++;
+              } else if (isFoul) {
+                if (strikes < 2) strikes++;
+              }
+              
+              if (strikes >= 3) {
+                finalResult = "K";
+                feedbackText = "STRIKE THREE!";
+                feedbackColor = "var(--accent-2)";
+                isFoul = false;
+                isMiss = false;
+              }
+            }
+
+            updateEventResult(event, finalResult);
+            hideLabel(labelHost);
+            showLabel(labelHost, feedbackText, feedbackColor);
+
+            sfx("pitch");
+            if (swingRef.fg) throwPush(swingRef);
+
+            const spec = PLAYBOOK[finalResult] ?? PLAYBOOK.OUT;
+            const { contact, final } = pickEndPoint(spec);
+
+            if (isFoul) {
+              const startBall = { x: 160, y: 195, r: 8 };
+              animateBall(ball, startBall, { x: contact.x, y: contact.y, r: 5 }, 380)
+                .then(() => {
+                  if (swingRef.fg || swingRef.bat) swingBat(swingRef);
+                  sfx("out");
+                  const foulLeft = Math.random() < 0.5;
+                  const foulFinal = { x: foulLeft ? -40 : W + 40, y: 130 + Math.random() * 40, r: 4, opacity: 0.4 };
+                  return animateBall(ball, { x: contact.x, y: contact.y, r: 5 }, foulFinal, 600);
+                })
+                .then(() => waitMs(600))
+                .then(() => {
+                  nextPitch();
+                });
+            } else if (isMiss) {
+              const startBall = { x: 160, y: 195, r: 8 };
+              animateBall(ball, startBall, { x: contact.x, y: contact.y, r: 5 }, 380)
+                .then(() => {
+                  if (Math.random() < 0.7 && (swingRef.fg || swingRef.bat)) {
+                    swingBat(swingRef);
+                  }
+                  sfx("strikeout");
+                  return waitMs(600);
+                })
+                .then(() => {
+                  nextPitch();
+                });
+            } else {
+              const startBall = { x: 160, y: 195, r: 8 };
+              animateBall(ball, startBall, { x: contact.x, y: contact.y, r: 5 }, 380)
+                .then(() => {
+                  if (spec.swing && (swingRef.fg || swingRef.bat)) {
+                    swingBat(swingRef);
+                  }
+                  playResultSfx(finalResult);
+                  return animateBall(ball, { x: contact.x, y: contact.y, r: 5 }, final, 700);
+                })
+                .then(() => {
+                  if (spec.firework) {
+                    spawnFireworks(fxHost ?? svg);
+                    return waitMs(900);
+                  }
+                  return waitMs(220);
+                })
+                .then(() => {
+                  ball.style.opacity = "0";
+                  hideLabel(labelHost);
+                  isInteractiveActive = false;
+                  resolve();
+                });
+            }
+          });
+        };
+
+        nextPitch();
       });
     }
   });

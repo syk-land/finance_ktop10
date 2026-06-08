@@ -55,7 +55,7 @@ function statFromGauss(base, sigma, weight = 1.0, cap = 150) {
 // 75% 평균 + sigma 14 면 약체 NPC ~cap*0.6 ~ 강체 NPC ~cap*0.9 분포.
 // 팀 strength 영향도 강화(0.3→0.6) — 강팀/약팀 격차 가시화.
 function stageBase(strength, cap) {
-  return cap * 0.75 + (strength - 60) * 0.6;
+  return cap * 0.88 + (strength - 60) * 0.6;
 }
 
 // 팀의 대략적 평균 능력치 (주인공 능력치와 같은 스케일) — 영입/오퍼 카드 표시용.
@@ -65,7 +65,13 @@ export function teamAvgOvr(strength, stage) {
   return Math.round(Math.max(20, Math.min(cap, stageBase(strength, cap))));
 }
 
-function createBatter(strength, ageRange = [19, 35], cap = 150) {
+// MLB 계열 stage — 한글 버전이어도 영어 이름 사용
+const MLB_STAGES = new Set(["mlb", "mlb_a", "mlb_aa", "mlb_aaa"]);
+function nameLocaleForStage(stage) {
+  return MLB_STAGES.has(stage) ? "en" : getLocale();
+}
+
+function createBatter(strength, ageRange = [19, 35], cap = 150, nameLocale = getLocale()) {
   const pos = POSITIONS_BATTER[Math.floor(Math.random() * POSITIONS_BATTER.length)];
   const w = POS_WEIGHTS[pos];
   const base = stageBase(strength, cap);
@@ -75,7 +81,7 @@ function createBatter(strength, ageRange = [19, 35], cap = 150) {
   }
   return {
     id: _npcIdCounter++,
-    name: randomName(getLocale()),
+    name: randomName(nameLocale),
     role: "batter",
     pos,
     age: rndInt(ageRange[0], ageRange[1]),
@@ -87,7 +93,7 @@ function createBatter(strength, ageRange = [19, 35], cap = 150) {
   };
 }
 
-function createPitcher(strength, ageRange = [19, 35], cap = 150) {
+function createPitcher(strength, ageRange = [19, 35], cap = 150, nameLocale = getLocale()) {
   const role = Math.random() < 0.5 ? "SP" : "RP";
   const base = stageBase(strength, cap);
   const pitcher = {};
@@ -96,7 +102,7 @@ function createPitcher(strength, ageRange = [19, 35], cap = 150) {
   }
   return {
     id: _npcIdCounter++,
-    name: randomName(getLocale()),
+    name: randomName(nameLocale),
     role: "pitcher",
     pos: role, // "SP" | "RP"
     age: rndInt(ageRange[0], ageRange[1]),
@@ -130,15 +136,17 @@ export function createRoster(strength, ageRange, opts = {}) {
   const { stage, teamName } = opts;
   const cap = getNpcStatCap(stage);
   const dummy = stage && teamName && isDummyStage(stage);
+  // MLB 계열은 한글 버전이어도 영어 이름 강제
+  const nameLoc = nameLocaleForStage(stage);
   // 25명: 12명 야수 + 13명 투수
   const roster = [];
   for (let i = 0; i < 12; i++) {
-    const n = createBatter(strength, ageRange, cap);
+    const n = createBatter(strength, ageRange, cap, nameLoc);
     if (dummy) { n.isDummy = true; n.name = dummyName(teamName, stage, "batter", i); }
     roster.push(n);
   }
   for (let i = 0; i < 13; i++) {
-    const n = createPitcher(strength, ageRange, cap);
+    const n = createPitcher(strength, ageRange, cap, nameLoc);
     if (dummy) { n.isDummy = true; n.name = dummyName(teamName, stage, "pitcher", i); }
     roster.push(n);
   }

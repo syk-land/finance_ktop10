@@ -2497,8 +2497,8 @@ function renderSeasonEnd(root, route) {
     retireBtn.type = "button";
     retireBtn.textContent = t("careerPath.retireLabel");
     retireBtn.style.cssText = "width:100%; padding:10px; margin-top:8px; font-size:12px; opacity:0.7;";
-    retireBtn.addEventListener("click", () => {
-      if (!confirm(t("careerPath.confirmRetire"))) return;
+    retireBtn.addEventListener("click", async () => {
+      if (!await window.showConfirmModal(t("careerPath.confirmRetire"))) return;
       transitionToStage("retire");
       route("weekly");
       showInterstitialAd();   // 은퇴 시점 전면 광고
@@ -2547,9 +2547,9 @@ function showFreeAgencyModal(fa, route, onClose) {
   const stayBtn = document.createElement("button");
   stayBtn.style.cssText = "width:100%; padding:10px; margin-bottom:6px; font-weight:700;";
   stayBtn.textContent = t("fa.btnStay", { team: state.player.teamName });
-  stayBtn.addEventListener("pointerdown", e => {
+  stayBtn.addEventListener("pointerdown", async e => {
     e.preventDefault();
-    if (!confirm(t("fa.confirmStay", { team: state.player.teamName }))) return;
+    if (!await window.showConfirmModal(t("fa.confirmStay", { team: state.player.teamName }))) return;
     applyFreeAgencyDecision(state.player, "stay");
     pushToast(t("fa.stayResult", { team: state.player.teamName }), "good");
     finish();
@@ -2567,9 +2567,9 @@ function showFreeAgencyModal(fa, route, onClose) {
       btn.className = "primary";
       btn.style.cssText = "width:100%; padding:10px; margin-top:4px; font-weight:700;";
       btn.textContent = t("fa.btnLeave", { team: offer.name });
-      btn.addEventListener("pointerdown", e => {
+      btn.addEventListener("pointerdown", async e => {
         e.preventDefault();
-        if (!confirm(t("fa.confirmLeave", { team: offer.name }))) return;
+        if (!await window.showConfirmModal(t("fa.confirmLeave", { team: offer.name }))) return;
         const res = applyFreeAgencyDecision(state.player, "leave", offer.name);
         pushToast(t("fa.leaveResult", { team: res.teamName }), "good");
         finish();
@@ -2627,9 +2627,9 @@ function showTradeModal(trade, route, onClose) {
   acceptBtn.className = "primary";
   acceptBtn.style.cssText = "width:100%; padding:10px; margin-bottom:6px; font-weight:700;";
   acceptBtn.textContent = t("trade.btnAccept", { team: trade.fromTeam });
-  acceptBtn.addEventListener("pointerdown", e => {
+  acceptBtn.addEventListener("pointerdown", async e => {
     e.preventDefault();
-    if (!confirm(t("trade.confirmAccept", { team: trade.fromTeam }))) return;
+    if (!await window.showConfirmModal(t("trade.confirmAccept", { team: trade.fromTeam }))) return;
     applyTradeAccept(state.player, trade.fromTeam);
     pushToast(t("trade.acceptResult", { team: trade.fromTeam }), "good");
     finish();
@@ -2728,9 +2728,9 @@ function showDemotionModal(fromStage, toStage, route) {
   retireBtn.className = "danger";
   retireBtn.style.cssText = "width:100%; padding:10px; font-weight:700;";
   retireBtn.textContent = t("demotion.btnRetire");
-  retireBtn.addEventListener("pointerdown", e => {
+  retireBtn.addEventListener("pointerdown", async e => {
     e.preventDefault();
-    if (!confirm(t("careerPath.confirmRetire"))) return;
+    if (!await window.showConfirmModal(t("careerPath.confirmRetire"))) return;
     transitionToStage("retire");
     saveGame();
     backdrop.remove();
@@ -2748,14 +2748,31 @@ function showDemotionModal(fromStage, toStage, route) {
 // "다음 연차 진행하기" 클릭 시 모달 닫고 다음 시즌으로.
 function showOffseasonModal(route) {
   if (!state.offseason) {
-    state.offseason = {
-      selectedCategory: null,
-      baseChanges: null,
-      eventKey: null,
-      decided: false,
-      outcomeKind: null,
-      eventChanges: null,
-    };
+    const categories = getAvailableCategories(state.player);
+    if (categories.length === 1 && (categories[0] === "intl_tournament" || categories[0] === "youth_worldcup")) {
+      const key = categories[0];
+      const { baseChanges, eventKey } = applyCategoryAndPickEvent(state.player, key);
+      const bracket = simulateIntlBracket(state.player);
+      const { outcomeKind, changes } = applyEventChoice(state.player, eventKey, bracket?.outcomeKind ?? null);
+      state.offseason = {
+        selectedCategory: key,
+        baseChanges: baseChanges,
+        eventKey: eventKey,
+        decided: true,
+        outcomeKind: outcomeKind,
+        eventChanges: changes,
+        bracket: bracket,
+      };
+    } else {
+      state.offseason = {
+        selectedCategory: null,
+        baseChanges: null,
+        eventKey: null,
+        decided: false,
+        outcomeKind: null,
+        eventChanges: null,
+      };
+    }
     saveGame();
   }
 
@@ -2871,9 +2888,9 @@ function buildOffseasonProposalPhase(dialog, rerender) {
   const off = state.offseason;
   const evKey = off.eventKey;
 
-  // 국제대회 자동 진행 — 시즌 중 라이브 모달에서 이미 참가 결정.
+  // 국제대회 및 청소년 세계대회 자동 진행 — 차출 시 무조건 자동 수락 처리.
   // yes/no 선택 단계를 건너뛰고 바로 실제 브래킷 시뮬 → 메달 등수로 결과(great/ok/bad) 결정.
-  if (off.selectedCategory === "intl_tournament") {
+  if (off.selectedCategory === "intl_tournament" || off.selectedCategory === "youth_worldcup") {
     const bracket = simulateIntlBracket(state.player);  // 실패 시 null → 난수 폴백
     const { outcomeKind, changes } = applyEventChoice(state.player, evKey, bracket?.outcomeKind ?? null);
     off.decided = true;
@@ -3143,7 +3160,7 @@ function renderCareerEndedPanel(route) {
       const meta = await getCloudSaveMeta();
       const localTs = Date.now();   // 지금 저장하면 lastSaved = now
       if (meta?.exists && meta.clientLastSaved && meta.clientLastSaved > localTs + 60000) {
-        if (!confirm(t("cloud.confirmOverwriteCloud"))) return;
+        if (!await window.showConfirmModal(t("cloud.confirmOverwriteCloud"))) return;
       }
       cloudBtn.disabled = true;
       cloudBtn.textContent = t("cloud.saving");
@@ -3450,9 +3467,9 @@ function showMLBChallengeModal(challenge, route, onDecline) {
     const btn = document.createElement("button");
     btn.style.cssText = "display:block; width:100%; padding:10px; margin-bottom:6px; text-align:left; background:var(--panel-2); border:1px solid var(--accent); color:inherit; font-family:inherit; cursor:pointer; border-radius:6px;";
     btn.innerHTML = `<div style="font-weight:700; color:var(--accent); font-size:13px">${team.name}</div><div style="font-size:10px; color:var(--muted); margin-top:2px">${t("careerPath.teamAvgOvr", { ovr: teamAvgOvr(team.strength, "mlb") })}</div>`;
-    btn.addEventListener("pointerdown", e => {
+    btn.addEventListener("pointerdown", async e => {
       e.preventDefault();
-      if (!confirm(t("mlbChallenge.confirm", { team: team.name }))) return;
+      if (!await window.showConfirmModal(t("mlbChallenge.confirm", { team: team.name }))) return;
       backdrop.remove();
       // 진로선택과 동일: advanceToNextSeason() 후 MLB stage 로 전이.
       advanceToNextSeason();
@@ -3556,9 +3573,9 @@ function openMLBOfferModal(offers, onChoose) {
     const btn = document.createElement("button");
     btn.style.cssText = "display:block; width:100%; padding:10px; margin-bottom:6px; text-align:left; background:var(--panel-2); border:1px solid var(--accent); color:inherit; font-family:inherit; cursor:pointer; border-radius:6px;";
     btn.innerHTML = `<div style="font-weight:700; color:var(--accent); font-size:13px">${team.name}</div><div style="font-size:10px; color:var(--muted); margin-top:2px">${t("careerPath.teamAvgOvr", { ovr: teamAvgOvr(team.strength, "mlb") })}</div>`;
-    btn.addEventListener("pointerdown", e => {
+    btn.addEventListener("pointerdown", async e => {
       e.preventDefault();
-      if (!confirm(t("careerPath.confirmMlb", { team: team.name }))) return;
+      if (!await window.showConfirmModal(t("careerPath.confirmMlb", { team: team.name }))) return;
       pick(team);
     });
     dialog.appendChild(btn);

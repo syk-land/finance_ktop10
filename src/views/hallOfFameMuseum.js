@@ -122,10 +122,12 @@ export function renderHallOfFameMuseum(root, route) {
       delBtn.textContent = "×";
       delBtn.style.cssText = "position:absolute; top:8px; right:8px; background:none; border:none; color:var(--muted); font-size:16px; padding:2px; cursor:pointer; min-width:0; line-height:1;";
       delBtn.addEventListener("click", () => {
-        if (confirm(t("hof.deleteConfirm") || "Are you sure you want to delete this record?")) {
-          deleteHallOfFameRecord(cat.key);
-          renderHallOfFameMuseum(root, route);
-        }
+        showConfirmModal(t("hof.deleteConfirm") || "Are you sure you want to delete this record?").then(confirmed => {
+          if (confirmed) {
+            deleteHallOfFameRecord(cat.key);
+            renderHallOfFameMuseum(root, route);
+          }
+        });
       });
       card.appendChild(delBtn);
 
