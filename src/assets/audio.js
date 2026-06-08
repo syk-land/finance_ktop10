@@ -72,9 +72,10 @@ export function sfx(name) {
   if (isMuted()) return;
   const c = audioCtx();
   if (!c) return;
+  const vol = sfxVol();
+  if (vol <= 0) return;
   if (c.state === "suspended") c.resume().catch(() => {});  // 첫 제스처 직후에도 울리도록
   const t = c.currentTime;
-  const vol = sfxVol();
   const out = c.createGain();
   out.gain.value = 1;
   out.connect(c.destination);
@@ -86,7 +87,7 @@ export function sfx(name) {
     const env = c.createGain();
     o.connect(env); env.connect(out);
     env.gain.setValueAtTime(0.0001, t + delay);
-    env.gain.exponentialRampToValueAtTime(peak * vol, t + delay + 0.008);
+    env.gain.exponentialRampToValueAtTime(Math.max(0.0001, peak * vol), t + delay + 0.008);
     env.gain.exponentialRampToValueAtTime(0.0001, t + delay + dur);
     o.start(t + delay); o.stop(t + delay + dur + 0.02);
   };
