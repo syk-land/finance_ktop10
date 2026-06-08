@@ -50,19 +50,28 @@ function statFromGauss(base, sigma, weight = 1.0, cap = 150) {
   return Math.max(20, Math.min(cap, Math.round(v * weight)));
 }
 
+const NPC_STAGE_MULTIPLIERS = {
+  high:    0.72,
+  univ:    0.75,
+  pro2:    0.88,
+  pro1:    0.80,
+  mlb_a:   0.82,
+  mlb_aa:  0.84,
+  mlb_aaa: 0.86,
+  mlb:     0.88,
+};
+
 // 팀 강도(strength) + stage cap 에 따라 평균 능력치 결정.
-// 평균은 stage cap 의 약 75% — 옛 90% 는 메인 성장과 격차 너무 커 ERA 30 같은 비현실 결과.
-// 75% 평균 + sigma 14 면 약체 NPC ~cap*0.6 ~ 강체 NPC ~cap*0.9 분포.
-// 팀 strength 영향도 강화(0.3→0.6) — 강팀/약팀 격차 가시화.
-function stageBase(strength, cap) {
-  return cap * 0.88 + (strength - 60) * 0.6;
+function stageBase(strength, cap, stage = null) {
+  const mult = NPC_STAGE_MULTIPLIERS[stage] ?? 0.80;
+  return cap * mult + (strength - 60) * 0.6;
 }
 
 // 팀의 대략적 평균 능력치 (주인공 능력치와 같은 스케일) — 영입/오퍼 카드 표시용.
 // stageBase 를 stage NPC cap 으로 산출 후 [20, cap] 클램프.
 export function teamAvgOvr(strength, stage) {
   const cap = getNpcStatCap(stage);
-  return Math.round(Math.max(20, Math.min(cap, stageBase(strength, cap))));
+  return Math.round(Math.max(20, Math.min(cap, stageBase(strength, cap, stage))));
 }
 
 // MLB 계열 stage — 한글 버전이어도 영어 이름 사용
@@ -71,10 +80,10 @@ function nameLocaleForStage(stage) {
   return MLB_STAGES.has(stage) ? "en" : getLocale();
 }
 
-function createBatter(strength, ageRange = [19, 35], cap = 150, nameLocale = getLocale()) {
+function createBatter(strength, ageRange = [19, 35], cap = 150, nameLocale = getLocale(), stage = null) {
   const pos = POSITIONS_BATTER[Math.floor(Math.random() * POSITIONS_BATTER.length)];
   const w = POS_WEIGHTS[pos];
-  const base = stageBase(strength, cap);
+  const base = stageBase(strength, cap, stage);
   const batter = {};
   for (const s of BATTER_STATS) {
     batter[s] = statFromGauss(base, 14, w[s] ?? 1.0, cap);
@@ -93,9 +102,9 @@ function createBatter(strength, ageRange = [19, 35], cap = 150, nameLocale = get
   };
 }
 
-function createPitcher(strength, ageRange = [19, 35], cap = 150, nameLocale = getLocale()) {
+function createPitcher(strength, ageRange = [19, 35], cap = 150, nameLocale = getLocale(), stage = null) {
   const role = Math.random() < 0.5 ? "SP" : "RP";
-  const base = stageBase(strength, cap);
+  const base = stageBase(strength, cap, stage);
   const pitcher = {};
   for (const s of PITCHER_STATS) {
     pitcher[s] = statFromGauss(base, 14, 1.0, cap);
@@ -141,12 +150,12 @@ export function createRoster(strength, ageRange, opts = {}) {
   // 25명: 12명 야수 + 13명 투수
   const roster = [];
   for (let i = 0; i < 12; i++) {
-    const n = createBatter(strength, ageRange, cap, nameLoc);
+    const n = createBatter(strength, ageRange, cap, nameLoc, stage);
     if (dummy) { n.isDummy = true; n.name = dummyName(teamName, stage, "batter", i); }
     roster.push(n);
   }
   for (let i = 0; i < 13; i++) {
-    const n = createPitcher(strength, ageRange, cap, nameLoc);
+    const n = createPitcher(strength, ageRange, cap, nameLoc, stage);
     if (dummy) { n.isDummy = true; n.name = dummyName(teamName, stage, "pitcher", i); }
     roster.push(n);
   }
@@ -236,12 +245,12 @@ export function ageUpRoster(roster, stage, strength, teamName = null) {
   const currentBatters = remaining.filter(p => p.role === "batter").length;
   const currentPitchers = remaining.filter(p => p.role === "pitcher").length;
   for (let i = currentBatters; i < 12; i++) {
-    const n = createBatter(strength, [ageRange[0], ageRange[0]], cap);
+    const n = createBatter(strength, [ageRange[0], ageRange[0]], cap, getLocale(), stage);
     if (dummy) { n.isDummy = true; n.name = dummyName(teamName, stage, "batter", i); }
     remaining.push(n);
   }
   for (let i = currentPitchers; i < 13; i++) {
-    const n = createPitcher(strength, [ageRange[0], ageRange[0]], cap);
+    const n = createPitcher(strength, [ageRange[0], ageRange[0]], cap, getLocale(), stage);
     if (dummy) { n.isDummy = true; n.name = dummyName(teamName, stage, "pitcher", i); }
     remaining.push(n);
   }

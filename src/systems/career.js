@@ -203,14 +203,52 @@ export function determineMLBStartStage(score) {
 // 2군 round 도 동일하게 좋아져 1군 진입 가능 (round 1~2 면 자동 1군 승격).
 export function kboDraft(player) {
   const score = nationalTeamRating(player);
+  const ss = player.seasonStats ?? {};
+  
+  let batterPenalty = 0;
+  let hasBatterStats = false;
+  if ((ss.ab ?? 0) >= 40) {
+    hasBatterStats = true;
+    const obpNum = (ss.h ?? 0) + (ss.bb ?? 0) + (ss.hbp ?? 0);
+    const obpDen = (ss.ab ?? 0) + (ss.bb ?? 0) + (ss.hbp ?? 0) + (ss.sf ?? 0);
+    const obp = obpDen > 0 ? obpNum / obpDen : 0;
+    const slg = ss.ab > 0 ? (ss.tb ?? 0) / ss.ab : 0;
+    const ops = obp + slg;
+    
+    if (ops < 0.550) batterPenalty = 30;
+    else if (ops < 0.650) batterPenalty = 15;
+  }
+
+  let pitcherPenalty = 0;
+  let hasPitcherStats = false;
+  if ((ss.pitchG ?? 0) >= 5 && (ss.ip ?? 0) >= 5) {
+    hasPitcherStats = true;
+    const era = (ss.er ?? 0) * 9 / ss.ip;
+    
+    if (era > 7.00) pitcherPenalty = 30;
+    else if (era > 5.50) pitcherPenalty = 15;
+  }
+
+  // 이도류인 경우 두 포지션 중 성적이 더 좋은 쪽(감점이 더 작은 쪽)의 페널티를 따릅니다.
+  let penalty = 0;
+  if (hasBatterStats && hasPitcherStats) {
+    penalty = Math.min(batterPenalty, pitcherPenalty);
+  } else if (hasBatterStats) {
+    penalty = batterPenalty;
+  } else if (hasPitcherStats) {
+    penalty = pitcherPenalty;
+  }
+
+  const finalScore = Math.max(0, score - penalty);
+  
   let stage = null, round = null, signingBonus = 0;
   // 역할기반 rating(특출=강한쪽 / 쓸만=양방향). HS 졸업 rating: 무회귀 ~92, 풀투자 ~118.
-  // 현실 반영: 신인은 거의 전원 2군 시작, 특출난 즉시전력만 1군 직행 → 2군서 콜업(113)으로 승격.
-  if (score >= 128)      { stage = "pro1"; round = 1; signingBonus = 50000; }  // 초특급 즉시전력 (매우 드묾)
-  else if (score >= 114) { stage = "pro1"; round = 2; signingBonus = 30000; }  // 특출 — 1군 직행 (풀투자급)
-  else if (score >= 100) { stage = "pro2"; round = 1; signingBonus = 18000; }  // 상위 지명 — 곧 콜업 후보
-  else if (score >= 86)  { stage = "pro2"; round = 3 + Math.floor(Math.random() * 2); signingBonus = 10000; }
-  else if (score >= 76)  { stage = "pro2"; round = 6 + Math.floor(Math.random() * 3); signingBonus = 5000; }
+  // 현실 반영: 신인은 거의 전원 2군 시작, 특출난 즉시전력만 1군 직행 → 2군서 콜업(138)으로 승격.
+  if (finalScore >= 128)      { stage = "pro1"; round = 1; signingBonus = 50000; }  // 초특급 즉시전력 (매우 드묾)
+  else if (finalScore >= 114) { stage = "pro1"; round = 2; signingBonus = 30000; }  // 특출 — 1군 직행 (풀투자급)
+  else if (finalScore >= 100) { stage = "pro2"; round = 1; signingBonus = 18000; }  // 상위 지명 — 곧 콜업 후보
+  else if (finalScore >= 86)  { stage = "pro2"; round = 3 + Math.floor(Math.random() * 2); signingBonus = 10000; }
+  else if (finalScore >= 76)  { stage = "pro2"; round = 6 + Math.floor(Math.random() * 3); signingBonus = 5000; }
 
   // calling_card: round 가 좋아짐 (N 칸 감소). 1 라운드가 하한.
   const roundBoost = effectAdd(player, "draftRound", "boost");
