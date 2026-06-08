@@ -100,6 +100,10 @@ export function applyMilitaryService(player, optionKey) {
 
   player.age += MILITARY_SEASONS;
   player.grade += MILITARY_SEASONS;
+  // 군 복무 기간만큼 캘린더 연도 경과 처리 (2년 복무 중 1년은 transitionAfterSeason -> resetGameDateForNewSeason 에서 더해지므로, 1년을 더함)
+  if (state.gameDate) {
+    state.gameDate.year += (MILITARY_SEASONS - 1);
+  }
   // 상무/경찰 복무 기간(퓨처스 리그)도 KBO 서비스 연수로 인정 — 포스팅/해외FA 자격에 반영.
   if (player.stage === "pro1" || player.stage === "pro2") {
     player.kboSeasons = (player.kboSeasons ?? 0) + MILITARY_SEASONS;
