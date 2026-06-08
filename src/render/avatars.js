@@ -7,14 +7,12 @@ export const FACES = [
   { id: "f2", label: "헬멧",       skin: "#e6b889", hair: "#2a1a0f", style: "helmet", accessory: "helmet", eye: "sharp" },
   { id: "f3", label: "곱슬",       skin: "#f0c89b", hair: "#3a2517", style: "curly",  accessory: null,    eye: "smile"  },
   { id: "f4", label: "캡모자",     skin: "#e3b07a", hair: "#1a1a1a", style: "short",  accessory: "cap",   eye: "cool"   },
-  { id: "f5", label: "안경",       skin: "#eccfa9", hair: "#222",    style: "neat",   accessory: "glasses", eye: "calm" },
-  { id: "f6", label: "장발",       skin: "#e7bc8a", hair: "#5a3a1d", style: "long",   accessory: null,    eye: "fierce" },
 ];
 
 export const SKIN_COLORS = ["#ecc7a1", "#e6b889", "#f0c89b", "#e3b07a", "#eccfa9"];
 export const HAIR_COLORS = ["#1a1a1a", "#2a1a0f", "#5a3a1d", "#b03030", "#d8a040"];
-export const HAIR_STYLES = ["short", "curly", "neat", "long", "spiky", "bald"]; // bald는 렌더링 생략
-export const ACCESSORIES = ["none", "cap", "glasses", "helmet", "scar", "blush"]; // none은 렌더링 생략
+export const HAIR_STYLES = ["short", "curly", "neat", "spiky", "bald"]; // long 제거 (bald는 렌더링 생략)
+export const ACCESSORIES = ["none", "cap", "helmet", "scar", "blush"]; // glasses 제거 (none은 렌더링 생략)
 export const EYES = ["calm", "sharp", "smile", "cool", "fierce"]; // 5종으로 축소
 export const FACE_SHAPES = ["round", "square", "vshape"];
 

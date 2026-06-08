@@ -10,13 +10,11 @@ function mapCustomToPreset(faceId) {
   const hairStyleIdx = parseInt(parts[3]) || 0; // hairStyle
   const accIdx = parseInt(parts[4]) || 0;       // accessory
 
-  // ACCESSORIES = ["none", "cap", "glasses", "helmet", "scar", "blush"]
-  // HAIR_STYLES = ["short", "curly", "neat", "long", "spiky", "bald"]
-  if (accIdx === 3) return "f2"; // helmet -> f2
+  // ACCESSORIES = ["none", "cap", "helmet", "scar", "blush"]
+  // HAIR_STYLES = ["short", "curly", "neat", "spiky", "bald"]
+  if (accIdx === 2) return "f2"; // helmet -> f2
   if (accIdx === 1) return "f4"; // cap -> f4
-  if (accIdx === 2) return "f5"; // glasses -> f5
   if (hairStyleIdx === 1) return "f3"; // curly -> f3
-  if (hairStyleIdx === 3) return "f6"; // long -> f6
   return "f1"; // default -> f1
 }
 

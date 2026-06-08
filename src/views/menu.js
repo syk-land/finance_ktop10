@@ -711,95 +711,63 @@ function showConfirmModal({ title, message, confirmLabel, cancelLabel, danger, o
 
 function renderCreatePanel(route) {
   const panel = panelEl(t("menu.newGameTitle"));
-  panel.style.padding = "10px";          // 한 화면 절약 — 기본 패널 패딩 축소
+  panel.style.padding = "10px";
   const h = panel.querySelector("h2");
   if (h) h.style.cssText = "margin:0 0 2px; font-size:14px;";
 
   const col = document.createElement("div");
   col.className = "stack";
-  col.style.gap = "4px"; // 한 화면 안에 들어오도록 간격 축소
+  col.style.gap = "6px";
 
-  let step = 1;
+  // 1. 이름 입력 필드
+  col.appendChild(renderNameField());
+  
+  // 2. 재능 선택 필드
+  col.appendChild(renderTalentField());
+  
+  // 3. 투타방향 선택 필드
+  col.appendChild(renderHandField());
+  
+  // 4. 캐릭터 프리셋 선택 필드
+  col.appendChild(renderFaceGallery());
 
-  // 단계별 콘텐츠 컨테이너
-  const stepContainer = document.createElement("div");
-  stepContainer.className = "stack";
-  stepContainer.style.gap = "6px";
-  col.appendChild(stepContainer);
+  // 5. 캐릭터 미리보기
+  const previewWrap = document.createElement("div");
+  previewWrap.id = "preview-col";
+  previewWrap.appendChild(renderPreview());
+  col.appendChild(previewWrap);
 
-  function refreshStep() {
-    stepContainer.innerHTML = "";
-
-    if (step === 1) {
-      // 1단계: 이름, 재능, 좌우투타
-      stepContainer.appendChild(renderNameField());
-      stepContainer.appendChild(renderTalentField());
-      stepContainer.appendChild(renderHandField());
-
-      // 다음 단계 버튼
-      const nextBtn = button(t("common.next"), "primary", () => {
-        step = 2;
-        refreshStep();
-      });
-      nextBtn.style.cssText = "margin-top:8px; width:100%; padding:10px; font-size:15px; font-weight:700;";
-      stepContainer.appendChild(nextBtn);
-    } else {
-      // 2단계: 커스터마이징 및 캐릭터 미리보기
-      stepContainer.appendChild(renderFaceGallery());
-
-      // 캐릭터 미리보기
-      const previewWrap = document.createElement("div");
-      previewWrap.id = "preview-col";
-      previewWrap.appendChild(renderPreview());
-      stepContainer.appendChild(previewWrap);
-
-      // 하단 버튼 그리드 (이전 / 시작)
-      const btnGrid = document.createElement("div");
-      btnGrid.style.cssText = "display:grid; grid-template-columns:1fr 1.5fr; gap:6px; margin-top:8px;";
-
-      const prevBtn = button(t("common.back"), "", () => {
-        step = 1;
-        refreshStep();
-      });
-      prevBtn.style.cssText = "padding:10px; font-size:14px;";
-      btnGrid.appendChild(prevBtn);
-
-      const startBtn = button(t("menu.startBtn"), "primary", () => {
-        const name = draft.name.trim() || t("menu.defaultName");
-        syncDraftTalents();
-        // 회귀 로드아웃 — 캐릭터당 1회용. 생성 직전 snapshot 뜨고 resetLoadout 실행.
-        const loadout = state.regression
-          ? consumeLoadoutForCharacter()
-          : { startingStat: null, traits: [], relics: [] };
-        resetState();
-        state.player = createPlayer({
-          name,
-          talent: draft.talent,
-          talents: draft.talents,
-          hand: draft.hand,
-          faceId: draft.faceId,
-          startingStat: loadout.startingStat,
-          traits: loadout.traits,
-          relics: loadout.relics,
-          relicLevels: loadout.relicLevels,
-          equipment: loadout.equipment,
-        });
-        startHighSchoolCareer(name, draft.talent, null);
-        state.gameDate = createGameDate();
-        state.autoMode = "two_way";
-        state.paused = true;
-        resetWeeklyCarousel();
-        saveGame();
-        route("weekly");
-      });
-      startBtn.style.cssText = "padding:10px; font-size:15px; font-weight:700;";
-      btnGrid.appendChild(startBtn);
-
-      stepContainer.appendChild(btnGrid);
-    }
-  }
-
-  refreshStep();
+  // 6. 게임 시작 버튼
+  const startBtn = button(t("menu.startBtn"), "primary", () => {
+    const name = draft.name.trim() || t("menu.defaultName");
+    syncDraftTalents();
+    // 회귀 로드아웃 — 캐릭터당 1회용. 생성 직전 snapshot 뜨고 resetLoadout 실행.
+    const loadout = state.regression
+      ? consumeLoadoutForCharacter()
+      : { startingStat: null, traits: [], relics: [] };
+    resetState();
+    state.player = createPlayer({
+      name,
+      talent: draft.talent,
+      talents: draft.talents,
+      hand: draft.hand,
+      faceId: draft.faceId,
+      startingStat: loadout.startingStat,
+      traits: loadout.traits,
+      relics: loadout.relics,
+      relicLevels: loadout.relicLevels,
+      equipment: loadout.equipment,
+    });
+    startHighSchoolCareer(name, draft.talent, null);
+    state.gameDate = createGameDate();
+    state.autoMode = "two_way";
+    state.paused = true;
+    resetWeeklyCarousel();
+    saveGame();
+    route("weekly");
+  });
+  startBtn.style.cssText = "width:100%; padding:11px; font-size:15px; font-weight:700; margin-top:4px;";
+  col.appendChild(startBtn);
 
   panel.appendChild(col);
   return panel;
@@ -873,11 +841,9 @@ function renderNameField() {
 
 function syncPresetToCustom(faceId) {
   if (faceId === "f1") return [0, 0, 0, 0, 0, 0];
-  if (faceId === "f2") return [1, 1, 1, 3, 1, 0];
-  if (faceId === "f3") return [2, 3, 1, 0, 2, 0];
-  if (faceId === "f4") return [3, 0, 0, 1, 3, 0];
-  if (faceId === "f5") return [4, 0, 2, 2, 0, 0];
-  if (faceId === "f6") return [1, 2, 3, 0, 4, 0];
+  if (faceId === "f2") return [1, 1, 1, 2, 1, 0]; // 헬멧 (accIdx=2)
+  if (faceId === "f3") return [2, 3, 1, 0, 2, 0]; // 곱슬 (hairStyleIdx=1)
+  if (faceId === "f4") return [3, 0, 0, 1, 3, 0]; // 캡모자 (accIdx=1)
   if (faceId.startsWith("f_")) {
     const p = faceId.split("_");
     return [
@@ -899,13 +865,11 @@ function mapCustomToPreset(faceId) {
   const hairStyleIdx = parseInt(parts[3]) || 0; // hairStyle
   const accIdx = parseInt(parts[4]) || 0;       // accessory
 
-  // ACCESSORIES = ["none", "cap", "glasses", "helmet", "scar", "blush"]
-  // HAIR_STYLES = ["short", "curly", "neat", "long", "bald", "spiky"]
-  if (accIdx === 3) return "f2"; // helmet -> f2
+  // ACCESSORIES = ["none", "cap", "helmet", "scar", "blush"]
+  // HAIR_STYLES = ["short", "curly", "neat", "spiky", "bald"]
+  if (accIdx === 2) return "f2"; // helmet -> f2
   if (accIdx === 1) return "f4"; // cap -> f4
-  if (accIdx === 2) return "f5"; // glasses -> f5
   if (hairStyleIdx === 1) return "f3"; // curly -> f3
-  if (hairStyleIdx === 3) return "f6"; // long -> f6
   return "f1"; // default -> f1
 }
 
@@ -913,27 +877,24 @@ function renderFaceGallery() {
   const wrap = document.createElement("div");
   wrap.appendChild(label(t("menu.fieldFace")));
 
-  // 1) 6개 프리셋 얼굴 그리드
+  // 4개 프리셋 얼굴 그리드
   const row = document.createElement("div");
   row.style.display = "grid";
-  row.style.gridTemplateColumns = "repeat(6, minmax(0, 1fr))";
+  row.style.gridTemplateColumns = "repeat(4, minmax(0, 1fr))";
   row.style.gap = "4px";
-  row.style.marginBottom = "8px";
-
-  const isCustom = draft.faceId.startsWith("f_");
-  const customParts = syncPresetToCustom(draft.faceId);
+  row.style.marginBottom = "4px";
 
   for (const face of FACES) {
     const cell = document.createElement("div");
     cell.style.background = "var(--panel-2)";
     cell.style.border = "1.5px solid var(--border)";
     cell.style.borderRadius = "6px";
-    cell.style.padding = "2px 1px";
+    cell.style.padding = "4px 2px";
     cell.style.cursor = "pointer";
     cell.style.transition = "border-color 120ms";
     cell.style.textAlign = "center";
     cell.style.minWidth = "0";
-    if (!isCustom && draft.faceId === face.id) {
+    if (draft.faceId === face.id) {
       cell.style.borderColor = "var(--accent)";
     }
 
@@ -946,7 +907,7 @@ function renderFaceGallery() {
     const lbl = document.createElement("div");
     lbl.className = "small muted";
     lbl.style.marginTop = "2px";
-    lbl.style.fontSize = "9px";
+    lbl.style.fontSize = "9.5px";
     lbl.style.lineHeight = "1.1";
     lbl.style.overflow = "hidden";
     lbl.style.textOverflow = "ellipsis";
@@ -956,79 +917,15 @@ function renderFaceGallery() {
 
     cell.addEventListener("click", () => {
       draft.faceId = face.id;
+      for (const el of row.children) {
+        el.style.borderColor = "var(--border)";
+      }
+      cell.style.borderColor = "var(--accent)";
       refreshPreview();
-      // 프리셋에 맞는 인덱스로 강제 싱크
-      const newCustom = syncPresetToCustom(face.id);
-      rebuildCustomUI(newCustom);
     });
     row.appendChild(cell);
   }
   wrap.appendChild(row);
-
-  // 2) 세부 커스터마이징 조절판 영역
-  const customSection = document.createElement("div");
-  customSection.id = "custom-face-editor";
-  customSection.style.cssText = "background:var(--panel-2); border:1px solid var(--border); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:6px;";
-  wrap.appendChild(customSection);
-
-  function rebuildCustomUI(parts) {
-    customSection.innerHTML = "";
-    
-    // 파츠 타입별 타이틀과 렌더링 루프
-    const partTypes = [
-      { name: t("custom.skinLabel"), options: SKIN_COLORS, current: parts[0], colorType: true, idx: 0 },
-      { name: t("custom.hairColorLabel"), options: HAIR_COLORS, current: parts[1], colorType: true, idx: 1 },
-      { name: t("custom.hairStyleLabel"), options: HAIR_STYLES, current: parts[2], transPrefix: "custom.style.", idx: 2 },
-      { name: t("custom.accessoryLabel"), options: ACCESSORIES, current: parts[3], transPrefix: "custom.acc.", idx: 3 },
-      { name: t("custom.eyeLabel"), options: EYES, current: parts[4], transPrefix: "custom.eye.", idx: 4 },
-      { name: t("custom.shapeLabel"), options: FACE_SHAPES, current: parts[5], transPrefix: "custom.shape.", idx: 5 }
-    ];
-
-    for (const pt of partTypes) {
-      const rowDiv = document.createElement("div");
-      rowDiv.style.cssText = "display:flex; align-items:center; gap:6px;";
-      
-      const pTitle = document.createElement("div");
-      pTitle.style.cssText = "font-size:10px; font-weight:700; width:52px; color:var(--accent-2); flex-shrink:0;";
-      pTitle.textContent = pt.name;
-      rowDiv.appendChild(pTitle);
-
-      const optRow = document.createElement("div");
-      optRow.style.cssText = "display:flex; gap:3px; flex-wrap:wrap; flex:1;";
-
-      pt.options.forEach((opt, oIdx) => {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        
-        if (pt.colorType) {
-          // 컬러 파츠는 색상 칩 형태로
-          btn.style.cssText = `width:16px; height:16px; border-radius:50%; background:${opt}; border:1.5px solid ${pt.current === oIdx ? "var(--accent)" : "var(--border)"}; padding:0; min-width:0; cursor:pointer;`;
-        } else {
-          // 텍스트 파츠는 작게 버튼으로
-          btn.textContent = t(pt.transPrefix + opt);
-          btn.style.cssText = "padding:2px 5px; font-size:9.5px; min-width:0; line-height:1.2;";
-          if (pt.current === oIdx) btn.classList.add("primary");
-        }
-
-        btn.addEventListener("click", () => {
-          parts[pt.idx] = oIdx;
-          const newFaceId = `f_${parts[0]}_${parts[1]}_${parts[2]}_${parts[3]}_${parts[4]}_${parts[5]}`;
-          draft.faceId = newFaceId;
-          refreshPreview();
-          // 프리셋 얼굴 하이라이트 초기화
-          for (const el of row.children) {
-            el.style.borderColor = "var(--border)";
-          }
-          rebuildCustomUI(parts);
-        });
-        optRow.appendChild(btn);
-      });
-      rowDiv.appendChild(optRow);
-      customSection.appendChild(rowDiv);
-    }
-  }
-
-  rebuildCustomUI(customParts);
   return wrap;
 }
 
