@@ -3176,7 +3176,10 @@ function renderCareerEndedPanel(route) {
   // 회귀 점수 적립 — 캐릭터당 1회. recordRun 이 멱등이 아니므로 player 플래그로 가드.
   if (!state.regression) loadRegressionMeta();
   if (!state.player.regressionScored) {
-    recordRun(hof.total);
+    const res = recordRun(hof.total);
+    if (res && res.bonus > 0) {
+      state.player.firstRetireBonusAwarded = res.bonus;
+    }
     recordHallOfFame(state.player);
     state.player.regressionScored = true;
     // 명예의 전당 헌액 시 회귀 도전과제 해금. rank === "hof" 만 (300+ 점수).
@@ -3222,7 +3225,12 @@ function renderCareerEndedPanel(route) {
   regressionBox.style.cssText = "background:var(--panel-2); border:1px solid var(--accent); border-radius:6px; padding:10px; margin-bottom:10px; font-size:12px; text-align:center;";
   const earnLine = document.createElement("div");
   earnLine.style.cssText = "font-weight:700; color:var(--accent); margin-bottom:4px;";
-  earnLine.textContent = t("regression.scoreEarned", { score: hof.total });
+  if (state.player.firstRetireBonusAwarded) {
+    const labelBonus = t("regression.firstRetireBonus") || "First Retire Bonus";
+    earnLine.textContent = t("regression.scoreEarned", { score: hof.total }) + ` (+${state.player.firstRetireBonusAwarded} ${labelBonus})`;
+  } else {
+    earnLine.textContent = t("regression.scoreEarned", { score: hof.total });
+  }
   regressionBox.appendChild(earnLine);
   const balLine = document.createElement("div");
   balLine.className = "muted small";

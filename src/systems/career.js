@@ -532,7 +532,7 @@ export function checkDemotion(player, statsToUse = null) {
         avgCutoff = 0.250;
       }
       
-      if (ops < opsCutoff && avg < avgCutoff) batterBad = true;
+      if ((ops < opsCutoff && avg < avgCutoff) || avg < 0.130) batterBad = true;
     }
 
     // 투수 성적 감점 (최소 15이닝)

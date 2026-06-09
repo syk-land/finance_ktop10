@@ -30,18 +30,19 @@ export function computeHallOfFameScore(player) {
   const championships = player.championships ?? [];
   breakdown.championships = championships.length * 30;
 
-  // 대회 우승 — tournamentHistory champion (PO 챔피언 + HS 토너먼트 우승)
+  // 대회 우승 및 준우승 — 하위리그(고교/대학/기타) 명예보상 강화
   const tHistory = player.tournamentHistory ?? [];
   const tChampions = tHistory.filter(r => r.result === "champion").length;
-  breakdown.tournamentChampions = tChampions * 5;
+  const tRunners = tHistory.filter(r => r.result === "runner").length;
+  breakdown.tournamentChampions = (tChampions * 15) + (tRunners * 6);
 
-  // 시즌 수상 — MVP 50, 신인왕 30, 타격왕/홈런왕/타점왕/방어율왕 등 각 10
+  // 시즌 수상 — MVP 50, 신인왕 30, 타격왕/홈런왕/타점왕/방어율왕 등 각 12 (하위리그 및 마이너 명예보상 강화)
   const awards = player.awards ?? [];
   let awardScore = 0;
   for (const a of awards) {
     if (a.key === "mvp" || a.key === "twoWayMvp") awardScore += 50;
-    else if (a.key === "rookieOfYear")            awardScore += 30;
-    else                                          awardScore += 10;
+    else if (a.key === "rookie" || a.key === "rookieOfYear")      awardScore += 30;
+    else                                                          awardScore += 12;
   }
   breakdown.awards = awardScore;
 

@@ -485,6 +485,7 @@ export const en = {
     menuBalance:  "{balance} pts · {runs} runs",
     enterShop:    "Open Shop",
     unlocked:     "{name} unlocked! Available in regression shop",
+    firstRetireBonus: "First Retire Bonus",
   },
 
   // Cloud save (Firestore)

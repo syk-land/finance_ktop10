@@ -488,6 +488,7 @@ export const ko = {
     menuBalance:  "잔액 {balance}점 · 회귀 {runs}회",
     enterShop:    "상점 보기",
     unlocked:     "{name} 해금! 회귀 상점에서 사용 가능",
+    firstRetireBonus: "최초 은퇴 보너스",
   },
 
   // Cloud save (Firestore)

@@ -153,15 +153,19 @@ export function spendBalance(amount) {
 }
 
 // 회귀 1회 기록 — 은퇴 시 HoF 점수를 balance/totalEarned 에 추가하고 runs++.
+// 최초 은퇴 시 보너스 500점 지급.
 export function recordRun(score) {
   const m = ensureMeta();
-  m.runs += 1;
-  if (Number.isFinite(score) && score > 0) {
-    m.balance += score;
-    m.totalEarned += score;
+  let bonus = 0;
+  if (m.runs === 0) {
+    bonus = 500;
   }
+  m.runs += 1;
+  const earned = (Number.isFinite(score) && score > 0) ? score : 0;
+  m.balance += (earned + bonus);
+  m.totalEarned += (earned + bonus);
   saveRegressionMeta();
-  return m;
+  return { balance: m.balance, totalEarned: m.totalEarned, runs: m.runs, bonus };
 }
 
 // ── 영구 구매 ──────────────────────────────────────────────────────
