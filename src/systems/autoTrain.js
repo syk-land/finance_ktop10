@@ -40,9 +40,27 @@ export const AUTO_PRESETS = {
   two_way:         { statWeights: W(1, 1, 1, 1, 1, 1, 1, 1), equalize: true },               // 올밸런스
 };
 
+// Helper to resolve preset key safely (maps deprecated keys dynamically)
+function getPreset(presetKey) {
+  if (!presetKey) return null;
+  let preset = AUTO_PRESETS[presetKey];
+  if (!preset) {
+    const deprecatedPresets = {
+      contact: "contact_speed",
+      speedster: "contact_speed",
+      defender: "contact_speed",
+      finesse: "breaking",
+      recovery: "two_way"
+    };
+    const resolvedKey = deprecatedPresets[presetKey] ?? "two_way";
+    preset = AUTO_PRESETS[resolvedKey];
+  }
+  return preset;
+}
+
 // 프리셋의 최고 비중 스탯 키 (동률이면 스탯 순서상 첫 번째). 안내 메시지/캡 판정용.
 export function topWeightStat(presetKey) {
-  const preset = AUTO_PRESETS[presetKey];
+  const preset = getPreset(presetKey);
   if (!preset) return null;
   let best = null, bestW = -1;
   for (const [stat, w] of Object.entries(preset.statWeights)) {
@@ -56,8 +74,9 @@ export function topWeightStat(presetKey) {
 //   대상 능력치 합을 그대로 둔 채 전부 평균으로 맞춰 → "모든 능력치가 같은 수치로" + 강함(총량)은 유지.
 //   (능력치를 깎아 버리던 옛 밴드 방식과 달리, 솟은 능력치의 초과분을 낮은 능력치로 옮겨 손실 없음.)
 //   cap 초과분은 미달 능력치로 1회 재분배. ⚠ 방향형/회복엔 적용 안 함(전환 시 능력치 깎임 방지).
+//   presetKey 가 유효하지 않으면 fallback으로 처리.
 export function clampStatsToDirection(player, presetKey) {
-  const preset = AUTO_PRESETS[presetKey];
+  const preset = getPreset(presetKey);
   if (!preset || !preset.equalize || !player) return;
   const stats = (preset.equalizeStats ?? ALL_STATS).filter(s => statValue(player, s) != null);
   if (stats.length === 0) return;
@@ -97,7 +116,7 @@ export function clampStatsToDirection(player, presetKey) {
 //   밸런스(equalize): 전 스탯이 공통 목표값(최저 cap) 도달.
 //   그 외: 최고 비중 스탯이 자기 cap 도달.
 export function isTrainDirectionMaxed(player, presetKey) {
-  const preset = AUTO_PRESETS[presetKey];
+  const preset = getPreset(presetKey);
   if (!preset || !player) return false;
   if (preset.equalize) {
     const stats = preset.equalizeStats ?? [...BATTER_STATS, ...PITCHER_STATS];
@@ -157,7 +176,7 @@ const ALL_STATS = [...BATTER_STATS, ...PITCHER_STATS];
 //     재분배해 균형을 맞춘다(경기경험을 버리지 않고 보존).
 // presetKey 없으면 null → 클램프 안 함(기존 동작).
 export function directionTargets(player, presetKey) {
-  const preset = AUTO_PRESETS[presetKey];
+  const preset = getPreset(presetKey);
   if (!preset || !player) return null;
   if (preset.equalize) return null;
   const out = {};
@@ -178,7 +197,7 @@ export function directionTargets(player, presetKey) {
 export function pickAutoAction(presetKey, player) {
   if (player.injury) return { action: "rest" };
   if (player.stamina < 25) return { action: "rest" };
-  const preset = AUTO_PRESETS[presetKey];
+  const preset = getPreset(presetKey);
   if (!preset) return { action: "rest" };
 
   // restBias (회복 우선) — 일정 확률로 휴식

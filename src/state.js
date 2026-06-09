@@ -153,20 +153,18 @@ function migrateSave(data) {
     }
   }
 
-  // Auto train preset key migration
-  if (data.autoMode) {
-    const deprecatedPresets = {
-      contact: "contact_speed",
-      speedster: "contact_speed",
-      defender: "contact_speed",
-      finesse: "breaking",
-      recovery: "two_way"
-    };
-    if (deprecatedPresets[data.autoMode]) {
-      data.autoMode = deprecatedPresets[data.autoMode];
-    } else if (!["slugger", "contact_speed", "batter_balance", "fireballer", "breaking", "pitcher_balance", "two_way"].includes(data.autoMode)) {
-      data.autoMode = "two_way";
-    }
+  // Migrate old autoMode keys cleanly
+  const deprecatedPresets = {
+    contact: "contact_speed",
+    speedster: "contact_speed",
+    defender: "contact_speed",
+    finesse: "breaking",
+    recovery: "two_way"
+  };
+  if (data.autoMode && deprecatedPresets[data.autoMode]) {
+    data.autoMode = deprecatedPresets[data.autoMode];
+  } else if (data.autoMode && !["slugger", "contact_speed", "batter_balance", "fireballer", "breaking", "pitcher_balance", "two_way"].includes(data.autoMode)) {
+    data.autoMode = "two_way";
   }
 
   data.saveVersion = SAVE_VERSION;
