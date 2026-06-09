@@ -183,7 +183,7 @@ export function getMLBOffers(player) {
   let pitEligible = false;
   if ((ss.pitchG ?? 0) >= 5 && (ss.ip ?? 0) >= 15) {
     const era = (ss.er ?? 0) * 9 / ss.ip;
-    if (era <= 3.50) {
+    if (era <= 3.50 || (ss.sv ?? 0) >= 30 || (ss.pK ?? 0) >= 130) {
       pitEligible = true;
     }
   }
@@ -544,7 +544,9 @@ export function checkDemotion(player, statsToUse = null) {
       if (player.stage === "mlb") eraCutoff = 5.30;
       else if (player.stage === "mlb_aaa" || player.stage === "mlb_aa") eraCutoff = 5.00;
       
-      if (era > eraCutoff) pitcherBad = true;
+      // 세이브나 탈삼진이 준수하다면 약간의 ERA 부진은 참작하여 강등 제외, 단 ERA가 8.00 초과로 매우 높으면 무조건 강등
+      if (era > eraCutoff && (ss.sv ?? 0) < 15 && (ss.pK ?? 0) < 90) pitcherBad = true;
+      if (era > 8.00) pitcherBad = true;
     }
 
     // 두 포지션 다 부진한 경우에만 강등 (한쪽이라도 밥값을 하면 잔류)
@@ -592,7 +594,18 @@ export function checkPromotion(player, statsToUse = null) {
   // 투수 성적 만족 여부 판정 (최소 5경기, 1이닝 이상)
   if (!statsOk && (ss.pitchG ?? 0) >= 5 && (ss.ip ?? 0) >= 1) {
     const era = (ss.er ?? 0) * 9 / ss.ip;
-    if (era <= rule.maxERA) statsOk = true;
+    
+    let minSv = 15;
+    let minK = 80;
+    if (player.stage === "mlb_a") {
+      minSv = 12;
+      minK = 70;
+    } else if (player.stage === "mlb_aaa") {
+      minSv = 18;
+      minK = 90;
+    }
+
+    if (era <= rule.maxERA || (ss.sv ?? 0) >= minSv || (ss.pK ?? 0) >= minK) statsOk = true;
   }
 
   return statsOk ? rule.next : null;
