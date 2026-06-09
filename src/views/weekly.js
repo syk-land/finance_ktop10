@@ -3560,22 +3560,41 @@ function showMLBChallengeModal(challenge, route, onDecline) {
       let adjustedRating = rawRating;
       const ss = state.player.seasonStats;
       if (ss && state.player.stage === "pro1") {
+        let batAdj = 0;
+        let hasBat = false;
         if ((ss.ab ?? 0) >= 50) {
+          hasBat = true;
           const obpNum = (ss.h ?? 0) + (ss.bb ?? 0) + (ss.hbp ?? 0);
           const obpDen = (ss.ab ?? 0) + (ss.bb ?? 0) + (ss.hbp ?? 0) + (ss.sf ?? 0);
           const obp = obpDen > 0 ? obpNum / obpDen : 0;
           const slg = ss.ab > 0 ? (ss.tb ?? 0) / ss.ab : 0;
           const ops = obp + slg;
-          if (ops < 0.600) adjustedRating -= 30;
-          else if (ops < 0.720) adjustedRating -= 15;
-          else if (ops >= 0.900) adjustedRating += 10;
+          if (ops < 0.820) batAdj = -25;
+          else if (ops < 0.950) batAdj = -10;
+          else batAdj = 10;
         }
+        let pitAdj = 0;
+        let hasPit = false;
         if ((ss.pitchG ?? 0) >= 5 && (ss.ip ?? 0) >= 15) {
+          hasPit = true;
           const era = (ss.er ?? 0) * 9 / ss.ip;
-          if (era > 5.50) adjustedRating -= 30;
-          else if (era > 4.50) adjustedRating -= 15;
-          else if (era <= 3.20) adjustedRating += 10;
+          if (era > 4.20) pitAdj = -25;
+          else if (era > 3.20) pitAdj = -10;
+          else pitAdj = 10;
         }
+        let finalAdj = 0;
+        if (hasBat && hasPit) {
+          finalAdj = Math.max(batAdj, pitAdj);
+        } else if (hasBat) {
+          finalAdj = batAdj;
+        } else if (hasPit) {
+          finalAdj = pitAdj;
+        } else {
+          finalAdj = -40;
+        }
+        adjustedRating += finalAdj;
+      } else if (state.player.stage === "pro1") {
+        adjustedRating -= 40;
       }
 
       backdrop.remove();

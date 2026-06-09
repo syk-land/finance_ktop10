@@ -155,32 +155,48 @@ export function teamFame(team) {
 export function getMLBOffers(player) {
   let score = nationalTeamRating(player);
   
-  // 성적 감점/가점 반영 (쩌리 선수가 오버롤만 높아서 MLB 오퍼 받는 현상 방지)
+  // 성적 감점/가점 반영 (국내리그를 씹어먹고 있어야 MLB 오퍼 자격 부여)
   const ss = player.seasonStats;
-  if (ss) {
-    if (player.stage === "pro1") {
-      // 타자 성적 감점 (최소 50타수)
-      if ((ss.ab ?? 0) >= 50) {
-        const obpNum = (ss.h ?? 0) + (ss.bb ?? 0) + (ss.hbp ?? 0);
-        const obpDen = (ss.ab ?? 0) + (ss.bb ?? 0) + (ss.hbp ?? 0) + (ss.sf ?? 0);
-        const obp = obpDen > 0 ? obpNum / obpDen : 0;
-        const slg = ss.ab > 0 ? (ss.tb ?? 0) / ss.ab : 0;
-        const ops = obp + slg;
+  if (ss && player.stage === "pro1") {
+    let batAdj = 0;
+    let hasBat = false;
+    if ((ss.ab ?? 0) >= 50) {
+      hasBat = true;
+      const obpNum = (ss.h ?? 0) + (ss.bb ?? 0) + (ss.hbp ?? 0);
+      const obpDen = (ss.ab ?? 0) + (ss.bb ?? 0) + (ss.hbp ?? 0) + (ss.sf ?? 0);
+      const obp = obpDen > 0 ? obpNum / obpDen : 0;
+      const slg = ss.ab > 0 ? (ss.tb ?? 0) / ss.ab : 0;
+      const ops = obp + slg;
 
-        if (ops < 0.600) score -= 30;
-        else if (ops < 0.720) score -= 15;
-        else if (ops >= 0.900) score += 10;
-      }
-      
-      // 투수 성적 감점 (최소 15이닝)
-      if ((ss.pitchG ?? 0) >= 5 && (ss.ip ?? 0) >= 15) {
-        const era = (ss.er ?? 0) * 9 / ss.ip;
-
-        if (era > 5.50) score -= 30;
-        else if (era > 4.50) score -= 15;
-        else if (era <= 3.20) score += 10;
-      }
+      if (ops < 0.820) batAdj = -25;
+      else if (ops < 0.950) batAdj = -10;
+      else batAdj = 10;
     }
+
+    let pitAdj = 0;
+    let hasPit = false;
+    if ((ss.pitchG ?? 0) >= 5 && (ss.ip ?? 0) >= 15) {
+      hasPit = true;
+      const era = (ss.er ?? 0) * 9 / ss.ip;
+
+      if (era > 4.20) pitAdj = -25;
+      else if (era > 3.20) pitAdj = -10;
+      else pitAdj = 10;
+    }
+
+    let finalAdj = 0;
+    if (hasBat && hasPit) {
+      finalAdj = Math.max(batAdj, pitAdj);
+    } else if (hasBat) {
+      finalAdj = batAdj;
+    } else if (hasPit) {
+      finalAdj = pitAdj;
+    } else {
+      finalAdj = -40; // 1군 출전 기록이 전혀 없으면 사실상 기회 박탈
+    }
+    score += finalAdj;
+  } else if (player.stage === "pro1") {
+    score -= 40;
   }
 
   if (score < 110) return [];                       // 자격 — 역할기반 rating 110+
