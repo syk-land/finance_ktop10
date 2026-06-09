@@ -3554,52 +3554,10 @@ function showMLBChallengeModal(challenge, route, onDecline) {
     btn.addEventListener("pointerdown", async e => {
       e.preventDefault();
       if (!await window.showConfirmModal(t("mlbChallenge.confirm", { team: team.name }))) return;
-      
-      // advanceToNextSeason() 호출 시 seasonStats 가 초기화되므로, 그 전에 성적 기반 감점/가점 반영
-      const rawRating = nationalTeamRating(state.player);
-      let adjustedRating = rawRating;
-      const ss = state.player.seasonStats;
-      if (ss && state.player.stage === "pro1") {
-        let batAdj = 0;
-        let hasBat = false;
-        if ((ss.ab ?? 0) >= 50) {
-          hasBat = true;
-          const obpNum = (ss.h ?? 0) + (ss.bb ?? 0) + (ss.hbp ?? 0);
-          const obpDen = (ss.ab ?? 0) + (ss.bb ?? 0) + (ss.hbp ?? 0) + (ss.sf ?? 0);
-          const obp = obpDen > 0 ? obpNum / obpDen : 0;
-          const slg = ss.ab > 0 ? (ss.tb ?? 0) / ss.ab : 0;
-          const ops = obp + slg;
-          if (ops < 0.820) batAdj = -25;
-          else if (ops < 0.950) batAdj = -10;
-          else batAdj = 10;
-        }
-        let pitAdj = 0;
-        let hasPit = false;
-        if ((ss.pitchG ?? 0) >= 5 && (ss.ip ?? 0) >= 15) {
-          hasPit = true;
-          const era = (ss.er ?? 0) * 9 / ss.ip;
-          if (era > 4.20) pitAdj = -25;
-          else if (era > 3.20) pitAdj = -10;
-          else pitAdj = 10;
-        }
-        let finalAdj = 0;
-        if (hasBat && hasPit) {
-          finalAdj = Math.max(batAdj, pitAdj);
-        } else if (hasBat) {
-          finalAdj = batAdj;
-        } else if (hasPit) {
-          finalAdj = pitAdj;
-        } else {
-          finalAdj = -40;
-        }
-        adjustedRating += finalAdj;
-      } else if (state.player.stage === "pro1") {
-        adjustedRating -= 40;
-      }
-
       backdrop.remove();
+      // 진로선택과 동일: advanceToNextSeason() 후 MLB stage 로 전이.
       advanceToNextSeason();
-      const startStage = determineMLBStartStage(adjustedRating);
+      const startStage = determineMLBStartStage(nationalTeamRating(state.player));
       transitionToStage(startStage, team.name);
       state.offseason = null;
       state.paused = true;

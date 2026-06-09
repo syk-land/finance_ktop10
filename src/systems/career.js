@@ -153,52 +153,38 @@ export function teamFame(team) {
 }
 
 export function getMLBOffers(player) {
-  let score = nationalTeamRating(player);
-  
-  // 성적 감점/가점 반영 (국내리그를 씹어먹고 있어야 MLB 오퍼 자격 부여)
+  if (!player || player.stage !== "pro1") return [];
+
+  // 성적 기준 체크 (국내리그를 씹어먹고 있어야만 MLB 진출 오퍼 자격 부여)
   const ss = player.seasonStats;
-  if (ss && player.stage === "pro1") {
-    let batAdj = 0;
-    let hasBat = false;
-    if ((ss.ab ?? 0) >= 50) {
-      hasBat = true;
-      const obpNum = (ss.h ?? 0) + (ss.bb ?? 0) + (ss.hbp ?? 0);
-      const obpDen = (ss.ab ?? 0) + (ss.bb ?? 0) + (ss.hbp ?? 0) + (ss.sf ?? 0);
-      const obp = obpDen > 0 ? obpNum / obpDen : 0;
-      const slg = ss.ab > 0 ? (ss.tb ?? 0) / ss.ab : 0;
-      const ops = obp + slg;
+  if (!ss) return [];
 
-      if (ops < 0.820) batAdj = -25;
-      else if (ops < 0.950) batAdj = -10;
-      else batAdj = 10;
+  let batEligible = false;
+  if ((ss.ab ?? 0) >= 50) {
+    const obpNum = (ss.h ?? 0) + (ss.bb ?? 0) + (ss.hbp ?? 0);
+    const obpDen = (ss.ab ?? 0) + (ss.bb ?? 0) + (ss.hbp ?? 0) + (ss.sf ?? 0);
+    const obp = obpDen > 0 ? obpNum / obpDen : 0;
+    const slg = ss.ab > 0 ? (ss.tb ?? 0) / ss.ab : 0;
+    const ops = obp + slg;
+    if (ops >= 0.900) {
+      batEligible = true;
     }
-
-    let pitAdj = 0;
-    let hasPit = false;
-    if ((ss.pitchG ?? 0) >= 5 && (ss.ip ?? 0) >= 15) {
-      hasPit = true;
-      const era = (ss.er ?? 0) * 9 / ss.ip;
-
-      if (era > 4.20) pitAdj = -25;
-      else if (era > 3.20) pitAdj = -10;
-      else pitAdj = 10;
-    }
-
-    let finalAdj = 0;
-    if (hasBat && hasPit) {
-      finalAdj = Math.max(batAdj, pitAdj);
-    } else if (hasBat) {
-      finalAdj = batAdj;
-    } else if (hasPit) {
-      finalAdj = pitAdj;
-    } else {
-      finalAdj = -40; // 1군 출전 기록이 전혀 없으면 사실상 기회 박탈
-    }
-    score += finalAdj;
-  } else if (player.stage === "pro1") {
-    score -= 40;
   }
 
+  let pitEligible = false;
+  if ((ss.pitchG ?? 0) >= 5 && (ss.ip ?? 0) >= 15) {
+    const era = (ss.er ?? 0) * 9 / ss.ip;
+    if (era <= 3.50) {
+      pitEligible = true;
+    }
+  }
+
+  // KBO 1군에서 압도적인 성적(타자 OPS 0.900 이상 또는 투수 ERA 3.50 이하)을 거두지 못하면 오퍼 없음
+  if (!batEligible && !pitEligible) {
+    return [];
+  }
+
+  const score = nationalTeamRating(player);
   if (score < 110) return [];                       // 자격 — 역할기반 rating 110+
   const pool = getTeamPool("mlb", getLocale());
   if (!pool || pool.length === 0) return [];
