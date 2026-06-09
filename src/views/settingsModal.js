@@ -107,14 +107,14 @@ export function openSettingsModal(route) {
   const finalsBtn = document.createElement("button");
   finalsBtn.type = "button";
   const isSkip = !!getSetting("skipFinalsModal");
-  finalsBtn.textContent = isSkip ? t("settingsModal.toggleOff") : t("settingsModal.toggleOn");
-  finalsBtn.className = isSkip ? "" : "primary";
+  finalsBtn.textContent = isSkip ? t("settingsModal.toggleOn") : t("settingsModal.toggleOff");
+  finalsBtn.className = isSkip ? "primary" : "";
   finalsBtn.style.cssText = "padding:8px 14px; font-size:12px; font-weight:700; flex-shrink:0;";
   finalsBtn.addEventListener("click", () => {
     const next = !getSetting("skipFinalsModal");
     setSetting("skipFinalsModal", next);
-    finalsBtn.textContent = next ? t("settingsModal.toggleOff") : t("settingsModal.toggleOn");
-    finalsBtn.className = next ? "" : "primary";
+    finalsBtn.textContent = next ? t("settingsModal.toggleOn") : t("settingsModal.toggleOff");
+    finalsBtn.className = next ? "primary" : "";
   });
   finalsRow.appendChild(finalsBtn);
   finalsSection.appendChild(finalsRow);

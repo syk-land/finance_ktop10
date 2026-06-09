@@ -517,7 +517,7 @@ export const en = {
     language:          "Language",
     gameInactiveHint:  "Create a character to enable game controls.",
     finalsModalTitle:  "Live modal auto-skip",
-    finalsModalDesc:   "Live visualization for finals / PO / All-Star / Intl tournaments. OFF = auto-simulate with result toast only.",
+    finalsModalDesc:   "Whether to automatically skip the live visualization for finals / PO / All-Star / Intl tournaments. ON = auto-simulate with result toast only.",
     toggleOn:          "ON",
     toggleOff:         "OFF",
     soundTitle:        "Sound",

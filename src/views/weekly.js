@@ -149,6 +149,7 @@ function showFinalModalIfNeeded(route) {
     }
     state.pendingFinal = null;
     saveGame();
+    route("weekly");
     return;
   }
 
@@ -3999,6 +4000,7 @@ function showSeasonEventModalIfNeeded(route) {
       pushToast(t("weekly.allStarAutoDone"), "good");
       clearPendingEvent();
       saveGame();
+      route("weekly");
       return;
     }
     if (ev.handlerKey === "intlTournamentLive") {
@@ -4006,6 +4008,7 @@ function showSeasonEventModalIfNeeded(route) {
       pushToast(t("weekly.intlTournamentAutoDone", { tournament: t("seasonEvent." + ev.key) }), "good");
       clearPendingEvent();
       saveGame();
+      route("weekly");
       return;
     }
   }

@@ -520,7 +520,7 @@ export const ko = {
     language:          "언어",
     gameInactiveHint:  "캐릭터를 생성하면 게임 진행을 제어할 수 있습니다.",
     finalsModalTitle:  "라이브 모달 자동 진행",
-    finalsModalDesc:   "결승/PO/올스타/국제대회 라이브 시각화 모달을 띄울지. OFF 면 자동 진행 후 결과 토스트만.",
+    finalsModalDesc:   "결승/PO/올스타/국제대회 라이브 시각화 모달을 자동으로 스킵하고 진행할지 여부. ON 이면 결과만 토스트로 알립니다.",
     toggleOn:          "ON",
     toggleOff:         "OFF",
     soundTitle:        "사운드",
