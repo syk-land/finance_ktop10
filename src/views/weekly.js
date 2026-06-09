@@ -4299,6 +4299,21 @@ function renderChangeRow(c) {
   if (c.group === "meta" && c.stat === "fame") {
     labelText = t("offseason.fame");
     color = "var(--accent-2)";
+  } else if (c.group === "meta" && c.stat === "maxStamina") {
+    labelText = t("offseason.maxStamina") || "최대 체력";
+    color = "var(--good)";
+  } else if (c.group === "meta" && c.stat === "stamina") {
+    labelText = t("offseason.stamina") || "체력";
+    color = "var(--good)";
+  } else if (c.group === "meta" && c.stat === "condition") {
+    labelText = t("offseason.condition") || "컨디션";
+    color = "var(--good)";
+  } else if (c.group === "meta" && c.stat === "injuryHeal") {
+    labelText = t("offseason.injuryHeal") || "부상 회복";
+    color = "var(--good)";
+  } else if (c.group === "cap") {
+    labelText = `${t("weekly.cat" + (c.statType === "pitcher" ? "Pitcher" : "Batter") + "Short") || ""} ${t("stat." + c.stat)} 캡(Cap)`;
+    color = "var(--bad)";
   } else if (c.group === "batter") {
     labelText = `${t("weekly.catBatterShort")} ${t("stat." + c.stat)}`;
     color = "var(--accent)";

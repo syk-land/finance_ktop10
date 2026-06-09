@@ -130,6 +130,10 @@ export const en = {
     sectionEvent: "Event result",
     noChange: "No change",
     fame: "Fame",
+    maxStamina: "Max Stamina",
+    stamina: "Stamina",
+    condition: "Condition",
+    injuryHeal: "Injury recovery",
     skipped: "Declined the special event.",
 
     intense:        { label: "Intense training", desc: "Harsh drills. High reward, high risk." },

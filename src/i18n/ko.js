@@ -131,6 +131,10 @@ export const ko = {
     sectionEvent: "이벤트 결과",
     noChange: "변화 없음",
     fame: "명성",
+    maxStamina: "최대 체력",
+    stamina: "체력",
+    condition: "컨디션",
+    injuryHeal: "부상 회복",
     skipped: "특별 이벤트를 거절했다.",
 
     // 옵션 카테고리

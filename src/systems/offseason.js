@@ -25,6 +25,37 @@ function bump(player, group, stat, delta) {
   player[group][stat] = +after.toFixed(1);
   return { group, stat, delta: +(after - before).toFixed(1) };
 }
+function bumpCap(player, group, stat, delta) {
+  if (player[group] == null || player[group][stat] === undefined) return null;
+  player.offseasonCapBonuses = player.offseasonCapBonuses ?? {};
+  const before = player.offseasonCapBonuses[stat] ?? 0;
+  player.offseasonCapBonuses[stat] = before + delta;
+  return { group: "cap", stat, delta, statType: group };
+}
+function maxStaminaBump(player, delta) {
+  player.maxStamina = (player.maxStamina ?? 100) + delta;
+  return { group: "meta", stat: "maxStamina", delta };
+}
+function staminaBump(player, delta) {
+  const before = player.stamina;
+  const after = Math.max(0, Math.min(player.maxStamina ?? 100, player.stamina + delta));
+  player.stamina = after;
+  return { group: "meta", stat: "stamina", delta: +(after - before).toFixed(1) };
+}
+function conditionBump(player, delta) {
+  const before = player.condition ?? 50;
+  const after = Math.max(0, Math.min(100, before + delta));
+  player.condition = after;
+  return { group: "meta", stat: "condition", delta: +(after - before).toFixed(1) };
+}
+function healInjury(player, weeks) {
+  if (!player.injury) return null;
+  const before = player.injury.weeksLeft;
+  player.injury.weeksLeft = Math.max(0, player.injury.weeksLeft - weeks);
+  const actual = before - player.injury.weeksLeft;
+  if (player.injury.weeksLeft <= 0) player.injury = null;
+  return { group: "meta", stat: "injuryHeal", delta: actual };
+}
 function bumpMany(player, list) {
   return list.map(([g, s, d]) => bump(player, g, s, d)).filter(Boolean);
 }
@@ -49,37 +80,47 @@ function fameBump(player, delta) {
 export const OFFSEASON_CATEGORIES = {
   intense: {
     base(player) {
-      // 특훈 base — 랜덤 stat 1개 +3
+      // 특훈 base — 핵심 능력치 중 하나 대폭 상승 (+5) 단, 체력 -30 소모
+      const ch = [];
+      const c1 = staminaBump(player, -30); if (c1) ch.push(c1);
       const group = Math.random() < 0.5 ? "batter" : "pitcher";
       const s = randStat(group);
-      const c = bump(player, group, s, +3);
-      return c ? [c] : [];
+      const c2 = bump(player, group, s, +5); if (c2) ch.push(c2);
+      return ch;
     },
     pool: ["mad_scientist_pitch", "mad_scientist_bat", "secret_pitch", "extreme_drill", "new_form"],
   },
   camp: {
     base(player) {
-      // 전지훈련 base — 모든 stat +1
-      return bumpAllBoth(player, +1);
+      // 전지훈련 base — 최대 체력 +2, 체력 +15, 모든 능력치 +1
+      const ch = [];
+      const c1 = maxStaminaBump(player, +2); if (c1) ch.push(c1);
+      const c2 = staminaBump(player, +15); if (c2) ch.push(c2);
+      const stats = bumpAllBoth(player, +1);
+      return [...ch, ...stats];
     },
     pool: ["foreign_coach", "mentor_pitcher", "team_chemistry", "tough_camp", "unfamiliar_env"],
   },
   regular: {
     base(player) {
-      // 일반훈련 base — 랜덤 타자 1 + 랜덤 투수 1 stat +2
+      // 일반훈련 base — 체력 -15, 컨디션 +10, 랜덤 타자 1 + 랜덤 투수 1 능력치 +2
       const ch = [];
-      const sb = randStat("batter");  const c1 = bump(player, "batter",  sb, +2); if (c1) ch.push(c1);
-      const sp = randStat("pitcher"); const c2 = bump(player, "pitcher", sp, +2); if (c2) ch.push(c2);
+      const c1 = staminaBump(player, -15); if (c1) ch.push(c1);
+      const c2 = conditionBump(player, +10); if (c2) ch.push(c2);
+      const sb = randStat("batter");  const c3 = bump(player, "batter",  sb, +2); if (c3) ch.push(c3);
+      const sp = randStat("pitcher"); const c4 = bump(player, "pitcher", sp, +2); if (c4) ch.push(c4);
       return ch;
     },
     pool: ["new_technique", "rival", "coach_advice", "routine_drill", "night_training"],
   },
   rest: {
     base(player) {
-      // 휴식 base — 투수 스태미나/멘탈 +3
+      // 휴식 base — 체력 +50, 컨디션 +15, 부상 회복 1주 단축, 멘탈 +3
       const ch = [];
-      const c1 = bump(player, "pitcher", "stamina", +3); if (c1) ch.push(c1);
-      const c2 = bump(player, "pitcher", "mental",  +3); if (c2) ch.push(c2);
+      const c1 = staminaBump(player, +50); if (c1) ch.push(c1);
+      const c2 = conditionBump(player, +15); if (c2) ch.push(c2);
+      const c3 = healInjury(player, 1); if (c3) ch.push(c3);
+      const c4 = bump(player, "pitcher", "mental", +3); if (c4) ch.push(c4);
       return ch;
     },
     pool: ["confession", "family_time", "hobby", "short_trip", "quiet_rest"],
@@ -126,25 +167,46 @@ export const EVENTS = {
   // ── 특훈 ──
   mad_scientist_pitch: {
     category: "intense",
-    great: (p) => bumpMany(p, [["pitcher","velocity",+12],["pitcher","breaking",+6]]),
-    ok:    (p) => bumpMany(p, [["pitcher","velocity",+3]]),
+    great: (p) => {
+      const ch = [];
+      const c1 = bumpCap(p, "pitcher", "velocity", +2); if (c1) ch.push(c1);
+      const stats = bumpMany(p, [["pitcher","velocity",+12],["pitcher","breaking",+6]]);
+      return [...ch, ...stats];
+    },
+    ok:    (p) => bumpMany(p, [["pitcher","velocity",+4]]),
     bad:   (p) => bumpMany(p, [["pitcher","velocity",-3],["pitcher","control",-2]]),
   },
   mad_scientist_bat: {
     category: "intense",
-    great: (p) => bumpMany(p, [["batter","contact",+12],["batter","power",+6]]),
-    ok:    (p) => bumpMany(p, [["batter","contact",+3]]),
+    great: (p) => {
+      const ch = [];
+      const c1 = bumpCap(p, "batter", "contact", +2); if (c1) ch.push(c1);
+      const stats = bumpMany(p, [["batter","contact",+12],["batter","power",+6]]);
+      return [...ch, ...stats];
+    },
+    ok:    (p) => bumpMany(p, [["batter","contact",+4]]),
     bad:   (p) => bumpMany(p, [["batter","contact",-3],["batter","power",-2]]),
   },
   secret_pitch: {
     category: "intense",
-    great: (p) => bumpMany(p, [["pitcher","breaking",+12],["pitcher","control",+5]]),
-    ok:    (p) => bumpMany(p, [["pitcher","breaking",+3]]),
+    great: (p) => {
+      const ch = [];
+      const c1 = bumpCap(p, "pitcher", "breaking", +2); if (c1) ch.push(c1);
+      const stats = bumpMany(p, [["pitcher","breaking",+12],["pitcher","control",+5]]);
+      return [...ch, ...stats];
+    },
+    ok:    (p) => bumpMany(p, [["pitcher","breaking",+4]]),
     bad:   (p) => { applyInjury(p, 0.70); return bumpMany(p, [["pitcher","stamina",-3]]); },
   },
   extreme_drill: {
     category: "intense",
-    great: (p) => bumpAllBoth(p, +3),
+    great: (p) => {
+      const ch = [];
+      const c1 = bumpCap(p, "pitcher", "mental", +2); if (c1) ch.push(c1);
+      const c2 = bumpCap(p, "pitcher", "stamina", +2); if (c2) ch.push(c2);
+      const stats = bumpAllBoth(p, +3);
+      return [...ch, ...c1 ? [c1] : [], ...c2 ? [c2] : [], ...stats];
+    },
     ok:    (p) => bumpAllBoth(p, +1),
     bad:   (p) => bumpAllBoth(p, -2),
   },
@@ -153,9 +215,12 @@ export const EVENTS = {
     great: (p) => {
       const group = Math.random() < 0.5 ? "batter" : "pitcher";
       const s = randStat(group);
-      return bumpMany(p, [[group, s, +10]]);
+      const ch = [];
+      const c1 = bumpCap(p, group, s, +2); if (c1) ch.push(c1);
+      const stats = bumpMany(p, [[group, s, +10]]);
+      return [...ch, ...stats];
     },
-    ok: (p) => bumpMany(p, [["pitcher","mental",+2]]),
+    ok: (p) => bumpMany(p, [["pitcher","mental",+3]]),
     bad: (p) => {
       const group = Math.random() < 0.5 ? "batter" : "pitcher";
       const s = randStat(group);
@@ -166,32 +231,83 @@ export const EVENTS = {
   // ── 전지훈련 ──
   foreign_coach: {
     category: "camp",
-    great: (p) => bumpAll(p, "batter", +4),
-    ok:    (p) => bumpAll(p, "batter", +1),
+    great: (p) => {
+      const ch = [];
+      const c1 = maxStaminaBump(p, +3); if (c1) ch.push(c1);
+      const stats = bumpAll(p, "batter", +4);
+      return [...ch, ...stats];
+    },
+    ok:    (p) => {
+      const ch = [];
+      const c1 = maxStaminaBump(p, +1); if (c1) ch.push(c1);
+      const stats = bumpAll(p, "batter", +1);
+      return [...ch, ...stats];
+    },
     bad:   (p) => bumpMany(p, [["pitcher","mental",-3]]),
   },
   mentor_pitcher: {
     category: "camp",
-    great: (p) => bumpMany(p, [["pitcher","mental",+8],["pitcher","control",+6],["pitcher","breaking",+4]]),
-    ok:    (p) => bumpMany(p, [["pitcher","mental",+2]]),
+    great: (p) => {
+      const ch = [];
+      const c1 = maxStaminaBump(p, +3); if (c1) ch.push(c1);
+      const stats = bumpMany(p, [["pitcher","mental",+8],["pitcher","control",+6],["pitcher","breaking",+4]]);
+      return [...ch, ...stats];
+    },
+    ok:    (p) => {
+      const ch = [];
+      const c1 = maxStaminaBump(p, +1); if (c1) ch.push(c1);
+      const stats = bumpMany(p, [["pitcher","mental",+3]]);
+      return [...ch, ...stats];
+    },
     bad:   (p) => bumpMany(p, [["pitcher","mental",-2]]),
   },
   team_chemistry: {
     category: "camp",
-    great: (p) => [...bumpAllBoth(p, +2), fameBump(p, +5)],
-    ok:    (p) => [fameBump(p, +2)],
+    great: (p) => {
+      const ch = [];
+      const c1 = maxStaminaBump(p, +3); if (c1) ch.push(c1);
+      const stats = bumpAllBoth(p, +2);
+      const f = fameBump(p, +5);
+      return [...ch, ...stats, f];
+    },
+    ok:    (p) => {
+      const ch = [];
+      const c1 = maxStaminaBump(p, +1); if (c1) ch.push(c1);
+      const f = fameBump(p, +2);
+      return [...ch, f];
+    },
     bad:   (p) => bumpMany(p, [["pitcher","mental",-3]]),
   },
   tough_camp: {
     category: "camp",
-    great: (p) => bumpMany(p, [["pitcher","stamina",+8],["batter","speed",+5]]),
-    ok:    (p) => bumpMany(p, [["pitcher","stamina",+2]]),
+    great: (p) => {
+      const ch = [];
+      const c1 = maxStaminaBump(p, +5); if (c1) ch.push(c1);
+      const stats = bumpMany(p, [["pitcher","stamina",+8],["batter","speed",+5]]);
+      return [...ch, ...stats];
+    },
+    ok:    (p) => {
+      const ch = [];
+      const c1 = maxStaminaBump(p, +2); if (c1) ch.push(c1);
+      const stats = bumpMany(p, [["pitcher","stamina",+2]]);
+      return [...ch, ...stats];
+    },
     bad:   (p) => { applyInjury(p, 0.80); return bumpMany(p, [["batter","speed",-3]]); },
   },
   unfamiliar_env: {
     category: "camp",
-    great: (p) => bumpMany(p, [["pitcher","mental",+6],["batter","eye",+4]]),
-    ok:    (p) => bumpMany(p, [["pitcher","mental",+1]]),
+    great: (p) => {
+      const ch = [];
+      const c1 = maxStaminaBump(p, +3); if (c1) ch.push(c1);
+      const stats = bumpMany(p, [["pitcher","mental",+6],["batter","eye",+4]]);
+      return [...ch, ...stats];
+    },
+    ok:    (p) => {
+      const ch = [];
+      const c1 = maxStaminaBump(p, +1); if (c1) ch.push(c1);
+      const stats = bumpMany(p, [["pitcher","mental",+1]]);
+      return [...ch, ...stats];
+    },
     bad:   (p) => bumpMany(p, [["pitcher","mental",-4]]),
   },
 
@@ -201,37 +317,83 @@ export const EVENTS = {
     great: (p) => {
       const group = Math.random() < 0.5 ? "batter" : "pitcher";
       const s = randStat(group);
-      return bumpMany(p, [[group, s, +8]]);
+      const ch = [];
+      const c1 = conditionBump(p, +15); if (c1) ch.push(c1);
+      const stats = bumpMany(p, [[group, s, +8]]);
+      return [...ch, ...stats];
     },
     ok: (p) => {
       const group = Math.random() < 0.5 ? "batter" : "pitcher";
       const s = randStat(group);
-      return bumpMany(p, [[group, s, +2]]);
+      const ch = [];
+      const c1 = conditionBump(p, +5); if (c1) ch.push(c1);
+      const stats = bumpMany(p, [[group, s, +2]]);
+      return [...ch, ...stats];
     },
     bad: (p) => bumpMany(p, [["pitcher","mental",-2]]),
   },
   rival: {
     category: "regular",
-    great: (p) => bumpMany(p, [["pitcher","mental",+6],["batter","contact",+4]]),
-    ok:    (p) => bumpMany(p, [["pitcher","mental",+2]]),
+    great: (p) => {
+      const ch = [];
+      const c1 = conditionBump(p, +15); if (c1) ch.push(c1);
+      const stats = bumpMany(p, [["pitcher","mental",+6],["batter","contact",+4]]);
+      return [...ch, ...stats];
+    },
+    ok:    (p) => {
+      const ch = [];
+      const c1 = conditionBump(p, +5); if (c1) ch.push(c1);
+      const stats = bumpMany(p, [["pitcher","mental",+2]]);
+      return [...ch, ...stats];
+    },
     bad:   (p) => bumpMany(p, [["pitcher","mental",-3]]),
   },
   coach_advice: {
     category: "regular",
-    great: (p) => bumpMany(p, [["pitcher","control",+7],["batter","eye",+7]]),
-    ok:    (p) => bumpMany(p, [["pitcher","control",+2],["batter","eye",+2]]),
+    great: (p) => {
+      const ch = [];
+      const c1 = conditionBump(p, +15); if (c1) ch.push(c1);
+      const stats = bumpMany(p, [["pitcher","control",+7],["batter","eye",+7]]);
+      return [...ch, ...stats];
+    },
+    ok:    (p) => {
+      const ch = [];
+      const c1 = conditionBump(p, +5); if (c1) ch.push(c1);
+      const stats = bumpMany(p, [["pitcher","control",+2],["batter","eye",+2]]);
+      return [...ch, ...stats];
+    },
     bad:   (p) => bumpMany(p, [["pitcher","mental",-2]]),
   },
   routine_drill: {
     category: "regular",
-    great: (p) => bumpMany(p, [["pitcher","stamina",+5],["batter","defense",+4]]),
-    ok:    (p) => bumpMany(p, [["pitcher","stamina",+2]]),
+    great: (p) => {
+      const ch = [];
+      const c1 = conditionBump(p, +20); if (c1) ch.push(c1);
+      const stats = bumpMany(p, [["pitcher","stamina",+5],["batter","defense",+4]]);
+      return [...ch, ...stats];
+    },
+    ok:    (p) => {
+      const ch = [];
+      const c1 = conditionBump(p, +5); if (c1) ch.push(c1);
+      const stats = bumpMany(p, [["pitcher","stamina",+2]]);
+      return [...ch, ...stats];
+    },
     bad:   (p) => bumpMany(p, [["pitcher","mental",-3]]),
   },
   night_training: {
     category: "regular",
-    great: (p) => bumpMany(p, [["batter","power",+6],["pitcher","velocity",+5]]),
-    ok:    (p) => bumpMany(p, [["batter","power",+2]]),
+    great: (p) => {
+      const ch = [];
+      const c1 = conditionBump(p, +15); if (c1) ch.push(c1);
+      const stats = bumpMany(p, [["batter","power",+6],["pitcher","velocity",+5]]);
+      return [...ch, ...stats];
+    },
+    ok:    (p) => {
+      const ch = [];
+      const c1 = conditionBump(p, +5); if (c1) ch.push(c1);
+      const stats = bumpMany(p, [["batter","power",+2]]);
+      return [...ch, ...stats];
+    },
     bad:   (p) => bumpMany(p, [["pitcher","stamina",-3]]),
   },
 
@@ -239,36 +401,79 @@ export const EVENTS = {
   confession: {
     category: "rest",
     great: (p) => {
-      const ch = bumpMany(p, [["pitcher","mental",+8]]);
+      const ch = [];
+      const c1 = healInjury(p, 99); if (c1) ch.push(c1);
+      const c2 = bumpMany(p, [["pitcher","mental",+10]]);
       const group = Math.random() < 0.5 ? "batter" : "pitcher";
       const s = randStat(group);
-      return [...ch, ...bumpMany(p, [[group, s, +5]])];
+      const stats = bumpMany(p, [[group, s, +5]]);
+      return [...ch, ...c2, ...stats];
     },
-    ok:  (p) => bumpMany(p, [["pitcher","mental",+3]]),
+    ok:  (p) => {
+      const ch = [];
+      const c1 = healInjury(p, 1); if (c1) ch.push(c1);
+      const stats = bumpMany(p, [["pitcher","mental",+3]]);
+      return [...ch, ...stats];
+    },
     bad: (p) => bumpAllBoth(p, -2),
   },
   family_time: {
     category: "rest",
-    great: (p) => bumpMany(p, [["pitcher","mental",+6],["batter","eye",+4]]),
-    ok:    (p) => bumpMany(p, [["pitcher","mental",+2]]),
+    great: (p) => {
+      const ch = [];
+      const c1 = healInjury(p, 99); if (c1) ch.push(c1);
+      const stats = bumpMany(p, [["pitcher","mental",+8],["batter","eye",+4]]);
+      return [...ch, ...stats];
+    },
+    ok:    (p) => {
+      const ch = [];
+      const c1 = healInjury(p, 1); if (c1) ch.push(c1);
+      const stats = bumpMany(p, [["pitcher","mental",+2]]);
+      return [...ch, ...stats];
+    },
     bad:   (p) => bumpMany(p, [["pitcher","mental",-2]]),
   },
   hobby: {
     category: "rest",
-    great: (p) => [...bumpMany(p, [["pitcher","mental",+5]]), fameBump(p, +5)],
-    ok:    (p) => [fameBump(p, +2)],
+    great: (p) => {
+      const ch = [];
+      const c1 = fameBump(p, +8);
+      const stats = bumpMany(p, [["pitcher","mental",+8]]);
+      return [c1, ...stats];
+    },
+    ok:    (p) => [fameBump(p, +3)],
     bad:   (p) => bumpAllBoth(p, -1),
   },
   short_trip: {
     category: "rest",
-    great: (p) => bumpMany(p, [["pitcher","mental",+5],["pitcher","stamina",+3],["batter","eye",+3]]),
-    ok:    (p) => bumpMany(p, [["pitcher","stamina",+2]]),
+    great: (p) => {
+      const ch = [];
+      const c1 = conditionBump(p, +30); if (c1) ch.push(c1);
+      const stats = bumpMany(p, [["pitcher","mental",+8],["pitcher","stamina",+5],["batter","eye",+3]]);
+      return [...ch, ...stats];
+    },
+    ok:    (p) => {
+      const ch = [];
+      const c1 = conditionBump(p, +10); if (c1) ch.push(c1);
+      const stats = bumpMany(p, [["pitcher","stamina",+2]]);
+      return [...ch, ...stats];
+    },
     bad:   (p) => bumpMany(p, [["pitcher","stamina",-3]]),
   },
   quiet_rest: {
     category: "rest",
-    great: (p) => bumpMany(p, [["pitcher","stamina",+6],["pitcher","mental",+4]]),
-    ok:    (p) => bumpMany(p, [["pitcher","stamina",+2]]),
+    great: (p) => {
+      const ch = [];
+      const c1 = staminaBump(p, +100); if (c1) ch.push(c1);
+      const stats = bumpMany(p, [["pitcher","stamina",+8],["pitcher","mental",+6]]);
+      return [...ch, ...stats];
+    },
+    ok:    (p) => {
+      const ch = [];
+      const c1 = staminaBump(p, +20); if (c1) ch.push(c1);
+      const stats = bumpMany(p, [["pitcher","stamina",+2]]);
+      return [...ch, ...stats];
+    },
     bad:   (p) => bumpAllBoth(p, -1),
   },
 

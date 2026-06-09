@@ -263,17 +263,25 @@ export function statScale(stage) {
   return STAT_SCALE_BY_STAGE[base] ?? 1.0;
 }
 
-// stat 을 주면 해당 스탯의 캡(= stage base + 스탯별 영구 +5 보너스), 생략하면 stage base 만.
+// stat 을 주면 해당 스탯의 캡(= stage base + 스탯별 영구 +5 보너스 + 비시즌 한계돌파 보너스), 생략하면 stage base 만.
 export function getPlayerStatCap(player, stat = null) {
   const base = PLAYER_STAT_CAP_BY_STAGE[player?.stage] ?? 150;
   const bonus = stat ? capBonusForStat(stat, state?.regression?.permanentPurchases?.statCaps) : 0;
-  return base + bonus;
+  const offseasonBonus = (stat && player?.offseasonCapBonuses && player.offseasonCapBonuses[stat]) ? player.offseasonCapBonuses[stat] : 0;
+  return base + bonus + offseasonBonus;
 }
 // 레이다/막대 그래프 공통 max — stage base + 전 스탯 중 최대 보너스.
 // 캡이 큰 스탯에 맞춰 그래프 전체가 함께 커지도록 (한 축이라도 넘치지 않게).
 export function getPlayerMaxStatCap(player) {
   const base = PLAYER_STAT_CAP_BY_STAGE[player?.stage] ?? 150;
-  return base + maxCapBonus(state?.regression?.permanentPurchases?.statCaps);
+  const shopBonus = maxCapBonus(state?.regression?.permanentPurchases?.statCaps);
+  let maxOffseasonBonus = 0;
+  if (player?.offseasonCapBonuses) {
+    for (const val of Object.values(player.offseasonCapBonuses)) {
+      if (val > maxOffseasonBonus) maxOffseasonBonus = val;
+    }
+  }
+  return base + shopBonus + maxOffseasonBonus;
 }
 // 호환용 (옛 코드/세이브) — 의미는 "기본 cap"
 export const STAT_CAP = 150;
