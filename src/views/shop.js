@@ -180,8 +180,8 @@ function renderCapTab() {
 
   const statCaps = m.permanentPurchases.statCaps ?? {};
   const groups = [
-    { label: t("shop.capGroupBatter"),  stats: ["contact", "power", "eye", "speed", "defense"] },
-    { label: t("shop.capGroupPitcher"), stats: ["velocity", "control", "breaking", "stamina", "mental"] },
+    { label: t("shop.capGroupBatter"),  stats: ["contact", "power", "eye", "speed"] },
+    { label: t("shop.capGroupPitcher"), stats: ["velocity", "control", "breaking", "stamina"] },
   ];
   for (const g of groups) {
     const header = document.createElement("div");

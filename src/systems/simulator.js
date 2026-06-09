@@ -122,10 +122,10 @@ function simulateAtBat(batter, pitcher, opts = {}) {
   const overwork = clamp((pitcherPA - capacity) / 12, 0, 1);
   const fatiguePenalty = overwork * 12;
 
-  // 투수 mental(클러치) — 고압 상황(leverage)에서만 위기관리로 작동.
-  //   고멘탈: 안타/홈런/볼넷 억제(침착). 저멘탈: 멘탈붕괴로 실점↑. leverage=0 이면 무영향.
+  // 투수 제구(control)를 mental(클러치) 대용으로 — 고압 상황(leverage)에서만 위기관리로 작동.
+  //   고멘탈(고제구): 안타/홈런/볼넷 억제(침착). 저멘탈: 멘탈붕괴로 실점↑. leverage=0 이면 무영향.
   // mental 절대기준(클러치) — 스케일업분 정규화.
-  const mental = (p.mental ?? 50) / SIM_SCALE;
+  const mental = (p.control ?? 50) / SIM_SCALE;
   const mentalEdge = leverage > 0 ? (mental - 50) * leverage : 0;
 
   const stuffAvg   = (velocity + breaking) / 2 - fatiguePenalty;
@@ -240,7 +240,7 @@ function makeLineupState(lineup, bench, side, isPlayerTeam, mainBenchEntry, trac
 function entryBatterOVR(e) {
   const b = e?.batter;
   if (!b) return 0;
-  return ((b.contact ?? 50) + (b.power ?? 50) + (b.eye ?? 50) + (b.speed ?? 50) + (b.defense ?? 50)) / 5;
+  return ((b.contact ?? 50) + (b.power ?? 50) + (b.eye ?? 50) + (b.speed ?? 50)) / 4;
 }
 function entrySpeed(e) { return e?.batter?.speed ?? 50; }
 
@@ -558,11 +558,11 @@ function recordLead(history, inning, homeScore, awayScore, homeMound, awayMound)
 // OVR (정렬·라인업 슬롯 결정용. 출장 결정에서는 더 이상 사용 안 함)
 export function batterOVR(player) {
   const b = player.batter;
-  return (b.contact + b.power + b.eye + b.speed + b.defense) / 5;
+  return (b.contact + b.power + b.eye + b.speed) / 4;
 }
 export function pitcherOVR(player) {
   const p = player.pitcher;
-  return (p.velocity + p.control + p.breaking + p.stamina + p.mental) / 5;
+  return (p.velocity + p.control + p.breaking + p.stamina) / 4;
 }
 
 // 출장 룰:
@@ -678,8 +678,7 @@ function buildLineup(team, mainPlayerForBat, mainTrack = null) {
   let mainOvr = null;
   let mainEntry = null;
   if (mainPlayerForBat) {
-    const b = mainPlayerForBat.batter;
-    mainOvr = (b.contact + b.power + b.eye + b.speed + b.defense) / 5;
+    mainOvr = (b.contact + b.power + b.eye + b.speed) / 4;
     mainEntry = { entry: null, ovr: mainOvr, isMain: true };
   }
   pool.sort((a, b) => b.ovr - a.ovr);
@@ -1131,12 +1130,12 @@ function applyResult(type, bases, batter) {
   return { runs: scoredRunners.length, outsAdded, bases: newBases, scoredRunners, rbi };
 }
 
-// 수비팀 평균 defense — 실책 굴림에 사용. lineup 의 야수 9명 평균.
+// 수비팀 평균 speed — 실책 굴림에 사용. lineup 의 야수 9명 평균.
 function teamDefenseRating(lineup) {
   if (!lineup || lineup.length === 0) return 50;
   let sum = 0, n = 0;
   for (const e of lineup) {
-    const d = (e.batter?.defense ?? e.defense);
+    const d = (e.batter?.speed ?? e.speed);
     if (d != null) { sum += d; n++; }
   }
   return n > 0 ? sum / n : 50;

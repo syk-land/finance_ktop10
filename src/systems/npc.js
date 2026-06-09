@@ -8,15 +8,15 @@ import { assignPitches, rollNpcBats, rollNpcThrows } from "./pitches.js";
 const POSITIONS_BATTER = ["C", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "DH"];
 // 포지션별 능력치 가중치 (생성 시)
 const POS_WEIGHTS = {
-  C:  { contact: 1.0, power: 1.0, eye: 1.0, speed: 0.7, defense: 1.3 },
-  "1B": { contact: 1.1, power: 1.2, eye: 1.0, speed: 0.8, defense: 1.0 },
-  "2B": { contact: 1.1, power: 0.9, eye: 1.0, speed: 1.1, defense: 1.2 },
-  "3B": { contact: 1.0, power: 1.2, eye: 1.0, speed: 0.9, defense: 1.1 },
-  SS: { contact: 1.0, power: 0.9, eye: 1.0, speed: 1.2, defense: 1.3 },
-  LF: { contact: 1.1, power: 1.1, eye: 1.0, speed: 1.0, defense: 0.95 },
-  CF: { contact: 1.0, power: 1.0, eye: 1.0, speed: 1.3, defense: 1.2 },
-  RF: { contact: 1.0, power: 1.2, eye: 1.0, speed: 1.0, defense: 1.0 },
-  DH: { contact: 1.1, power: 1.3, eye: 1.1, speed: 0.7, defense: 0.5 },
+  C:  { contact: 1.0, power: 1.0, eye: 1.0, speed: 0.7 },
+  "1B": { contact: 1.1, power: 1.2, eye: 1.0, speed: 0.8 },
+  "2B": { contact: 1.1, power: 0.9, eye: 1.0, speed: 1.1 },
+  "3B": { contact: 1.0, power: 1.2, eye: 1.0, speed: 0.9 },
+  SS: { contact: 1.0, power: 0.9, eye: 1.0, speed: 1.2 },
+  LF: { contact: 1.1, power: 1.1, eye: 1.0, speed: 1.0 },
+  CF: { contact: 1.0, power: 1.0, eye: 1.0, speed: 1.3 },
+  RF: { contact: 1.0, power: 1.2, eye: 1.0, speed: 1.0 },
+  DH: { contact: 1.1, power: 1.3, eye: 1.1, speed: 0.7 },
 };
 
 let _npcIdCounter = 1;
@@ -53,8 +53,8 @@ function statFromGauss(base, sigma, weight = 1.0, cap = 150) {
 const NPC_STAGE_MULTIPLIERS = {
   high:    0.72,
   univ:    0.75,
-  pro2:    0.88,
-  pro1:    0.80,
+  pro2:    0.80,
+  pro1:    0.88,
   mlb_a:   0.82,
   mlb_aa:  0.84,
   mlb_aaa: 0.86,
@@ -262,10 +262,10 @@ export function ageUpRoster(roster, stage, strength, teamName = null) {
 export function npcOverall(npc) {
   if (npc.role === "batter") {
     const b = npc.batter;
-    return (b.contact + b.power + b.eye + b.speed + b.defense) / 5;
+    return (b.contact + b.power + b.eye + b.speed) / 4;
   } else {
     const p = npc.pitcher;
-    return (p.velocity + p.control + p.breaking + p.stamina + p.mental) / 5;
+    return (p.velocity + p.control + p.breaking + p.stamina) / 4;
   }
 }
 

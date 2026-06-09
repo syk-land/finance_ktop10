@@ -777,11 +777,11 @@ function renderCreatePanel(route) {
         if (npc.age === 16) {
           if (npc.role === "batter") {
             const b = npc.batter;
-            const ovr = (b.contact + b.power + b.eye + b.speed + b.defense) / 5;
+            const ovr = (b.contact + b.power + b.eye + b.speed) / 4;
             if (ovr < minBatter) minBatter = ovr;
           } else {
             const p = npc.pitcher;
-            const ovr = (p.velocity + p.control + p.breaking + p.stamina + p.mental) / 5;
+            const ovr = (p.velocity + p.control + p.breaking + p.stamina) / 4;
             if (ovr < minPitcher) minPitcher = ovr;
           }
         }
@@ -800,12 +800,12 @@ function renderCreatePanel(route) {
 
     // 주인공의 초기 능력치를 '가장 낮은 선수'의 평균치를 베이스로 하여 재능 분포에 맞게 재설정
     if (minBatter !== 999) {
-      for (const stat of ["contact", "power", "eye", "speed", "defense"]) {
+      for (const stat of ["contact", "power", "eye", "speed"]) {
         state.player.batter[stat] = Math.round(minBatter * (boostsCombined[stat] || 1.0));
       }
     }
     if (minPitcher !== 999) {
-      for (const stat of ["velocity", "control", "breaking", "stamina", "mental"]) {
+      for (const stat of ["velocity", "control", "breaking", "stamina"]) {
         state.player.pitcher[stat] = Math.round(minPitcher * (boostsCombined[stat] || 1.0));
       }
     }
@@ -1060,16 +1060,11 @@ function makeTalentSelect(slotIdx) {
   container.appendChild(btn);
 
   const TALENT_THEMES = {
-    contact:      { color: "#22c55e", bg: "rgba(34, 197, 94, 0.08)", border: "rgba(34, 197, 94, 0.4)" },
-    power:        { color: "#f97316", bg: "rgba(249, 115, 22, 0.08)", border: "rgba(249, 115, 22, 0.4)" },
-    speedster:    { color: "#eab308", bg: "rgba(234, 179, 8, 0.08)", border: "rgba(234, 179, 8, 0.4)" },
-    defender:     { color: "#0d9488", bg: "rgba(13, 148, 136, 0.08)", border: "rgba(13, 148, 136, 0.4)" },
-    bat_balanced: { color: "#10b981", bg: "rgba(16, 185, 129, 0.08)", border: "rgba(16, 185, 129, 0.4)" },
+    slugger:      { color: "#f97316", bg: "rgba(249, 115, 22, 0.08)", border: "rgba(249, 115, 22, 0.4)" },
+    sprinter:     { color: "#22c55e", bg: "rgba(34, 197, 94, 0.08)", border: "rgba(34, 197, 94, 0.4)" },
+    fireballer:   { color: "#a855f7", bg: "rgba(168, 85, 247, 0.08)", border: "rgba(168, 85, 247, 0.4)" },
+    tactician:    { color: "#06b6d4", bg: "rgba(6, 182, 212, 0.08)", border: "rgba(6, 182, 212, 0.4)" },
     all_round:    { color: "#d97706", bg: "rgba(217, 119, 6, 0.08)", border: "rgba(217, 119, 6, 0.4)" },
-    fireball:     { color: "#a855f7", bg: "rgba(168, 85, 247, 0.08)", border: "rgba(168, 85, 247, 0.4)" },
-    finesse:      { color: "#06b6d4", bg: "rgba(6, 182, 212, 0.08)", border: "rgba(6, 182, 212, 0.4)" },
-    breakerz:     { color: "#6366f1", bg: "rgba(99, 102, 241, 0.08)", border: "rgba(99, 102, 241, 0.4)" },
-    pit_balanced: { color: "#3b82f6", bg: "rgba(59, 130, 246, 0.08)", border: "rgba(59, 130, 246, 0.4)" },
   };
 
   function updateButtonState(val) {
@@ -1130,16 +1125,11 @@ function openTalentPickerModal(slotIdx, currentVal, onSelect) {
   list.style.cssText = "flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;";
 
   const TALENT_THEMES = {
-    contact:      { color: "#22c55e", bg: "rgba(34, 197, 94, 0.08)", border: "rgba(34, 197, 94, 0.2)" },
-    power:        { color: "#f97316", bg: "rgba(249, 115, 22, 0.08)", border: "rgba(249, 115, 22, 0.2)" },
-    speedster:    { color: "#eab308", bg: "rgba(234, 179, 8, 0.08)", border: "rgba(234, 179, 8, 0.2)" },
-    defender:     { color: "#0d9488", bg: "rgba(13, 148, 136, 0.08)", border: "rgba(13, 148, 136, 0.2)" },
-    bat_balanced: { color: "#10b981", bg: "rgba(16, 185, 129, 0.08)", border: "rgba(16, 185, 129, 0.2)" },
+    slugger:      { color: "#f97316", bg: "rgba(249, 115, 22, 0.08)", border: "rgba(249, 115, 22, 0.2)" },
+    sprinter:     { color: "#22c55e", bg: "rgba(34, 197, 94, 0.08)", border: "rgba(34, 197, 94, 0.2)" },
+    fireballer:   { color: "#a855f7", bg: "rgba(168, 85, 247, 0.08)", border: "rgba(168, 85, 247, 0.2)" },
+    tactician:    { color: "#06b6d4", bg: "rgba(6, 182, 212, 0.08)", border: "rgba(6, 182, 212, 0.2)" },
     all_round:    { color: "#d97706", bg: "rgba(217, 119, 6, 0.08)", border: "rgba(217, 119, 6, 0.2)" },
-    fireball:     { color: "#a855f7", bg: "rgba(168, 85, 247, 0.08)", border: "rgba(168, 85, 247, 0.2)" },
-    finesse:      { color: "#06b6d4", bg: "rgba(6, 182, 212, 0.08)", border: "rgba(6, 182, 212, 0.2)" },
-    breakerz:     { color: "#6366f1", bg: "rgba(99, 102, 241, 0.08)", border: "rgba(99, 102, 241, 0.2)" },
-    pit_balanced: { color: "#3b82f6", bg: "rgba(59, 130, 246, 0.08)", border: "rgba(59, 130, 246, 0.2)" },
   };
 
   for (const [key, talent] of Object.entries(TALENTS)) {

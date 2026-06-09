@@ -369,8 +369,8 @@ export function recordHallOfFame(player) {
   // 2) pitcher score
   const pitcherScore = combine("w") / 2 + combine("pK") / 10 + combine("sv") / 5;
   // 3) balanced score
-  const bOVR = (player.batter.contact + player.batter.power + player.batter.eye + player.batter.speed + player.batter.defense) / 5;
-  const pOVR = (player.pitcher.velocity + player.pitcher.control + player.pitcher.breaking + player.pitcher.stamina + player.pitcher.mental) / 5;
+  const bOVR = (player.batter.contact + player.batter.power + player.batter.eye + player.batter.speed) / 4;
+  const pOVR = (player.pitcher.velocity + player.pitcher.control + player.pitcher.breaking + player.pitcher.stamina) / 4;
   const balancedScore = (bOVR + pOVR) - Math.abs(bOVR - pOVR) * 0.5;
   // 4) honor score
   const honorScore = scoreData.total;

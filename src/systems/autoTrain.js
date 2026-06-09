@@ -24,23 +24,20 @@ function equalizeTarget(player, stats = [...BATTER_STATS, ...PITCHER_STATS]) {
   return isFinite(min) ? min : 150;
 }
 
-// 스탯 순서: 컨택 파워 선구 주력 수비 | 구속 제구 변화 스태 멘탈
-function W(contact, power, eye, speed, defense, velocity, control, breaking, stamina, mental) {
-  return { contact, power, eye, speed, defense, velocity, control, breaking, stamina, mental };
+// 스탯 순서: 컨택 파워 선구 주력 | 구속 제구 변화 스태
+function W(contact, power, eye, speed, velocity, control, breaking, stamina) {
+  return { contact, power, eye, speed, velocity, control, breaking, stamina };
 }
 
 export const AUTO_PRESETS = {
-  //                  컨택  파워  선구  주력  수비  구속  제구  변화  스태  멘탈
-  slugger:    { statWeights: W(0.75, 1.00, 0.75, 0.55, 0.55, 0, 0, 0, 0, 0) },          // 거포 — 파워 최우선
-  contact:    { statWeights: W(1.00, 0.55, 0.90, 0.70, 0.65, 0, 0, 0, 0, 0) },          // 교타자 — 컨택/선구
-  speedster:  { statWeights: W(0.80, 0.65, 0.70, 1.00, 0.75, 0, 0, 0, 0, 0) },          // 호타준족 — 주력 중심 호타
-  defender:   { statWeights: W(0.60, 0.45, 0.60, 0.85, 1.00, 0, 0, 0, 0, 0) },          // 수비형 — 수비/주력
-  batter_balance:  { statWeights: W(1, 1, 1, 1, 1, 0, 0, 0, 0, 0), equalize: true, equalizeStats: BATTER_STATS },   // 타자 밸런스 — 타격 5종 같은 값(최저 cap)으로
-  fireballer: { statWeights: W(0, 0, 0, 0, 0, 1.00, 0.65, 0.70, 0.85, 0.60) },          // 파워피처 — 구속/스태미나
-  finesse:    { statWeights: W(0, 0, 0, 0, 0, 0.60, 1.00, 0.90, 0.70, 0.85) },          // 기교파 — 제구/변화구/멘탈
-  pitcher_balance: { statWeights: W(0, 0, 0, 0, 0, 1, 1, 1, 1, 1), equalize: true, equalizeStats: PITCHER_STATS },  // 투수 밸런스 — 투구 5종 같은 값(최저 cap)으로
-  two_way:    { statWeights: W(1, 1, 1, 1, 1, 1, 1, 1, 1, 1), equalize: true },          // 밸런스 — 전 스탯 같은 값(최저 cap)으로
-  recovery:   { statWeights: W(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5), restBias: 0.6 }, // 회복 우선
+  //                  컨택  파워  선구  주력  구속  제구  변화  스태
+  slugger:         { statWeights: W(0.75, 1.00, 0.75, 0.55, 0, 0, 0, 0) },                   // 거포
+  contact_speed:   { statWeights: W(1.00, 0.50, 0.90, 1.00, 0, 0, 0, 0) },                   // 교타/주루
+  batter_balance:  { statWeights: W(1, 1, 1, 1, 0, 0, 0, 0), equalize: true, equalizeStats: BATTER_STATS },   // 타자 밸런스
+  fireballer:      { statWeights: W(0, 0, 0, 0, 1.00, 0.60, 0.50, 0.85) },                   // 강속구
+  breaking:        { statWeights: W(0, 0, 0, 0, 0.50, 1.00, 1.00, 0.80) },                   // 변화구
+  pitcher_balance: { statWeights: W(0, 0, 0, 0, 1, 1, 1, 1), equalize: true, equalizeStats: PITCHER_STATS },  // 투수 밸런스
+  two_way:         { statWeights: W(1, 1, 1, 1, 1, 1, 1, 1), equalize: true },               // 올밸런스
 };
 
 // 프리셋의 최고 비중 스탯 키 (동률이면 스탯 순서상 첫 번째). 안내 메시지/캡 판정용.
@@ -146,12 +143,10 @@ const STAT_TRAINING = {
   power:    "weight",
   eye:      "eye_drill",
   speed:    "running",
-  defense:  "fielding",
   velocity: "pitching",
   control:  "breaking_drill",
   breaking: "breaking_drill",
   stamina:  "weight",
-  mental:   "mental",
 };
 
 const ALL_STATS = [...BATTER_STATS, ...PITCHER_STATS];

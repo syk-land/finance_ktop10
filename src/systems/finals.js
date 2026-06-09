@@ -218,11 +218,11 @@ export function applyFinalReward(player, result, tournamentKey = null) {
     fameUp(Math.round(25 * perfMult * rewardMult));
     if (mvp) {
       // MVP 추가 보너스 — perfMult 영향 받지 않음 (MVP 조건 자체가 호조 보증)
-      bump("pitcher", "mental", +5);
+      bump("pitcher", "control", +5);
       fameUp(Math.round(10 * rewardMult));
     }
   } else {
-    bump("pitcher", "mental", +(5 * perfMult).toFixed(1));
+    bump("pitcher", "control", +(5 * perfMult).toFixed(1));
     fameUp(Math.round(10 * perfMult * rewardMult));
   }
 

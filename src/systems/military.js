@@ -77,8 +77,8 @@ export function applyMilitaryService(player, optionKey) {
     player.pitcher[s] = +after.toFixed(1);
   }
   addFame(player, opt.fameDelta);
-  if (player.pitcher.mental !== undefined) {
-    player.pitcher.mental = Math.min(getPlayerStatCap(player, "mental"), +(player.pitcher.mental + opt.mentalDelta).toFixed(1));
+  if (player.pitcher.control !== undefined) {
+    player.pitcher.control = Math.min(getPlayerStatCap(player, "control"), +(player.pitcher.control + opt.mentalDelta).toFixed(1));
   }
 
   // careerHistory 에 군 복무 시즌 2개 push (통계는 비어있음)

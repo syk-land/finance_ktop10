@@ -16,8 +16,8 @@ const THRESHOLDS = {
   kKing:         { pK: 30 },
   eraTitle:      { minIP: 30, eraMax: 1.80 },
   rookie:        { gradeMax: 1, minAB: 20, avg: 0.300 },
-  // 능력치 기반 — 게임 내 수비 통계(에러 등)가 없어 batter.defense 로 대체
-  goldenGlove:   { minGames: 10, defenseMin: 70 },
+  // 능력치 기반 — 게임 내 수비 통계(에러 등)가 없어 batter.speed 로 대체 (수비 능력치 삭제로 대체)
+  goldenGlove:   { minGames: 10, speedMin: 70 },
 };
 
 export function evaluateAndApplySeasonAwards(player, league, gameDate) {
@@ -63,10 +63,10 @@ function computeAwards(player, league) {
     result.push("eraTitle");
   }
 
-  // 골든글러브 — 일정 게임 이상 출장 + 수비 능력치 임계
+  // 골든글러브 — 일정 게임 이상 출장 + 주력 능력치 임계
   const games = ss.games ?? 0;
-  const defense = player.batter?.defense ?? 0;
-  if (games >= THRESHOLDS.goldenGlove.minGames && defense >= THRESHOLDS.goldenGlove.defenseMin) {
+  const speed = player.batter?.speed ?? 0;
+  if (games >= THRESHOLDS.goldenGlove.minGames && speed >= THRESHOLDS.goldenGlove.speedMin) {
     result.push("goldenGlove");
   }
 

@@ -228,7 +228,7 @@ export function clearPendingEvent() {
 // 올스타전 출장 보상 — 라이브 모달 종료 시 UI 가 호출.
 export function applyAllStarReward(player) {
   fameUp(player, 8);
-  bump(player, "pitcher", "mental", 2);
+  bump(player, "pitcher", "control", 2);
   bump(player, "batter", "eye", 1);
 }
 

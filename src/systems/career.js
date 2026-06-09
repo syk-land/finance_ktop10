@@ -125,8 +125,8 @@ export function compositeScore(player) {
   const b = player.batter;
   const p = player.pitcher;
   const stats = [
-    b.contact, b.power, b.eye, b.speed, b.defense,
-    p.velocity, p.control, p.breaking, p.stamina, p.mental,
+    b.contact, b.power, b.eye, b.speed,
+    p.velocity, p.control, p.breaking, p.stamina,
   ];
   const avg = stats.reduce((a, c) => a + c, 0) / stats.length;
   const max = Math.max(...stats);
@@ -140,8 +140,8 @@ export function promotionScore(player) {
   const b = player.batter;
   const p = player.pitcher;
   const stats = [
-    b.contact, b.power, b.eye, b.speed, b.defense,
-    p.velocity, p.control, p.breaking, p.stamina, p.mental,
+    b.contact, b.power, b.eye, b.speed,
+    p.velocity, p.control, p.breaking, p.stamina,
   ];
   return stats.reduce((a, c) => a + c, 0) / stats.length;
 }

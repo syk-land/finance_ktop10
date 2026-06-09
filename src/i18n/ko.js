@@ -82,16 +82,11 @@ export const ko = {
   },
 
   talent: {
-    contact:      "컨택형",
-    power:        "파워형",
-    speedster:    "주루형",
-    defender:     "수비형",
-    bat_balanced: "타자밸런스형",
+    slugger:      "거포형",
+    sprinter:     "교타/주루형",
+    fireballer:   "강속구형",
+    tactician:    "기교파/제구형",
     all_round:    "만능형",
-    fireball:     "강속구형",
-    finesse:      "제구형",
-    breakerz:     "변화구형",
-    pit_balanced: "투수밸런스형",
   },
 
   training: {
@@ -831,16 +826,13 @@ export const ko = {
   },
 
   preset: {
-    slugger: { label: "슬러거",       desc: "장타 극대화. 타격·웨이트 중심." },
-    contact: { label: "컨택 히터",    desc: "정교한 방망이. 타격·선구안 중심." },
-    speedster: { label: "호타준족",   desc: "주력 + 타격. 발 빠른 호타준족형." },
-    defender: { label: "수비 명인",   desc: "수비·주루 위주. 견고한 야수." },
-    batter_balance: { label: "타자 밸런스", desc: "타격 5종(컨택·파워·선구·주력·수비)을 같은 값으로." },
-    fireballer: { label: "파이어볼러", desc: "구속·파워. 강속구 투수." },
-    finesse: { label: "제구파 투수",  desc: "제구·변화구. 두뇌형 투수." },
-    pitcher_balance: { label: "투수 밸런스", desc: "투구 5종(구속·제구·변화·스태·멘탈)을 같은 값으로." },
-    two_way: { label: "양방향 (밸런스)", desc: "투타 균형. 모든 종목을 골고루." },
-    recovery: { label: "회복 우선",   desc: "체력/부상 회복 위주. 가벼운 훈련만." },
+    slugger: { label: "거포", desc: "장타 극대화. 파워 및 타격 위주." },
+    contact_speed: { label: "교타/주루", desc: "정교한 방망이와 빠른 발. 콘택트와 주력 위주." },
+    batter_balance: { label: "타자 밸런스", desc: "타자 4대 능력치(컨택·파워·선구·주력)를 같은 값으로." },
+    fireballer: { label: "강속구", desc: "강력한 구속. 구속 및 스태미나 위주." },
+    breaking: { label: "변화구", desc: "예리한 변화구와 안정된 제구. 변화구 및 제구 위주." },
+    pitcher_balance: { label: "투수 밸런스", desc: "투수 4대 능력치(구속·제구·변화·스태)를 같은 값으로." },
+    two_way: { label: "올 밸런스", desc: "투타의 완벽한 조화. 모든 스탯을 골고루." },
   },
 
   injury: {

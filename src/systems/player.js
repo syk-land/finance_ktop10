@@ -25,8 +25,8 @@ function unlockSevereRecoveredIf(player, justHealedSeverity) {
   }
 }
 
-export const BATTER_STATS = ["contact", "power", "eye", "speed", "defense"];
-export const PITCHER_STATS = ["velocity", "control", "breaking", "stamina", "mental"];
+export const BATTER_STATS = ["contact", "power", "eye", "speed"];
+export const PITCHER_STATS = ["velocity", "control", "breaking", "stamina"];
 
 // stat key → 현재 locale 의 라벨 맵 (radar / 표시용). 매 호출마다 새로 만든다.
 export function getStatLabels() {
@@ -37,16 +37,11 @@ export function getStatLabels() {
 
 // 재능 타입 — 훈련 효율에 영향. 라벨은 i18n 의 talent.<key>.
 export const TALENTS = {
-  contact:      { boost: { contact: 1.4, eye: 1.2 } },
-  power:        { boost: { power: 1.4, contact: 1.2 } },
-  speedster:    { boost: { speed: 1.5, contact: 1.2 } },
-  defender:     { boost: { defense: 1.5, speed: 1.2 } },
-  bat_balanced: { boost: { contact: 1.25, power: 1.25, eye: 1.25, speed: 1.25, defense: 1.25 } },
-  all_round:    { boost: { contact: 1.15, power: 1.15, eye: 1.15, speed: 1.15, defense: 1.15, velocity: 1.15, control: 1.15, breaking: 1.15, stamina: 1.15, mental: 1.15 } },
-  fireball:     { boost: { velocity: 1.5, stamina: 1.2 } },
-  finesse:      { boost: { control: 1.5, mental: 1.2 } },
-  breakerz:     { boost: { breaking: 1.5, control: 1.2 } },
-  pit_balanced: { boost: { velocity: 1.25, control: 1.25, breaking: 1.25, stamina: 1.25, mental: 1.25 } },
+  slugger:      { boost: { power: 1.5, contact: 1.3 } },
+  sprinter:     { boost: { contact: 1.3, speed: 1.3, eye: 1.2 } },
+  fireballer:   { boost: { velocity: 1.5, stamina: 1.3 } },
+  tactician:    { boost: { control: 1.5, breaking: 1.3 } },
+  all_round:    { boost: { contact: 1.1, power: 1.1, eye: 1.1, speed: 1.1, velocity: 1.1, control: 1.1, breaking: 1.1, stamina: 1.1 } },
 };
 
 // 훈련 카탈로그. 라벨은 i18n 의 training.<key>.
@@ -55,11 +50,9 @@ export const TRAININGS = {
   batting:        { stats: ["contact", "power"],     stamina: -18, injuryRisk: 0.008 },
   eye_drill:      { stats: ["eye", "contact"],       stamina: -12, injuryRisk: 0.004 },
   running:        { stats: ["speed"],                stamina: -16, injuryRisk: 0.010 },
-  fielding:       { stats: ["defense"],              stamina: -14, injuryRisk: 0.006 },
   pitching:       { stats: ["velocity", "control"],  stamina: -20, injuryRisk: 0.012 },
   breaking_drill: { stats: ["breaking", "control"],  stamina: -16, injuryRisk: 0.008 },
   weight:         { stats: ["power", "stamina"],     stamina: -22, injuryRisk: 0.010 },
-  mental:         { stats: ["mental", "control"],    stamina: -8,  injuryRisk: 0.002 },
 };
 
 // createPlayer: 다중 재능 + 회귀 로드아웃 지원.
@@ -78,8 +71,8 @@ export function createPlayer({
 }) {
   const talentList = Array.isArray(talents) && talents.length > 0 ? [...talents] : [talent];
   // 시작 스탯: 평균(50) 살짝 위 — 16세 유망주가 동급 또래보다 약간 두각. 회귀 시스템으로 더 높은 값에서 시작하는 안도 지원.
-  const baseBatter = { contact: 65, power: 54, eye: 65, speed: 60, defense: 60 };
-  const basePitcher = { velocity: 65, control: 60, breaking: 54, stamina: 62, mental: 60 };
+  const baseBatter = { contact: 65, power: 54, eye: 65, speed: 60 };
+  const basePitcher = { velocity: 65, control: 60, breaking: 54, stamina: 62 };
   const batter = { ...baseBatter };
   const pitcher = { ...basePitcher };
   // 재능들의 boost 합산 — 동일 stat 에 다중 적용 시 곱연산.
@@ -181,17 +174,12 @@ export function addFame(player, amount) {
 // 한 번 결정되면 player.position 에 고정. 게임 흐름에 영향 X (단순 표시 + 미래 확장 hook).
 function decideMainPosition(talentKey, batter, pitcher) {
   switch (talentKey) {
-    case "speedster": return Math.random() < 0.5 ? "CF" : "SS";
-    case "power":     return Math.random() < 0.5 ? "1B" : "RF";
-    case "defender":  return ["C", "SS", "CF"][Math.floor(Math.random() * 3)];
-    case "contact":   return Math.random() < 0.5 ? "2B" : "3B";
-    case "bat_balanced": return ["LF", "CF", "RF"][Math.floor(Math.random() * 3)];
-    case "fireball":
-    case "finesse":
-    case "breakerz":
-    case "pit_balanced": return "DH";   // 투수형 — 타석 설 일 적음
+    case "sprinter":   return Math.random() < 0.5 ? "CF" : "SS";
+    case "slugger":    return Math.random() < 0.5 ? "1B" : "RF";
+    case "fireballer":
+    case "tactician":  return "DH";   // 투수형 — 타석 설 일 적음
     case "all_round":
-    default:          return Math.random() < 0.5 ? "LF" : "3B";
+    default:           return Math.random() < 0.5 ? "LF" : "3B";
   }
 }
 
@@ -346,7 +334,7 @@ export function applyTraining(player, trainingKey, forcedStat = null) {
       handMult = 1.1;
     }
   } else if (player.hand === "lefty_rb") {
-    if (trainingKey === "fielding" || trainingKey === "mental") {
+    if (trainingKey === "running") {
       handMult = 1.1;
     }
   }
@@ -418,7 +406,7 @@ const BODY_PART_STATS = {
   shoulder:  [["pitcher", "velocity"], ["pitcher", "stamina"]],
   elbow:     [["pitcher", "velocity"], ["pitcher", "breaking"]],
   wrist:     [["batter",  "contact"],  ["batter",  "power"]],
-  knee:      [["batter",  "speed"],    ["batter",  "defense"]],
+  knee:      [["batter",  "speed"],    ["batter",  "contact"]],
   ankle:     [["batter",  "speed"]],
   hamstring: [["batter",  "speed"],    ["pitcher", "stamina"]],
   back:      [["batter",  "power"],    ["pitcher", "stamina"]],
@@ -517,10 +505,10 @@ function applyAftereffect(player, bodyPart, severity, surgery) {
 // 회복 보너스: pitcher.stamina + pitcher.mental 평균 → 70 기준 ±N pp 보정.
 // 스태미나 소모량(현재 stamina/maxStamina)도 회복에 영향 — 지친 상태에서는 컨디션 회복 둔화.
 export function tickConditionWeekly(player) {
-  // 컨디션 회복력 보정: stamina/mental 능력치 평균(50 기준) — 70 능력치라면 +2, 30이면 -2.
+  // 컨디션 회복력 보정: stamina/control 능력치 평균(50 기준) — 70 능력치라면 +2, 30이면 -2.
   const staminaAbil = player.pitcher?.stamina ?? 50;
-  const mentalAbil  = player.pitcher?.mental  ?? 50;
-  const abilBonus = ((staminaAbil + mentalAbil) / 2 - 50) / 10;  // ±5 정도
+  const controlAbil  = player.pitcher?.control  ?? 50;
+  const abilBonus = ((staminaAbil + controlAbil) / 2 - 50) / 10;  // ±5 정도
   // 현재 체력 소모 패널티: 체력 50 미만이면 회복 둔화.
   const fatiguePenalty = (player.stamina ?? 100) < 50 ? -2 : 0;
   // 70 기준 평균회귀 — 70 이상이면 떨어지는 쪽, 70 미만이면 올라가는 쪽으로 drift.
@@ -600,7 +588,6 @@ export function applyGameExperience(player, mainPlayerResult, targets = null) {
     bump("batter", "power", 0.05);
     bump("batter", "eye", 0.05);
     bump("batter", "speed", 0.05);
-    bump("batter", "defense", 0.05);
     // 성적 보너스
     bump("batter", "contact", bbox.h * 0.10);
     bump("batter", "power", bbox.hr * 0.30);
@@ -624,7 +611,6 @@ export function applyGameExperience(player, mainPlayerResult, targets = null) {
     bump("pitcher", "control", 0.10);
     bump("pitcher", "breaking", 0.05);
     bump("pitcher", "stamina", 0.10);
-    bump("pitcher", "mental", 0.05);
     // 성적 보너스
     bump("pitcher", "velocity", (pbox.pK ?? 0) * 0.04);
     bump("pitcher", "breaking", (pbox.pK ?? 0) * 0.03);
@@ -634,11 +620,11 @@ export function applyGameExperience(player, mainPlayerResult, targets = null) {
     // 호투 보너스
     const er = pbox.er ?? 0;
     if (er === 0) {
-      bump("pitcher", "control", 0.30);
-      bump("pitcher", "mental", 0.30);
+      bump("pitcher", "control", 0.40);
+      bump("pitcher", "breaking", 0.20);
     } else if (er <= 2) {
-      bump("pitcher", "control", 0.10);
-      bump("pitcher", "mental", 0.10);
+      bump("pitcher", "control", 0.15);
+      bump("pitcher", "breaking", 0.05);
     }
     if ((pbox.pK ?? 0) >= 9) {
       bump("pitcher", "velocity", 0.20);
@@ -711,8 +697,8 @@ export function declineStatsWeekly(player) {
 export function overallScore(player) {
   const b = player.batter;
   const p = player.pitcher;
-  const bat = (b.contact + b.power + b.eye + b.speed + b.defense) / 5;
-  const pit = (p.velocity + p.control + p.breaking + p.stamina + p.mental) / 5;
+  const bat = (b.contact + b.power + b.eye + b.speed) / 4;
+  const pit = (p.velocity + p.control + p.breaking + p.stamina) / 4;
   return +((bat * 0.6 + pit * 0.4)).toFixed(1);
 }
 
@@ -721,8 +707,8 @@ export function roleOVRs(player) {
   const b = player.batter;
   const p = player.pitcher;
   return {
-    bat: (b.contact + b.power + b.eye + b.speed + b.defense) / 5,
-    pit: (p.velocity + p.control + p.breaking + p.stamina + p.mental) / 5,
+    bat: (b.contact + b.power + b.eye + b.speed) / 4,
+    pit: (p.velocity + p.control + p.breaking + p.stamina) / 4,
   };
 }
 

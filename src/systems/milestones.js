@@ -57,7 +57,7 @@ function detectGameBattingMilestones(player, main, gameDate) {
   const types = new Set(events.map(e => e.type));
 
   if (types.has("1B") && types.has("2B") && types.has("3B") && types.has("HR")) {
-    award(player, "cycling", { fame: 15, mental: 1 }, gameDate, { stack: true });
+    award(player, "cycling", { fame: 15, contact: 1 }, gameDate, { stack: true });
   }
   const gs = bbox.gs ?? 0;
   for (let i = 0; i < gs; i++) {
@@ -68,9 +68,9 @@ function detectGameBattingMilestones(player, main, gameDate) {
   for (const ev of events) {
     if (!ev.walkoff) continue;
     if (ev.type === "HR") {
-      award(player, "walkoffHR", { fame: 20, mental: 2 }, gameDate, { stack: true });
+      award(player, "walkoffHR", { fame: 20, contact: 2 }, gameDate, { stack: true });
     } else {
-      award(player, "walkoff", { fame: 10, mental: 1 }, gameDate, { stack: true });
+      award(player, "walkoff", { fame: 10, contact: 1 }, gameDate, { stack: true });
     }
     tryUnlock("walkoff_one");
   }
@@ -84,11 +84,11 @@ function detectGamePitchingMilestones(player, main, gameDate) {
   const er  = pbox.er   ?? 0;
 
   if (h === 0 && bb === 0 && hbp === 0) {
-    award(player, "perfectGame", { fame: 50, mental: 5 }, gameDate, { stack: true });
+    award(player, "perfectGame", { fame: 50, control: 5 }, gameDate, { stack: true });
   } else if (h === 0) {
-    award(player, "noHitter", { fame: 25, mental: 3 }, gameDate, { stack: true });
+    award(player, "noHitter", { fame: 25, control: 3 }, gameDate, { stack: true });
   } else if (er === 0) {
-    award(player, "shutout", { fame: 5, mental: 1 }, gameDate, { stack: true });
+    award(player, "shutout", { fame: 5, control: 1 }, gameDate, { stack: true });
   }
 }
 
@@ -123,9 +123,13 @@ function award(player, key, bonuses, gameDate, opts = {}) {
   pushToast(t(labelKey, params), "good");
 
   if (bonuses.fame)   addFame(player, bonuses.fame);
-  if (bonuses.mental && player.pitcher) {
-    const cap = getPlayerStatCap(player, "mental");
-    player.pitcher.mental = Math.min(cap, (player.pitcher.mental ?? 0) + bonuses.mental);
+  if (bonuses.contact && player.batter) {
+    const cap = getPlayerStatCap(player, "contact");
+    player.batter.contact = Math.min(cap, (player.batter.contact ?? 0) + bonuses.contact);
+  }
+  if (bonuses.control && player.pitcher) {
+    const cap = getPlayerStatCap(player, "control");
+    player.pitcher.control = Math.min(cap, (player.pitcher.control ?? 0) + bonuses.control);
   }
 
   player.milestones.push({

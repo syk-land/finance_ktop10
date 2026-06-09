@@ -82,16 +82,11 @@ export const en = {
   },
 
   talent: {
-    contact:      "Contact",
-    power:        "Power",
-    speedster:    "Speedster",
-    defender:     "Defender",
-    bat_balanced: "Bat Balance",
+    slugger:      "Slugger",
+    sprinter:     "Contact/Speed",
+    fireballer:   "Fireballer",
+    tactician:    "Tactician",
     all_round:    "All-Round",
-    fireball:     "Fireballer",
-    finesse:      "Finesse",
-    breakerz:     "Breaking-ball",
-    pit_balanced: "Pit Balance",
   },
 
   training: {
@@ -827,16 +822,13 @@ export const en = {
   },
 
   preset: {
-    slugger:    { label: "Slugger",     desc: "Max power. Focus on batting & weights." },
-    contact:    { label: "Contact Hitter", desc: "Precision bat. Batting & eye." },
-    speedster:  { label: "Five-tool",   desc: "Speed + bat. Fast all-rounder." },
-    defender:   { label: "Defender",    desc: "Defense & running. Sturdy fielder." },
-    batter_balance:  { label: "Batter Balance",  desc: "All 5 hitting stats to one even level." },
-    fireballer: { label: "Fireballer",  desc: "Velocity & power pitcher." },
-    finesse:    { label: "Finesse",     desc: "Control & breakers. Brainy pitcher." },
-    pitcher_balance: { label: "Pitcher Balance", desc: "All 5 pitching stats to one even level." },
-    two_way:    { label: "Two-way (Balanced)", desc: "Hit + pitch. Even spread." },
-    recovery:   { label: "Recovery",    desc: "Rest & injury recovery. Light drills only." },
+    slugger:         { label: "Slugger", desc: "Max power. Focus on power and batting." },
+    contact_speed:   { label: "Contact & Speed", desc: "Precision hitting and speed. Focus on contact and running." },
+    batter_balance:  { label: "Batter Balance", desc: "Keep all 4 hitting stats (contact, power, eye, speed) at an even level." },
+    fireballer:      { label: "Fireballer", desc: "High velocity. Focus on speed and stamina." },
+    breaking:        { label: "Breaking ball", desc: "Sharp breaking pitches and control. Focus on breaking and control." },
+    pitcher_balance: { label: "Pitcher Balance", desc: "Keep all 4 pitching stats (velocity, control, breaking, stamina) at an even level." },
+    two_way:         { label: "All Balance", desc: "Perfect harmony of hitting and pitching. Even spread across all stats." },
   },
 
   injury: {
