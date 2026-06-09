@@ -47,8 +47,16 @@ export function transitionAfterSeason() {
     return { awaitingPath: true };
   }
 
+  // 방금 끝난 시즌의 stats를 careerHistory에서 가져옵니다 (advanceToNextSeason 에서 이미 아카이브하고 seasonStats 는 비운 상태이므로).
+  const lastHistory = player.careerHistory && player.careerHistory.length > 0
+    ? player.careerHistory[player.careerHistory.length - 1]
+    : null;
+  const lastSeasonStats = (lastHistory && lastHistory.stage === player.stage)
+    ? lastHistory.stats
+    : null;
+
   // 콜업 체크 (KBO 2군 → 1군 / MLB 마이너 각 단계 → 다음 단계)
-  const promotion = checkPromotion(player);
+  const promotion = checkPromotion(player, lastSeasonStats);
   if (promotion) {
     const fromStage = player.stage;
     const pool = getTeamPool(promotion, getLocale());
@@ -67,7 +75,7 @@ export function transitionAfterSeason() {
   }
 
   // 강등 체크 (노쇠 등으로 유지 임계 미달) — 콜업이 아닐 때만. 한 단계 하향 후 모달로 은퇴 선택 제공.
-  const demotion = checkDemotion(player);
+  const demotion = checkDemotion(player, lastSeasonStats);
   if (demotion) {
     const fromStage = player.stage;
     const pool = getTeamPool(demotion, getLocale());
@@ -166,7 +174,8 @@ export function getMLBOffers(player) {
     const obp = obpDen > 0 ? obpNum / obpDen : 0;
     const slg = ss.ab > 0 ? (ss.tb ?? 0) / ss.ab : 0;
     const ops = obp + slg;
-    if (ops >= 0.900) {
+    const avg = ss.ab > 0 ? (ss.h ?? 0) / ss.ab : 0;
+    if (ops >= 0.900 || avg >= 0.330) {
       batEligible = true;
     }
   }
@@ -248,9 +257,10 @@ export function kboDraft(player) {
     const obp = obpDen > 0 ? obpNum / obpDen : 0;
     const slg = ss.ab > 0 ? (ss.tb ?? 0) / ss.ab : 0;
     const ops = obp + slg;
+    const avg = ss.ab > 0 ? (ss.h ?? 0) / ss.ab : 0;
     
-    if (ops < 0.550) batterPenalty = 30;
-    else if (ops < 0.650) batterPenalty = 15;
+    if (ops < 0.550 && avg < 0.220) batterPenalty = 30;
+    else if (ops < 0.650 && avg < 0.250) batterPenalty = 15;
   }
 
   let pitcherPenalty = 0;
@@ -485,7 +495,7 @@ const DEMOTION_LADDER = {
   mlb_aa:  { down: "mlb_a",   minKeepOVR: 110 },
 };
 
-export function checkDemotion(player) {
+export function checkDemotion(player, statsToUse = null) {
   const rule = DEMOTION_LADDER[player.stage];
   if (!rule) return null;
   
@@ -495,7 +505,7 @@ export function checkDemotion(player) {
   if (belowKeep) return rule.down;
 
   // 2. 성적 기반 강등 체크 (시즌 성적이 극도로 나쁠 때)
-  const ss = player.seasonStats;
+  const ss = statsToUse || player.seasonStats;
   if (ss) {
     let batterBad = false;
     let pitcherBad = false;
@@ -510,12 +520,19 @@ export function checkDemotion(player) {
       const obp = obpDen > 0 ? obpNum / obpDen : 0;
       const slg = ss.ab > 0 ? (ss.tb ?? 0) / ss.ab : 0;
       const ops = obp + slg;
+      const avg = ss.ab > 0 ? (ss.h ?? 0) / ss.ab : 0;
       
       let opsCutoff = 0.600; // pro1 기본 컷오프
-      if (player.stage === "mlb") opsCutoff = 0.630;
-      else if (player.stage === "mlb_aaa" || player.stage === "mlb_aa") opsCutoff = 0.650;
+      let avgCutoff = 0.230;
+      if (player.stage === "mlb") {
+        opsCutoff = 0.630;
+        avgCutoff = 0.240;
+      } else if (player.stage === "mlb_aaa" || player.stage === "mlb_aa") {
+        opsCutoff = 0.650;
+        avgCutoff = 0.250;
+      }
       
-      if (ops < opsCutoff) batterBad = true;
+      if (ops < opsCutoff && avg < avgCutoff) batterBad = true;
     }
 
     // 투수 성적 감점 (최소 15이닝)
@@ -543,7 +560,7 @@ export function checkDemotion(player) {
   return null;
 }
 
-export function checkPromotion(player) {
+export function checkPromotion(player, statsToUse = null) {
   const rule = PROMOTION_LADDER[player.stage];
   if (!rule) return null;
 
@@ -551,7 +568,7 @@ export function checkPromotion(player) {
   const ovrOk = bat >= rule.minOVR || pit >= rule.minOVR;
   if (!ovrOk) return null;
 
-  const ss = player.seasonStats;
+  const ss = statsToUse || player.seasonStats;
   if (!ss) return null;
 
   let statsOk = false;
@@ -563,7 +580,13 @@ export function checkPromotion(player) {
     const obp = obpDen > 0 ? obpNum / obpDen : 0;
     const slg = ss.ab > 0 ? (ss.tb ?? 0) / ss.ab : 0;
     const ops = obp + slg;
-    if (ops >= rule.minOPS) statsOk = true;
+    const avg = ss.ab > 0 ? (ss.h ?? 0) / ss.ab : 0;
+    
+    let minAVG = 0.320;
+    if (rule.minOPS === 0.880) minAVG = 0.310;
+    else if (rule.minOPS === 0.850) minAVG = 0.300;
+
+    if (ops >= rule.minOPS || avg >= minAVG) statsOk = true;
   }
 
   // 투수 성적 만족 여부 판정 (최소 5경기, 1이닝 이상)
