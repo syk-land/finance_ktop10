@@ -879,12 +879,15 @@ export const en = {
     retired: "Retired from baseball.",
     forcedRetire: "Released with no team willing to sign — career over.",
     promoted: "Called up to {team} ({stage})!",
+    promotedMidseason: "Called up to {team} ({stage}) mid-season!",
     demoted: "Demoted to {team} ({stage})...",
   },
 
   promotion: {
     title: "Called up!",
     desc: "Called up to {team} ({stage}). Time to play on a bigger stage.",
+    titleMidseason: "Mid-season Call-up!",
+    descMidseason: "Due to your outstanding performance, you have been called up to {team} ({stage}) mid-season!\nShow your skills in the remaining season of the new tier!",
   },
 
   demotion: {

@@ -883,12 +883,15 @@ export const ko = {
     retired: "야구 인생을 마감합니다.",
     forcedRetire: "더 이상 받아주는 팀이 없어 방출 — 현역 은퇴.",
     promoted: "{stage} {team} 콜업!",
+    promotedMidseason: "시즌 중 {stage} {team} 콜업!",
     demoted: "{stage} {team}(으)로 강등...",
   },
 
   promotion: {
     title: "콜업!",
     desc: "{team} {stage}(으)로 콜업되었습니다. 더 높은 무대에서 뜁니다.",
+    titleMidseason: "시즌 중 콜업!",
+    descMidseason: "뛰어난 성적으로 시즌 도중 {team} {stage}(으)로 콜업되었습니다!\n새로운 리그에서 남은 시즌 활약을 펼쳐보세요!",
   },
 
   demotion: {

@@ -16,6 +16,7 @@ import { detectMilestones } from "./milestones.js";
 import { checkPostseasonAdvance } from "./postseason.js";
 import { directionTargets, clampStatsToDirection } from "./autoTrain.js";
 import { maybeShowSeasonAd } from "./ads.js";
+import { checkPromotion } from "./career.js";
 
 export function createSeason(stage) {
   return {
@@ -157,6 +158,22 @@ export function endWeek() {
 
   // 시즌 중 이벤트 (올스타/올림픽/WBC 등 — 현재는 카탈로그 비어있음, 인프라만)
   checkScheduledEvents(player, state.gameDate);
+
+  // 시즌 중 콜업 체크 (KBO 2군 -> KBO 1군 / MLB 마이너 각 단계 -> 다음 단계)
+  if (!state.pendingMidseasonCallup && !season.finished && !state.pendingFinal) {
+    const isMinor = player.stage === "pro2" || player.stage.startsWith("mlb_");
+    if (isMinor && season.weekIndex >= 4 && season.weekIndex < league.weeksPerSeason - 2) {
+      const nextStage = checkPromotion(player);
+      if (nextStage) {
+        state.pendingMidseasonCallup = {
+          fromStage: player.stage,
+          toStage: nextStage,
+          teamName: player.teamName
+        };
+        state.paused = true; // 자동진행 일시 정지
+      }
+    }
+  }
 
   // 시즌 종료 체크
   if (season.weekIndex >= league.weeksPerSeason) {

@@ -2,12 +2,12 @@
 // Phase 3에서 드래프트/콜업/해외진출 확장
 
 import { state, pushLog } from "../state.js";
-import { createLeague, ageUpLeague } from "./league.js";
+import { createLeague, ageUpLeague, getPlayerTeam, standings } from "./league.js";
 import { createSeason } from "./week.js";
 import { getTeamPool } from "../data/teams.js";
 import { t, getLocale } from "../i18n/index.js";
-import { resetGameDateForNewSeason } from "./tick.js";
-import { overallScore, addFame, nationalTeamRating, roleOVRs } from "./player.js";
+import { resetGameDateForNewSeason, SEASON_START_MONTH } from "./tick.js";
+import { overallScore, addFame, nationalTeamRating, roleOVRs, emptyStats } from "./player.js";
 import { effectAdd } from "./traitEffects.js";
 
 export function startHighSchoolCareer(playerName, talent, schoolName) {
@@ -506,4 +506,55 @@ export function checkForcedRetirement(player) {
   if (age >= 41) return true;
   const floor = FORCED_RETIRE_FLOOR[player.stage];
   return floor != null && age >= FORCED_RETIRE_MIN_AGE && nationalTeamRating(player) < floor;
+}
+
+// 시즌 중 콜업 적용
+export function applyMidseasonCallup(player, toStage) {
+  const fromStage = player.stage;
+  const pool = getTeamPool(toStage, getLocale());
+  const newTeamName = teamForStageKeeping(pool, player);
+
+  // 1. 누적 통계로 합산
+  Object.keys(player.seasonStats).forEach(k => {
+    player.careerStats[k] = (player.careerStats[k] ?? 0) + (player.seasonStats[k] ?? 0);
+  });
+
+  // 2. 시즌 기록 보관 (split 시즌)
+  player.careerHistory.push({
+    age: player.age,
+    grade: player.grade,
+    stage: fromStage,
+    teamName: player.teamName,
+    overall: overallScore(player),
+    stats: { ...player.seasonStats },
+    teamRecord: getPlayerTeam(state.league)?.record ? { ...getPlayerTeam(state.league).record } : null,
+    standings: standings(state.league).slice(0, 5).map(t => ({ name: t.name, w: t.record.w, l: t.record.l })),
+    midseasonCallup: true,
+  });
+
+  // 3. 리셋
+  player.seasonStats = emptyStats();
+
+  // 4. 이적/콜업 적용
+  player.stage = toStage;
+  player.teamName = newTeamName;
+  player.gamesSinceLastPitch = 99;
+  player.injury = null;
+
+  // 5. 날짜 리셋 (시즌 처음으로)
+  if (state.gameDate) {
+    state.gameDate.month = SEASON_START_MONTH;
+    state.gameDate.dayOfMonth = 1;
+    state.gameDate.day = 1;
+    state.gameDate.dayOfWeek = 0;
+  }
+
+  // 6. 리그 및 시즌 새로 생성
+  state.league = createLeague(toStage, player.teamName);
+  state.season = createSeason(toStage);
+
+  pushLog({
+    msg: t("log.promotedMidseason", { stage: t("stage." + toStage), team: player.teamName }),
+    kind: "good",
+  });
 }

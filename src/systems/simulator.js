@@ -130,24 +130,16 @@ function simulateAtBat(batter, pitcher, opts = {}) {
 
   const stuffAvg   = (velocity + breaking) / 2 - fatiguePenalty;
   const effControl = control - fatiguePenalty;
-  // 큰 격차일수록 추가 감쇄 — 30 OVR 차이가 비현실적 ERA 폭증 만들던 문제 완화.
-  // softDiff(x): |x|>15 부터 점점 평탄화. 30 격차도 효과 18 정도로 묶임.
-  function softDiff(x) {
-    const sign = x < 0 ? -1 : 1;
-    const a = Math.abs(x);
-    if (a <= 15) return x;
-    return sign * (15 + (a - 15) * 0.4);
-  }
-  const contactDiff = softDiff(contact - stuffAvg);
-  const eyeDiff     = softDiff(eye - effControl);
+  const contactDiff = contact - stuffAvg;
+  const eyeDiff     = eye - effControl;
 
   const r = Math.random() * 100;
 
   // 계수 감쇄 — 실제 야구 매치업 spread 에 가깝게. (기초타율 보정: kChance 22→21, inPlay 30→33 으로 50v50 AVG ~.250)
   // mentalEdge: 고압 상황에서 고멘탈 투수는 볼넷↓ (clamp 전 가산).
-  const kChance = clamp(21 - contactDiff * 0.28 - eyeDiff * 0.10 + platoonK, 5, 38);
-  const bbChance = clamp(9 + eyeDiff * 0.22 - mentalEdge * 0.04 + platoonBB, 3, 22);
-  const hbpChance = clamp(1.0 - (effControl - 50) * 0.03, 0.3, 3.0);
+  const kChance = clamp(21 - contactDiff * 0.28 - eyeDiff * 0.10 + platoonK, 0, 100);
+  const bbChance = clamp(9 + eyeDiff * 0.22 - mentalEdge * 0.04 + platoonBB, 0, 100);
+  const hbpChance = clamp(1.0 - (effControl - 50) * 0.03, 0, 100);
 
   if (r < kChance) return { type: "K" };
   if (r < kChance + bbChance) return { type: "BB" };
@@ -155,19 +147,19 @@ function simulateAtBat(batter, pitcher, opts = {}) {
 
   // 끝내기 부스트 — clutch ×2 (multiplier) + lucky_bat +5%p (flat). 9회+ 메인 home batter 한정.
   // mentalEdge: 고압 상황에서 고멘탈 투수는 인플레이 안타 억제.
-  let inPlayHitChance = clamp(33 + contactDiff * 0.24 - mentalEdge * 0.08 + platoonHit, 20, 55);
+  let inPlayHitChance = clamp(33 + contactDiff * 0.24 - mentalEdge * 0.08 + platoonHit, 0, 100);
   if (walkoffMult !== 1 || walkoffAddPct !== 0) {
-    inPlayHitChance = clamp(inPlayHitChance * walkoffMult + walkoffAddPct, 20, 95);
+    inPlayHitChance = clamp(inPlayHitChance * walkoffMult + walkoffAddPct, 0, 100);
   }
   const r2 = Math.random() * 100;
   if (r2 < inPlayHitChance) {
     const r3 = Math.random() * 100;
-    const powerDiff = softDiff(power - velocity);
+    const powerDiff = power - velocity;
     // mentalEdge: 고압 상황에서 고멘탈 투수는 장타(홈런) 억제.
-    const hrChance = clamp(powerDiff * 0.30 + 4 - mentalEdge * 0.04, 1, 18);
+    const hrChance = clamp(powerDiff * 0.30 + 4 - mentalEdge * 0.04, 0, 100);
     // 3루타 — 주력 의존(현실에서 가장 발 빠른 타구). 느림 0.5% ~ 빠름 ~4%.
-    const tripleChance = clamp((speed - 50) * 0.04 + 0.9, 0.3, 4);
-    const doubleChance = clamp(powerDiff * 0.22 + 10, 5, 20);
+    const tripleChance = clamp((speed - 50) * 0.04 + 0.9, 0, 100);
+    const doubleChance = clamp(powerDiff * 0.22 + 10, 0, 100);
     if (r3 < hrChance) return { type: "HR" };
     if (r3 < hrChance + tripleChance) return { type: "3B" };
     if (r3 < hrChance + tripleChance + doubleChance) return { type: "2B" };
@@ -186,18 +178,18 @@ function classifyOut(batter, bases, outs, defenseRating, opts = {}) {
   const speed   = batter.speed ?? 50;
 
   // 실책 출루(E) — 수비 낮을수록 + 컨택 높을수록 (강한 타구). 베이스라인 ~1.5%.
-  const eChance = clamp(((contact - defenseRating) * 0.08 + 1.5) * errorMult, 0.1, 7);
+  const eChance = clamp(((contact - defenseRating) * 0.08 + 1.5) * errorMult, 0, 100);
   if (Math.random() * 100 < eChance) return "E";
 
   // 희생플라이(SF) — 3루 주자 + <2아웃 + 파워(타구 깊이) 영향
   if (bases[2] && outs < 2) {
-    const sfChance = clamp(16 + (power - 50) * 0.25, 6, 32);
+    const sfChance = clamp(16 + (power - 50) * 0.25, 0, 100);
     if (Math.random() * 100 < sfChance) return "SF";
   }
 
   // 병살타(DP) — 1루 주자 + <2아웃. 느릴수록 잘 걸림.
   if (bases[0] && outs < 2) {
-    const dpChance = clamp(14 - (speed - 50) * 0.20, 4, 28);
+    const dpChance = clamp(14 - (speed - 50) * 0.20, 0, 100);
     if (Math.random() * 100 < dpChance) return "DP";
   }
 
@@ -211,10 +203,10 @@ function attemptSteal(bases, pitcher) {
   const r1 = bases[0];
   if (!r1 || bases[1]) return { attempted: false };
   const speed = r1.speed ?? 50;
-  const attemptChance = clamp((speed - 50) * 0.7, 0, 30);
+  const attemptChance = clamp((speed - 50) * 0.7, 0, 100);
   if (Math.random() * 100 >= attemptChance) return { attempted: false };
   const control = pitcher.control ?? 50;
-  const successChance = clamp(62 + (speed - control) * 0.5, 25, 90);
+  const successChance = clamp(62 + (speed - control) * 0.5, 0, 100);
   const success = Math.random() * 100 < successChance;
   return { attempted: true, success, runner: r1 };
 }
@@ -684,16 +676,25 @@ function buildLineup(team, mainPlayerForBat, mainTrack = null) {
 
   const pool = healthy.map(p => ({ entry: p, ovr: npcOverall(p), isMain: false }));
   let mainOvr = null;
+  let mainEntry = null;
   if (mainPlayerForBat) {
     const b = mainPlayerForBat.batter;
     mainOvr = (b.contact + b.power + b.eye + b.speed + b.defense) / 5;
-    pool.push({ entry: null, ovr: mainOvr, isMain: true });
+    mainEntry = { entry: null, ovr: mainOvr, isMain: true };
   }
   pool.sort((a, b) => b.ovr - a.ovr);
 
-  let starters = pool.slice(0, 9);
-  const benchPool = pool.slice(9);
-  // 9명 미달 시 부상자로 강행 충원.
+  let starters, benchPool;
+  if (mainEntry) {
+    // 주인공을 항상 선발 라인업에 보장하여, 2군 등에서 OVR 미달로 벤치 고착화되는 현상 방지
+    starters = [mainEntry, ...pool.slice(0, 8)];
+    benchPool = pool.slice(8);
+  } else {
+    starters = pool.slice(0, 9);
+    benchPool = pool.slice(9);
+  }
+
+  // 9명 미달 시 부상자로 강행 충원 (주인공이 없을 때만).
   if (starters.length < 9) {
     const fill = injured.map(p => ({ entry: p, ovr: npcOverall(p), isMain: false }));
     starters = [...starters, ...fill].slice(0, 9);

@@ -16,6 +16,7 @@ export const state = {
   offseason: null,       // null | { randomEventKey, selected, outcomeKind, changes[] } — 시즌 종료 후 휴식기 단계
   pendingFinal: null,    // null | { tournamentKey, opponent, status, result, processedWeek } — 토너먼트 결승전 대기
   pendingPostseason: null, // null | { bracket, round, opponent, status, completedRounds[] } — 포스트시즌(pro1/mlb)
+  pendingMidseasonCallup: null, // null | { fromStage, toStage, teamName } — 시즌 중 콜업 대기
   pendingToasts: [],     // [{msg, kind}] — UI 매 렌더에서 꺼내 표시
   pendingEvents: [],     // [{key, type, handlerKey, year}] — 시즌 중 이벤트 큐 (seasonEvents.js)
   regression: null,      // 회귀(NewGame+) 메타 — systems/regression.js 가 별도 localStorage 키로 영속화
@@ -59,6 +60,7 @@ export function saveGame() {
       // 시즌 중 이벤트 모달 대기 큐 (올스타·WBC·올림픽·AG·프리미어12).
       // 트리거된 뒤 처리 전 새로고침되면 모달이 사라져 보상 누락이라 반드시 저장.
       pendingEvents: state.pendingEvents,
+      pendingMidseasonCallup: state.pendingMidseasonCallup,
     };
     const serialized = JSON.stringify(payload);
     // 진단 로그 — 1 MB 넘으면 필드별 사이즈 breakdown 출력. 사용자가 큰 필드 식별 가능.
@@ -206,6 +208,7 @@ export function resetState() {
   state.offseason = null;
   state.pendingFinal = null;
   state.pendingPostseason = null;
+  state.pendingMidseasonCallup = null;
   state.pendingToasts = [];
   state.pendingEvents = [];
   // locale 은 게임 리셋과 무관하게 사용자 선택을 유지

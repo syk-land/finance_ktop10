@@ -10,7 +10,7 @@ import {
 } from "../systems/player.js";
 import { getEquipmentSpec } from "../data/shopCatalog.js";
 import { advanceToNextSeason, mergeSeasonStats } from "../systems/week.js";
-import { transitionAfterSeason, transitionToStage, eligibleCareerPaths, kboDraft, determineMLBStartStage, compositeScore, checkFreeAgency, applyFreeAgencyDecision, maybeTradeOffer, applyTradeAccept, checkMLBChallenge, TRADE_CONSENT_FAME } from "../systems/career.js";
+import { transitionAfterSeason, transitionToStage, eligibleCareerPaths, kboDraft, determineMLBStartStage, compositeScore, checkFreeAgency, applyFreeAgencyDecision, maybeTradeOffer, applyTradeAccept, checkMLBChallenge, TRADE_CONSENT_FAME, applyMidseasonCallup } from "../systems/career.js";
 import { getPlayerTeam, standings } from "../systems/league.js";
 import { createFaceSVG } from "../render/avatars.js";
 import { AUTO_PRESETS, autoFillWeek, topWeightStat, isTrainDirectionMaxed } from "../systems/autoTrain.js";
@@ -116,6 +116,8 @@ export function renderWeekly(root, route, opts = {}) {
 
   // 토너먼트 결승 진출 — 모달 발동 (한 번만)
   showFinalModalIfNeeded(route);
+  // 시즌 중 콜업(승격) 모달
+  showMidseasonCallupModalIfNeeded(route);
   // 시즌 중 이벤트 모달 (올스타전 등) — pendingEvents 큐 첫 항목
   showSeasonEventModalIfNeeded(route);
 }
@@ -2709,6 +2711,55 @@ function showPromotionModal(toStage) {
   btn.style.cssText = "width:100%; padding:11px; font-weight:700;";
   btn.textContent = t("common.confirm");
   btn.addEventListener("click", () => { state.paused = false; saveGame(); backdrop.remove(); });
+  dialog.appendChild(btn);
+  backdrop.appendChild(dialog);
+  document.body.appendChild(backdrop);
+}
+
+// ─── 시즌 중 콜업 모달 ──────────────────────────────────────────────
+function showMidseasonCallupModalIfNeeded(route) {
+  if (!state.pendingMidseasonCallup) return;
+  if (document.querySelector("[data-modal='midseasonCallup']")) return;
+
+  state.paused = true;
+  saveGame();
+
+  const callup = state.pendingMidseasonCallup;
+  const toStage = callup.toStage;
+
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  backdrop.dataset.modal = "midseasonCallup";
+  backdrop.dataset.noDismiss = "true";
+
+  const dialog = document.createElement("div");
+  dialog.className = "modal-dialog";
+  dialog.style.maxWidth = "340px";
+
+  const h = document.createElement("h2");
+  h.style.color = "var(--good)";
+  h.textContent = t("promotion.titleMidseason") || "시즌 중 콜업!";
+  dialog.appendChild(h);
+
+  const p = document.createElement("p");
+  p.className = "muted small";
+  p.style.cssText = "margin:0 0 18px; line-height:1.6; text-align:center; white-space:pre-line;";
+  p.textContent = t("promotion.descMidseason", { stage: t("stage." + toStage), team: callup.teamName });
+  dialog.appendChild(p);
+
+  const btn = document.createElement("button");
+  btn.className = "primary";
+  btn.style.cssText = "width:100%; padding:11px; font-weight:700;";
+  btn.textContent = t("common.confirm");
+  btn.addEventListener("click", () => {
+    applyMidseasonCallup(state.player, toStage);
+    state.pendingMidseasonCallup = null;
+    state.paused = false;
+    saveGame();
+    backdrop.remove();
+    route("weekly");
+  });
+
   dialog.appendChild(btn);
   backdrop.appendChild(dialog);
   document.body.appendChild(backdrop);
