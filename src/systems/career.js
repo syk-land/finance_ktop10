@@ -153,7 +153,36 @@ export function teamFame(team) {
 }
 
 export function getMLBOffers(player) {
-  const score = nationalTeamRating(player);
+  let score = nationalTeamRating(player);
+  
+  // 성적 감점/가점 반영 (쩌리 선수가 오버롤만 높아서 MLB 오퍼 받는 현상 방지)
+  const ss = player.seasonStats;
+  if (ss) {
+    if (player.stage === "pro1") {
+      // 타자 성적 감점 (최소 50타수)
+      if ((ss.ab ?? 0) >= 50) {
+        const obpNum = (ss.h ?? 0) + (ss.bb ?? 0) + (ss.hbp ?? 0);
+        const obpDen = (ss.ab ?? 0) + (ss.bb ?? 0) + (ss.hbp ?? 0) + (ss.sf ?? 0);
+        const obp = obpDen > 0 ? obpNum / obpDen : 0;
+        const slg = ss.ab > 0 ? (ss.tb ?? 0) / ss.ab : 0;
+        const ops = obp + slg;
+
+        if (ops < 0.600) score -= 30;
+        else if (ops < 0.720) score -= 15;
+        else if (ops >= 0.900) score += 10;
+      }
+      
+      // 투수 성적 감점 (최소 15이닝)
+      if ((ss.pitchG ?? 0) >= 5 && (ss.ip ?? 0) >= 15) {
+        const era = (ss.er ?? 0) * 9 / ss.ip;
+
+        if (era > 5.50) score -= 30;
+        else if (era > 4.50) score -= 15;
+        else if (era <= 3.20) score += 10;
+      }
+    }
+  }
+
   if (score < 110) return [];                       // 자격 — 역할기반 rating 110+
   const pool = getTeamPool("mlb", getLocale());
   if (!pool || pool.length === 0) return [];
