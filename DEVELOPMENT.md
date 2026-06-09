@@ -165,3 +165,110 @@ python3 -m http.server 8765                      # 로컬 서버 구동
 2. **제작 및 가공 가이드**:
    * AI 이미지 생성 시, 프롬프트에 `on a solid white background` 또는 `isolated on flat white background` 등을 필수 기재하여 배경을 단색으로 통일합니다.
    * 흰색 배경을 투명 누끼(알파 채널 0)로 자동 제거하는 파스 또는 Pillow 스크립트를 거친 뒤 420x562 규격의 WebP 파일로 덮어씌워 렌더링 완성도를 높여야 합니다.
+
+---
+
+## 8. 2026-06-09 리팩토링 및 버그수정 기록
+
+### 8.1 게임 디자인 변경
+
+#### 능력치 간소화
+- **제거된 능력치**: `defense`(수비), `mental`(정신력) 완전 제거
+- **영향 범위**: `player.js`, `npc.js`, `regression.js`, `simulator.js`, `milestones.js`, `awards.js`, `offseason.js`, `shopCatalog.js`
+
+#### 재능(Talent) 5종으로 통합
+| 재능 Key | 이름 | 가중치 |
+|---|---|---|
+| `slugger` | 거포 | 파워 ×1.5, 컨택 ×1.3 |
+| `sprinter` | 교타/주루 | 컨택 ×1.3, 주력 ×1.3, 선구 ×1.2 |
+| `fireballer` | 강속구 | 구속 ×1.5, 스태미나 ×1.3 |
+| `tactician` | 기교파 | 제구 ×1.5, 변화구 ×1.3 |
+| `all_round` | 올라운더 | 전 스탯 ×1.1 |
+
+#### 자동 훈련 방향 7종으로 정리
+| Key | 이름 | 특성 |
+|---|---|---|
+| `slugger` | 거포 | 파워 집중 빌드 |
+| `contact_speed` | 교타/주루 | 컨택·주력·선구 |
+| `batter_balance` | 타자 밸런스 | 4대 타자 스탯 균등 |
+| `fireballer` | 강속구 | 구속·스태미나 집중 |
+| `breaking` | 변화구 | 변화구·제구 집중 |
+| `pitcher_balance` | 투수 밸런스 | 4대 투수 스탯 균등 |
+| `two_way` | 올 밸런스 | 전 스탯 균등 |
+
+#### KBO 1군/2군 스탯 배율 교체
+- `pro1` 배율: `0.88`으로 조정 (기존 값 교체)
+- `pro2` 배율: `0.80`으로 조정
+
+---
+
+### 8.2 버그 수정
+
+#### `simulator.js` — ReferenceError 크리티컬 버그 수정 (커밋: `6e6400e`)
+- **위치**: `buildLineup` 함수 내부
+- **원인**: 주인공이 포함된 팀의 라인업 구성 시 타자 스탯 객체를 가리키는 `b` 변수가 선언 없이 참조되어 `ReferenceError: b is not defined` 발생
+- **수정**: `const b = mainPlayerForBat.batter;` 선언 추가
+
+#### `week.js` — 주인공 팀 경기 NPC 전용으로 잘못 시뮬레이션되는 버그 수정 (커밋: `a53cdbe`)
+- **원인**: 경기 스케줄 데이터의 홈/어웨이는 숫자 팀 ID이지만, 플레이어 소속 팀 비교에 문자열(`player.teamName`)을 직접 비교하여 항상 `false`가 반환됨 → 주인공 팀 경기 전체가 NPC 전용 fast-path로 우회되어 시즌 성적이 모두 0으로 기록되는 문제
+- **수정**: `getTeamById(league, g.home)?.name === player.teamName` 형태로 팀 객체 조회 후 이름 비교로 교정
+
+---
+
+### 8.3 자동 훈련 프리셋 마이그레이션 시스템 구축 (커밋: `d34c997`, `fc9120d`)
+
+구버전 세이브 데이터에 저장된 레거시 자동 훈련 키(`contact`, `speedster`, `defender`, `finesse`, `recovery`)가 신규 프리셋과 충돌하여 자동 진행 루프가 멈추는 현상 수정.
+
+**두 계층에서 안전망 구축:**
+1. **`state.js` (`loadGame` → `migrateSave`)**: 세이브 데이터 불러오기 시점에 레거시 키를 신규 키로 즉시 변환
+2. **`autoTrain.js` (`getPreset` 헬퍼)**: 모든 프리셋 조회 함수가 `getPreset()` 단일 헬퍼를 경유. 알 수 없는 키가 전달되더라도 폴백(`two_way`)으로 안전하게 처리
+
+| 구버전 키 | 매핑 신규 키 |
+|---|---|
+| `contact` | `contact_speed` |
+| `speedster` | `contact_speed` |
+| `defender` | `contact_speed` |
+| `finesse` | `breaking` |
+| `recovery` | `two_way` |
+| 기타 미인식 키 | `two_way` |
+
+---
+
+### 8.4 성능 최적화 — NPC-only 경기 고속 시뮬레이션 (커밋: `880f961`)
+
+주간 리그 시뮬레이션에서 플레이어가 참여하지 않는 **NPC간 경기**에 대해 기존의 타석별 이벤트 시뮬레이션을 완전히 생략하는 **fast-path 분기** 도입.
+
+- **`week.js`**: 각 경기별로 플레이어 팀 참여 여부를 판단, NPC 전용 경기에 `{ isNpcOnly: true }` 옵션 전달
+- **`simulator.js`**: `opts.isNpcOnly` 시 타석 시뮬레이션 전체를 건너뛰고, 양 팀 OVR 기반 통계적 점수 산출 후 즉시 반환
+- **효과**: NPC 경기당 수백~수천 개의 이벤트 객체 할당이 사라져 주간 자동 진행 속도 및 가비지 컬렉션 부담이 크게 개선됨
+
+---
+
+### 8.5 OVR 계산 로직 중앙화 (커밋: `880f961`)
+
+**신설 파일**: `src/systems/ovrHelper.js`
+
+`player.js`와 `simulator.js` 곳곳에 하드코딩으로 중복 작성되어 있던 스탯 합산 평균 공식들을 단일 유틸리티 모듈로 통합.
+
+| 함수 | 설명 |
+|---|---|
+| `getBatterOVR(player)` | 타자 4대 스탯 평균 (컨택·파워·선구·주력) |
+| `getPitcherOVR(player)` | 투수 4대 스탯 평균 (구속·제구·변화·스태미나) |
+| `getCombinedOVR(player)` | 투타 가중 종합 OVR (타자 60% + 투수 40%) |
+
+**변경 파일**: `player.js`의 `overallScore`, `roleOVRs`, `simulator.js`의 `batterOVR`, `pitcherOVR`, `entryBatterOVR`, `buildLineup` 내부 계산 — 모두 위 헬퍼 함수 위임으로 교체
+
+---
+
+### 8.6 폴더 구조 업데이트
+
+```
+src/systems/
+  ├── simulator.js    # NPC fast-path 추가, OVR 중복 공식 제거
+  ├── player.js       # overallScore/roleOVRs 를 ovrHelper 위임
+  ├── ovrHelper.js    # (신설) OVR 계산 공통 유틸리티
+  ├── autoTrain.js    # getPreset 헬퍼 추가, 전 함수가 안전 조회 경유
+  └── week.js         # NPC-only 플래그 전달 + getTeamById 정확 비교
+src/state.js          # migrateSave에서 레거시 autoMode 키 자동 변환
+```
+

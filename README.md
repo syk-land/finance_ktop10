@@ -652,6 +652,29 @@ AdSense 디스플레이를 모달에 넣는 방식은 게임 광고로 부적합
 
 검증: `node --check` 통과. 실기로 (a) 시작 광고 1회 시청 후 2분 경과 (b) 고교 3년차 종료 → 진로 선택 → 광고 확인.
 
+### v0.8.0 ✓ — 성능 최적화 · 버그수정 · 코드 리팩토링 (2026-06-09)
+
+> **리팩토링 3원칙**: 1순위 성능 / 2순위 결합도 완화 / 3순위 중복 로직 제거
+
+| 커밋 | 영역 | 작업 |
+|---|---|---|
+| `6e6400e` | **버그** | `simulator.js` `buildLineup` — `const b = mainPlayerForBat.batter` 선언 누락으로 `ReferenceError: b is not defined` 발생 → 선언 추가로 수정 |
+| `a53cdbe` | **버그** | `week.js` 스케줄 루프 — 팀 ID(number) vs 팀 이름(string) 비교 오류로 주인공 팀 경기 전체가 NPC-only fast-path로 우회 → 시즌 타율/ERA가 0으로 기록되던 버그 → `getTeamById()` 조회 후 `.name` 비교로 교정 |
+| `d34c997` `fc9120d` | **안전망** | `state.js` `migrateSave` + `autoTrain.js` `getPreset` 헬퍼 — 구버전 자동훈련 키(`contact`/`speedster`/`defender`/`finesse`/`recovery`) 로드 시 자동 변환 + 미인식 키 폴백(`two_way`). 세이브 로드 후 자동진행이 멈추던 버그 차단 |
+| `880f961` | **성능** | NPC-only 경기 fast-path 도입 (`isNpcOnly` 플래그) — 타석별 이벤트 객체 할당 전체 생략, OVR 기반 통계적 점수 산출으로 대체. 주간 자동진행 처리 속도 및 GC 부담 대폭 감소 |
+| `880f961` | **중복제거** | `src/systems/ovrHelper.js` 신설 — `getBatterOVR` / `getPitcherOVR` / `getCombinedOVR` 함수 일원화. `player.js` · `simulator.js` 내 동일 스탯합산 공식 중복 제거 |
+
+**레거시 자동훈련 키 마이그레이션 맵:**
+
+| 구버전 키 | 신버전 키 |
+|---|---|
+| `contact`, `speedster`, `defender` | `contact_speed` |
+| `finesse` | `breaking` |
+| `recovery`, 기타 미인식 | `two_way` |
+
+검증: `node --check src/systems/simulator.js src/systems/week.js src/systems/player.js src/systems/ovrHelper.js src/systems/autoTrain.js src/state.js` 전체 통과.
+
+
 **자동 검증** (회귀·밸런스): `node probe.mjs` + `node probe-career.mjs` — 실행 방법 §시뮬레이션 돌려보기 참고.
 
 **수동 시나리오** (브라우저 UX 확인):
