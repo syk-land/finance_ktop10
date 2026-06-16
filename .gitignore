@@ -1,34 +1,4 @@
-# OS
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# Editors
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# Logs / 임시
-*.log
-tmp/
-.tmp/
-
-# 의존성 (probe/검증용 --no-save 설치분 — 커밋 안 함)
 node_modules/
-package-lock.json
-
-# 환경 변수
-.env
-.env.local
-
-# 로컬 설정 (개인 권한)
-.settings.local.json
-probe-debug.mjs
-
-# 원본 이미지 (대용량)
-source_images/
-
-# BGM 원본 (대용량)
-source_audio/
+dist/
+*.log
+.gemini/

@@ -1,0 +1,2628 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🧬 PROJECT 2100 - JRPG Sprite Sheet Diagnostic Panel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Outfit:wght@300;400;600;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #07090e;
+      --panel-bg: rgba(13, 20, 35, 0.65);
+      --border-glow: rgba(0, 242, 254, 0.15);
+      --neon-cyan: #00f2fe;
+      --neon-purple: #b92b27;
+      --neon-pink: #ff007f;
+      --neon-yellow: #ffeb3b;
+      --neon-green: #39ff14;
+      --text-main: #f0f4f8;
+      --text-muted: #8a9fc4;
+      --card-bg: rgba(18, 26, 47, 0.45);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(20, 30, 60, 0.4) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(80, 20, 60, 0.25) 0px, transparent 50%);
+      color: var(--text-main);
+      font-family: 'Outfit', sans-serif;
+      min-height: 100vh;
+      padding: 40px 20px;
+      overflow-x: hidden;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+      border-bottom: 1px solid rgba(0, 242, 254, 0.2);
+      padding-bottom: 30px;
+      position: relative;
+    }
+
+    header h1 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 2.5rem;
+      font-weight: 900;
+      letter-spacing: 2px;
+      background: linear-gradient(90deg, var(--neon-cyan), #4facfe, #ff007f);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 0 30px rgba(0, 242, 254, 0.25);
+      margin-bottom: 10px;
+    }
+
+    header p {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      font-family: 'Outfit', sans-serif;
+    }
+
+    .badge-mono {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      background: rgba(0, 242, 254, 0.1);
+      border: 1px solid rgba(0, 242, 254, 0.3);
+      padding: 4px 8px;
+      border-radius: 4px;
+      color: var(--neon-cyan);
+      display: inline-block;
+      margin-top: 10px;
+      text-transform: uppercase;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(620px, 1fr));
+      gap: 25px;
+    }
+
+    .card {
+      background: var(--panel-bg);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      backdrop-filter: blur(10px);
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: linear-gradient(90deg, var(--neon-cyan), var(--neon-pink));
+      opacity: 0.7;
+    }
+
+    .card:hover {
+      border-color: rgba(0, 242, 254, 0.3);
+      box-shadow: 0 15px 40px rgba(0, 242, 254, 0.1);
+      transform: translateY(-2px);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px;
+    }
+
+    .card-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .card-meta {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .grid-spec {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--neon-yellow);
+      background: rgba(255, 235, 59, 0.08);
+      border: 1px solid rgba(255, 235, 59, 0.2);
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+
+    /* Actions preview row */
+    .actions-preview {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 15px;
+      background: rgba(0,0,0,0.25);
+      padding: 15px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.02);
+    }
+
+    .action-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .action-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      font-family: 'Orbitron', sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .action-label.idle { color: var(--neon-cyan); }
+    .action-label.walk { color: var(--neon-green); }
+    .action-label.attack { color: var(--neon-pink); }
+    .action-label.special { color: var(--neon-yellow); }
+
+    .sprite-viewport {
+      width: 80px;
+      height: 80px;
+      background-color: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+    }
+
+    .sprite-sheet-element {
+      width: 100%;
+      height: 100%;
+      background-repeat: no-repeat;
+      image-rendering: pixelated;
+    }
+
+    .loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(7, 9, 14, 0.9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--neon-cyan);
+      border-radius: 6px;
+    }
+
+    .map-section {
+      background: var(--panel-bg);
+      border: 1px solid rgba(0, 242, 254, 0.15);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 40px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      backdrop-filter: blur(10px);
+      text-align: center;
+      position: relative;
+    }
+
+    .map-section::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple));
+      opacity: 0.7;
+    }
+
+    .map-section h2 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 20px;
+      letter-spacing: 1px;
+      text-shadow: 0 0 10px rgba(0, 242, 254, 0.3);
+    }
+
+    .map-container {
+      width: 100%;
+      max-height: 600px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      overflow: hidden;
+      background: rgba(0,0,0,0.3);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .map-container img {
+      max-width: 100%;
+      max-height: 600px;
+      object-fit: contain;
+      border-radius: 8px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+      transition: transform 0.3s ease;
+    }
+
+    .map-container img:hover {
+      transform: scale(1.01);
+    }
+
+    .backgrounds-section {
+      background: var(--panel-bg);
+      border: 1px solid rgba(0, 242, 254, 0.15);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 40px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      backdrop-filter: blur(10px);
+      position: relative;
+    }
+
+    .backgrounds-section::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: linear-gradient(90deg, var(--neon-cyan), var(--neon-yellow));
+      opacity: 0.7;
+    }
+
+    .backgrounds-section h2 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 20px;
+      text-align: center;
+      letter-spacing: 1px;
+      text-shadow: 0 0 10px rgba(0, 242, 254, 0.3);
+    }
+
+    .bg-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .bg-card {
+      background: rgba(0,0,0,0.2);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 8px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .bg-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--neon-cyan);
+      font-family: 'Orbitron', sans-serif;
+    }
+
+    .bg-preview {
+      width: 100%;
+      height: 150px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+    }
+
+    /* 4. Live Combat Simulator Styles */
+    .sim-section {
+      background: var(--panel-bg);
+      border: 1px solid rgba(255, 0, 127, 0.2);
+      border-radius: 12px;
+      padding: 24px;
+      margin-top: 40px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      backdrop-filter: blur(10px);
+      position: relative;
+    }
+
+    .sim-section::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: linear-gradient(90deg, var(--neon-pink), var(--neon-purple));
+      opacity: 0.7;
+    }
+
+    .sim-section h2 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 20px;
+      text-align: center;
+      letter-spacing: 1px;
+      text-shadow: 0 0 10px rgba(255, 0, 127, 0.3);
+    }
+
+    .sim-arena {
+      width: 100%;
+      height: 320px;
+      border: 2px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      position: relative;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding: 0 80px 40px 80px;
+      overflow: hidden;
+      box-shadow: inset 0 0 40px rgba(0,0,0,0.8);
+      background-position: -9999px -9999px !important;
+    }
+
+    .sim-arena::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: inherit;
+      background-size: cover;
+      background-position: center !important;
+      background-repeat: no-repeat;
+      opacity: 0.7; /* 30% transparency for background */
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .sim-fighter {
+      width: 120px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      z-index: 3;
+      transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
+
+    .sim-fighter.player-side {
+      transform-origin: bottom center;
+    }
+
+    .sim-fighter.enemy-side {
+      transform-origin: bottom center;
+    }
+
+    .sim-name-tag {
+      background: #111;
+      color: #fff;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 10px;
+      margin-bottom: 6px;
+      border: 1px solid rgba(255,255,255,0.15);
+      white-space: nowrap;
+    }
+
+    .sim-hp-container {
+      width: 100px;
+      height: 8px;
+      background: #333;
+      border-radius: 4px;
+      overflow: hidden;
+      border: 1px solid #000;
+      margin-bottom: 10px;
+    }
+
+    .sim-hp-bar {
+      height: 100%;
+      background: var(--neon-green);
+      width: 100%;
+      transition: width 0.2s ease;
+    }
+
+    .sim-sprite-viewport {
+      width: 90px;
+      height: 90px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .sim-sprite {
+      width: 100%;
+      height: 100%;
+      background-repeat: no-repeat;
+      image-rendering: pixelated;
+    }
+
+    .sim-floating-text {
+      position: absolute;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 20px;
+      font-weight: 900;
+      text-shadow: 0 0 6px #000, 0 0 12px currentColor;
+      animation: floatUp 0.8s forwards ease-out;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    @keyframes floatUp {
+      0% {
+        transform: translateY(0) scale(0.8);
+        opacity: 0;
+      }
+      20% {
+        transform: translateY(-20px) scale(1.2);
+        opacity: 1;
+      }
+      100% {
+        transform: translateY(-80px) scale(1);
+        opacity: 0;
+      }
+    }
+
+    /* Attack Dash animations */
+    .sim-dash-left {
+      animation: dashLeft 0.7s forwards ease-in-out;
+    }
+    .sim-dash-right {
+      animation: dashRight 0.7s forwards ease-in-out;
+    }
+    .sim-hurt {
+      animation: shakeHurt 0.2s forwards;
+    }
+
+    @keyframes dashLeft {
+      0% { transform: translateX(0); }
+      35% { transform: translateX(105px); }
+      70% { transform: translateX(105px); }
+      100% { transform: translateX(0); }
+    }
+
+    @keyframes dashRight {
+      0% { transform: translateX(0); }
+      35% { transform: translateX(-105px); }
+      70% { transform: translateX(-105px); }
+      100% { transform: translateX(0); }
+    }
+
+    @keyframes shakeHurt {
+      0%, 100% { transform: translateX(0); filter: brightness(1); }
+      20%, 60% { transform: translateX(-8px); filter: brightness(1.5) sepia(1) saturate(5) hue-rotate(-50deg); }
+      40%, 80% { transform: translateX(8px); filter: brightness(1.5) sepia(1) saturate(5) hue-rotate(-50deg); }
+    }
+
+    #pixi-canvas-container {
+      background-position: -9999px -9999px !important;
+    }
+
+    #pixi-canvas-container::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: inherit;
+      background-size: cover;
+      background-position: center !important;
+      background-repeat: no-repeat;
+      opacity: 0.7; /* 30% transparency for background */
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    #pixi-canvas-container canvas {
+      position: relative;
+      z-index: 5;
+    }
+
+    /* Tab Layout Styling */
+    .diagnostic-tabs {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 35px;
+      flex-wrap: wrap;
+    }
+
+    .diag-tab-btn {
+      background: var(--card-bg);
+      border: 1px solid rgba(0, 242, 254, 0.15);
+      color: var(--text-muted);
+      padding: 12px 22px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 700;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .diag-tab-btn:hover {
+      border-color: var(--neon-cyan);
+      color: #fff;
+      box-shadow: 0 0 12px rgba(0, 242, 254, 0.2);
+      transform: translateY(-1px);
+    }
+
+    .diag-tab-btn.active {
+      background: rgba(0, 242, 254, 0.12);
+      border-color: var(--neon-cyan);
+      color: var(--neon-cyan);
+      box-shadow: 0 0 15px rgba(0, 242, 254, 0.25);
+      text-shadow: 0 0 5px rgba(0, 242, 254, 0.4);
+    }
+
+    .diag-tab-content {
+      display: none;
+    }
+
+    .diag-tab-content.active-content {
+      display: block;
+      animation: tabFadeIn 0.45s ease-out;
+    }
+
+    @keyframes tabFadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(12px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
+  <script src="/combat_backgrounds.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.4.2/pixi.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🧬 JRPG SPRITE DIAGNOSTIC PANEL</h1>
+      <p>10종의 모든 하이브리드 융합체 특성 스프라이트 시트가 올바르게 슬라이싱 및 애니메이션되는지 실시간으로 검사합니다.</p>
+      <div class="badge-mono">Local Live Preview Server Active</div>
+    </header>
+
+    <div class="diagnostic-tabs">
+      <button class="diag-tab-btn active" data-tab="tab-map-bg">🗺️ 작전 지도 & 배경</button>
+      <button class="diag-tab-btn" data-tab="tab-diagnostics">🔍 스프라이트 시트 진단</button>
+      <button class="diag-tab-btn" data-tab="tab-combatsim">⚔️ JRPG 전투 시뮬레이션</button>
+      <button class="diag-tab-btn" data-tab="tab-webgl-physics">🔮 WebGL 탄성 물리 데모</button>
+      <button class="diag-tab-btn" data-tab="tab-skeletal-rig">🧬 2D 관절 리깅</button>
+    </div>
+
+    <!-- Tab 1: 작전 지도 & 배경 프리뷰 -->
+    <div id="tab-map-bg" class="diag-tab-content active-content">
+      <div class="map-section">
+        <h2>🌍 전역 작전 지도 (Eurasia Tactical Map)</h2>
+        <div class="map-container">
+          <img src="/eurasia_tactical_map.png" alt="유라시아 전역 지도" />
+        </div>
+      </div>
+
+      <div class="backgrounds-section">
+        <h2>🌄 14개 지역 전투 배경 미리보기 (14 Regional Combat Backgrounds)</h2>
+        <div class="bg-grid" id="backgrounds-grid">
+          <!-- 14 backgrounds will be dynamically injected here -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: 스프라이트 시트 진단 -->
+    <div id="tab-diagnostics" class="diag-tab-content">
+      <div class="grid" id="diagnostic-grid">
+        <!-- 10 JRPG cards will be dynamically injected here -->
+      </div>
+    </div>
+
+    <!-- Tab 3: JRPG 전투 시뮬레이션 -->
+    <div id="tab-combatsim" class="diag-tab-content">
+      <div class="sim-section">
+        <h2>⚔️ 4. 실시간 지역별 전투 연출 시뮬레이터 (Live Combat Simulator)</h2>
+        <div style="margin-bottom: 20px; text-align: center; display: flex; justify-content: center; align-items: center; gap: 15px;">
+          <label for="sim-region-select" style="font-family:'Orbitron', sans-serif; color:var(--neon-yellow); font-weight:700;">전투 지역 선택:</label>
+          <select id="sim-region-select" style="background:#121a2f; color:#fff; border:2px solid var(--neon-cyan); padding:8px 16px; border-radius:6px; font-family:'Outfit'; font-weight:600; cursor:pointer; box-shadow: 0 0 10px rgba(0, 242, 254, 0.25);">
+            <!-- options will be injected dynamically -->
+          </select>
+        </div>
+        
+        <div class="sim-arena" id="sim-arena-stage">
+          <!-- Player Side -->
+          <div class="sim-fighter player-side" id="sim-player-container">
+            <div class="sim-name-tag" id="sim-player-name">플레이어</div>
+            <div class="sim-hp-container">
+              <div class="sim-hp-bar" id="sim-player-hp-bar"></div>
+            </div>
+            <div class="sim-sprite-viewport">
+              <div class="sim-sprite" id="sim-player-sprite"></div>
+            </div>
+          </div>
+          
+          <!-- VS -->
+          <div style="font-family:'Orbitron', sans-serif; font-size:28px; color:var(--neon-pink); font-weight:900; text-shadow:0 0 15px rgba(255, 0, 127, 0.8); z-index:3; align-self: center; margin-bottom: 20px;">VS</div>
+          
+          <!-- Enemy Side -->
+          <div class="sim-fighter enemy-side" id="sim-enemy-container">
+            <div class="sim-name-tag" id="sim-enemy-name">적 보스</div>
+            <div class="sim-hp-container">
+              <div class="sim-hp-bar" id="sim-enemy-hp-bar"></div>
+            </div>
+            <div class="sim-sprite-viewport">
+              <div class="sim-sprite" id="sim-enemy-sprite"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 4: WebGL 탄성 물리 데모 -->
+    <div id="tab-webgl-physics" class="diag-tab-content">
+      <div class="sim-section" style="border-color: var(--neon-cyan); margin-top: 40px;">
+        <h2>🔮 5. PixiJS 기반 차세대 WebGL 탄성 전투 데모 (Next-Gen WebGL Demo)</h2>
+        <p style="font-size:12px; color:var(--text-muted); text-align:center; margin-bottom: 20px;">
+          GPU 가속(WebGL)과 실시간 스프링 감쇄 물리(스쿼시 & 스트레치)를 적용하여 젤리처럼 쫀득하게 튕기고 반응하는 전투 연출 데모입니다.
+        </p>
+        
+        <div style="margin-bottom: 20px; text-align: center; display: flex; justify-content: center; align-items: center; gap: 15px;">
+          <button class="btn-dev" id="btn-pixi-player-atk" style="background:var(--neon-pink); border-color:var(--neon-pink); color:#fff; font-weight:700;">🔥 플레이어 물리 타격 (Attack/Stretch)</button>
+          <button class="btn-dev" id="btn-pixi-enemy-atk" style="background:var(--neon-yellow); border-color:var(--neon-yellow); color:#000; font-weight:700;">⚡ 적 보스 물리 타격 (Attack/Stretch)</button>
+        </div>
+
+        <div id="pixi-canvas-container" style="width: 100%; height: 320px; border: 2px solid var(--neon-cyan); border-radius: 8px; overflow: hidden; background: #07090e; position: relative; box-shadow: 0 0 20px rgba(0, 242, 254, 0.15);"></div>
+      </div>
+    </div>
+
+    <!-- Tab 5: 2D 관절 리깅 시뮬레이터 -->
+    <div id="tab-skeletal-rig" class="diag-tab-content">
+      <div class="sim-section" style="border-color: var(--neon-pink); margin-top: 40px;">
+        <h2>🧬 6. Spine 2D 관절 리깅 및 스킨 스와핑 시뮬레이터 (WebGL Skeletal Rig)</h2>
+        <p style="font-size:12px; color:var(--text-muted); text-align:center; margin-bottom: 20px;">
+          부위별 스프라이트 파츠를 관절 구조(Skeleton)로 연결하고, 실시간 본 회전 애니메이션과 동적 파츠 교체(Skin/Weapon Swapping)를 지원하는 차세대 관절 엔진 데모입니다.
+        </p>
+
+        <!-- Control Panel -->
+        <div style="margin-bottom: 20px; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 15px;">
+          <!-- Motion -->
+          <div style="display:flex; align-items:center; gap:8px;">
+            <label style="color:#fff; font-size:11px; font-weight:700;">모션:</label>
+            <select id="sel-skeletal-anim" class="input-dev" style="background:#0f172a; color:#fff; border:1px solid var(--neon-pink); border-radius:4px; padding:4px 8px; font-size:11px;">
+              <option value="idle">대기 동작 (Idle Breathing)</option>
+              <option value="walk">걷기 동작 (Walk Cycle)</option>
+              <option value="attack">공격 모션 (Swing Attack)</option>
+              <option value="special">특수 모션 (Special Action)</option>
+            </select>
+          </div>
+
+          <!-- Skeletal Skin -->
+          <div style="display:flex; align-items:center; gap:8px;">
+            <label style="color:#fff; font-size:11px; font-weight:700;">리깅 캐릭터:</label>
+            <select id="sel-skeletal-char" class="input-dev" style="background:#0f172a; color:#fff; border:1px solid var(--neon-pink); border-radius:4px; padding:4px 8px; font-size:11px;">
+              <option value="male_base">🧔 남성 기본 피규어 (Male Base)</option>
+              <option value="female_base">👩 여성 기본 피규어 (Female Base)</option>
+              <option value="0">1. 플라즈마 거수 (Plasma Beast)</option>
+              <option value="1">2. 양자 파괴자 (Quantum Destroyer)</option>
+              <option value="2">3. 나노 흡혈귀 (Nano Vampire)</option>
+              <option value="3">4. 불멸의 언데드 (Undead Immortal)</option>
+              <option value="4">5. 잿더미 군주 (Ash Lord)</option>
+              <option value="5">6. 용암 해일 (Lava Tsunami)</option>
+              <option value="6">7. 환각의 도깨비 (Illusion Goblin)</option>
+              <option value="7">8. 오로라 정령 (Aurora Sprite)</option>
+              <option value="8">9. 강철 약탈자 (Steel Raider)</option>
+              <option value="9">10. 메카닉 타이탄 (Mechanic Titan)</option>
+            </select>
+          </div>
+
+          <!-- Weapon -->
+          <div style="display:flex; align-items:center; gap:8px;">
+            <label style="color:#fff; font-size:11px; font-weight:700;">장착 무기:</label>
+            <select id="sel-skeletal-weapon" class="input-dev" style="background:#0f172a; color:#fff; border:1px solid var(--neon-pink); border-radius:4px; padding:4px 8px; font-size:11px;">
+              <option value="scrap_sword">키메라 요술봉 (Scrap Wand)</option>
+              <option value="bio_claw">땅콩 주머니 (Peanut Bag)</option>
+              <option value="nuclear_gun">정신 파동 링 (Mind Blaster)</option>
+            </select>
+          </div>
+
+          <!-- Show Bones -->
+          <div style="display:flex; align-items:center; gap:8px; color:#fff; font-size:11px;">
+            <input type="checkbox" id="chk-skeletal-bones" checked>
+            <label for="chk-skeletal-bones" style="cursor:pointer; user-select:none;">본(Bones) 골격 표시</label>
+          </div>
+        </div>
+
+        <div id="pixi-skeletal-container" style="width: 100%; height: 320px; border: 2px solid var(--neon-pink); border-radius: 8px; overflow: hidden; background: #07090e; position: relative; box-shadow: 0 0 20px rgba(255, 0, 127, 0.15);"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/svgs.js"></script>
+  <script type="module">
+    // Render 14 region backgrounds
+    const bgGrid = document.getElementById("backgrounds-grid");
+    const regions = [
+      { id: 1, name: "1. 시베리아 대황무지" },
+      { id: 2, name: "2. 서유럽 원전 지대" },
+      { id: 3, name: "3. 동아시아 메가시티" },
+      { id: 4, name: "4. 루마니아 고성" },
+      { id: 5, name: "5. 이집트 피라미드" },
+      { id: 6, name: "6. 영국 스톤헨지" },
+      { id: 7, name: "7. 몽골 초원" },
+      { id: 8, name: "8. 중동 유전 지대" },
+      { id: 9, name: "9. 그리스 침수 도시" },
+      { id: 10, name: "10. 북유럽 침엽수림" },
+      { id: 11, name: "11. 인도 오염 사원" },
+      { id: 12, name: "12. 우크라이나 체르노빌" },
+      { id: 13, name: "13. 스위스 알프스 벙커" },
+      { id: 14, name: "14. 에베레스트 정상" }
+    ];
+
+    if (window.BackgroundRenderer) {
+      regions.forEach(reg => {
+        const bgCard = document.createElement("div");
+        bgCard.className = "bg-card";
+        bgCard.innerHTML = `
+          <div class="bg-title">${reg.name}</div>
+          <div class="bg-preview" id="bg-preview-${reg.id}"></div>
+        `;
+        bgGrid.appendChild(bgCard);
+        
+        const previewEl = document.getElementById(`bg-preview-${reg.id}`);
+        window.BackgroundRenderer.applyBackground(previewEl, reg.id);
+      });
+    } else {
+      bgGrid.innerHTML = `<p style="color:var(--neon-pink)">BackgroundRenderer가 로드되지 않았습니다.</p>`;
+    }
+
+    // Configuration for the 10 hybrid JRPG sprites
+    const characters = [
+      { id: "plasma_beast", name: "1. 플라즈마 거수 (Plasma Beast)", origin: "시베리아 + 서유럽", url: "/plasma_beast_sprite.png", cols: 10, rows: 4, bgId: 1 },
+      { id: "quantum_destroyer", name: "2. 양자 파괴자 (Quantum Destroyer)", origin: "서유럽 + 동아시아", url: "/quantum_destroyer_sprite.png", cols: 10, rows: 4, bgId: 2 },
+      { id: "nano_vampire", name: "3. 나노 흡혈귀 (Nano Vampire)", origin: "동아시아 + 루마니아", url: "/nano_vampire_sprite.png", cols: 10, rows: 4, bgId: 3 },
+      { id: "undead_immortal", name: "4. 불멸의 언데드 (Undead Immortal)", origin: "루마니아 + 이집트", url: "/undead_immortal_sprite.png", cols: 10, rows: 4, bgId: 4 },
+      { id: "ash_lord", name: "5. 잿더미 군주 (Ash Lord)", origin: "이집트 + 중동", url: "/ash_lord_sprite.png", cols: 10, rows: 4, bgId: 5 },
+      { id: "lava_tsunami", name: "6. 용암 해일 (Lava Tsunami)", origin: "중동 + 그리스", url: "/lava_tsunami_sprite.png", cols: 10, rows: 4, bgId: 8 },
+      { id: "illusion_goblin", name: "7. 환각의 도깨비 (Illusion Goblin)", origin: "그리스 + 영국", url: "/illusion_goblin_sprite.png", cols: 10, rows: 4, bgId: 9 },
+      { id: "aurora_sprite", name: "8. 오로라 정령 (Aurora Sprite)", origin: "영국 + 북유럽", url: "/aurora_sprite_sprite.png", cols: 10, rows: 4, bgId: 10 },
+      { id: "steel_raider", name: "9. 강철 약탈자 (Steel Raider)", origin: "북유럽 + 몽골", url: "/steel_raider_sprite.png", cols: 10, rows: 4, bgId: 7 },
+      { id: "mechanic_titan", name: "10. 메카닉 타이탄 (Mechanic Titan)", origin: "몽골 + 시베리아", url: "/mechanic_titan_sprite.png", cols: 10, rows: 4, bgId: 13 }
+    ];
+
+    // Background Cleaner & Grid Remover (Filters background out and centers characters, ignoring grid border noise)
+    function cleanSpriteBackground(imgUrl, cols, rows, callback) {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        const srcCanvas = document.createElement("canvas");
+        srcCanvas.width = img.width;
+        srcCanvas.height = img.height;
+        const srcCtx = srcCanvas.getContext("2d", { willReadFrequently: true });
+        srcCtx.drawImage(img, 0, 0);
+
+        try {
+          const imgData = srcCtx.getImageData(0, 0, srcCanvas.width, srcCanvas.height);
+          const data = imgData.data;
+          
+          // Sample background color by scanning diagonally from (0,0) to (16,16)
+          // to skip dark border grid lines and find the true background color.
+          let bgR = data[0];
+          let bgG = data[1];
+          let bgB = data[2];
+          let bgA = data[3];
+          
+          for (let i = 0; i <= 16; i++) {
+            const idx = (i * img.width + i) * 4;
+            if (idx + 3 < data.length) {
+              const r = data[idx];
+              const g = data[idx+1];
+              const b = data[idx+2];
+              const a = data[idx+3];
+              if (a < 50 || (r > 200 && g > 200 && b > 200)) {
+                bgR = r;
+                bgG = g;
+                bgB = b;
+                bgA = a;
+                break;
+              }
+            }
+          }
+          const hasBackground = bgA > 10; // Only key out if background is opaque
+          
+          // 1. Key out background color dynamically
+          if (hasBackground) {
+            for (let i = 0; i < data.length; i += 4) {
+              const r = data[i];
+              const g = data[i+1];
+              const b = data[i+2];
+              
+              const diff = Math.abs(r - bgR) + Math.abs(g - bgG) + Math.abs(b - bgB);
+              if (diff < 20) {
+                data[i+3] = 0; // Make transparent
+              }
+            }
+          }
+          srcCtx.putImageData(imgData, 0, 0);
+
+          // 2. Align and center characters inside a clean canvas
+          const destCanvas = document.createElement("canvas");
+          destCanvas.width = img.width;
+          destCanvas.height = img.height;
+          const destCtx = destCanvas.getContext("2d");
+
+          const cellW = img.width / cols;
+          const cellH = img.height / rows;
+
+          // Create a temporary canvas for cell drawing to prevent spillover
+          const tempCanvas = document.createElement("canvas");
+          tempCanvas.width = Math.ceil(cellW);
+          tempCanvas.height = Math.ceil(cellH);
+          const tempCtx = tempCanvas.getContext("2d");
+
+          const activeFrames = {};
+
+          // Pass 1: Scan all cells to find their bounding boxes and locate the maximum baseline Y (lowest ground level)
+          const cellBoxes = {};
+          let baselineY = 0;
+
+          for (let r = 0; r < rows; r++) {
+            cellBoxes[r] = {};
+            for (let c = 0; c < cols; c++) {
+              const startX = Math.min(img.width - 1, Math.max(0, Math.round(c * cellW)));
+              const startY = Math.min(img.height - 1, Math.max(0, Math.round(r * cellH)));
+              const w = Math.min(img.width - startX, Math.round(cellW));
+              const h = Math.min(img.height - startY, Math.round(cellH));
+
+              if (w <= 0 || h <= 0) continue;
+
+              const cellData = srcCtx.getImageData(startX, startY, w, h);
+              const cellPixels = cellData.data;
+
+              const scanCell = (mX, mY) => {
+                let minX = w;
+                let maxX = 0;
+                let minY = h;
+                let maxY = 0;
+                let sumX = 0;
+                let pixelCount = 0;
+                let hasPixels = false;
+                for (let y = mY; y < h - mY; y++) {
+                  for (let x = mX; x < w - mX; x++) {
+                    const idx = (y * w + x) * 4;
+                    const alpha = cellPixels[idx + 3];
+                    if (alpha > 5) {
+                      if (x < minX) minX = x;
+                      if (x > maxX) maxX = x;
+                      if (y < minY) minY = y;
+                      if (y > maxY) maxY = y;
+                      sumX += x;
+                      pixelCount++;
+                      hasPixels = true;
+                    }
+                  }
+                }
+                return { hasPixels, minX, maxX, minY, maxY, sumX, pixelCount };
+              };
+
+              let scan = scanCell(16, 6);
+              if (!scan.hasPixels) {
+                scan = scanCell(4, 4);
+              }
+
+              if (scan.hasPixels) {
+                cellBoxes[r][c] = scan;
+                if (scan.maxY > baselineY) {
+                  baselineY = scan.maxY;
+                }
+              }
+            }
+          }
+
+          if (baselineY === 0) {
+            baselineY = cellH - 12; // Fallback baseline Y
+          }
+
+          // Pass 2: Draw the centered and vertically grounded frames
+          for (let r = 0; r < rows; r++) {
+            activeFrames[r] = [];
+            for (let c = 0; c < cols; c++) {
+              const scan = cellBoxes[r][c];
+              if (!scan) continue;
+
+              activeFrames[r].push(c);
+
+              const startX = Math.min(img.width - 1, Math.max(0, Math.round(c * cellW)));
+              const startY = Math.min(img.height - 1, Math.max(0, Math.round(r * cellH)));
+
+              const charW = scan.maxX - scan.minX + 1;
+              const charH = scan.maxY - scan.minY + 1;
+              const centroidX = scan.sumX / scan.pixelCount;
+              const minX = scan.minX;
+              const minY = scan.minY;
+
+              // Clear temporary canvas
+              tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+              // Centroid-based centering: align character so its centroid is at cellW / 2
+              const shiftX = Math.round(cellW / 2 - centroidX);
+              const destX = minX + shiftX;
+
+              // Vertical alignment: ground the character by aligning maxY to baselineY
+              const shiftY = baselineY - scan.maxY;
+              const destY = minY + shiftY;
+
+              tempCtx.drawImage(
+                srcCanvas,
+                startX + minX,
+                startY + minY,
+                charW,
+                charH,
+                destX,
+                destY,
+                charW,
+                charH
+              );
+
+              // Copy clean, centered, and grounded frame to destCanvas
+              destCtx.drawImage(
+                tempCanvas,
+                0,
+                0,
+                cellW,
+                cellH,
+                startX,
+                startY,
+                cellW,
+                cellH
+              );
+            }
+          }
+
+          callback(destCanvas.toDataURL("image/png"), activeFrames);
+        } catch (e) {
+          console.error("Clean background failed", e);
+          callback(imgUrl, {});
+        }
+      };
+      img.onerror = () => {
+        callback(imgUrl, {});
+      };
+      img.src = imgUrl + (imgUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
+    }
+
+    const grid = document.getElementById("diagnostic-grid");
+
+    // Initialize character cards
+    characters.forEach(char => {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.id = `card-${char.id}`;
+      card.innerHTML = `
+        <div class="card-header">
+          <div>
+            <div class="card-title">${char.name}</div>
+            <div class="card-meta">요구 조합: ${char.origin}</div>
+          </div>
+          <span class="grid-spec" id="spec-${char.id}">정렬 스캔 대기 중...</span>
+        </div>
+        <div class="actions-preview">
+          <div class="action-container">
+            <div class="action-label idle">Idle (대기)</div>
+            <div class="sprite-viewport">
+              <div class="sprite-sheet-element" id="sprite-${char.id}-idle"></div>
+              <div class="loading-overlay" id="loading-${char.id}-idle">SCANNING</div>
+            </div>
+          </div>
+          <div class="action-container">
+            <div class="action-label walk">Walk (걷기)</div>
+            <div class="sprite-viewport">
+              <div class="sprite-sheet-element" id="sprite-${char.id}-walk"></div>
+              <div class="loading-overlay" id="loading-${char.id}-walk">SCANNING</div>
+            </div>
+          </div>
+          <div class="action-container">
+            <div class="action-label attack">Attack (기본)</div>
+            <div class="sprite-viewport">
+              <div class="sprite-sheet-element" id="sprite-${char.id}-attack"></div>
+              <div class="loading-overlay" id="loading-${char.id}-attack">SCANNING</div>
+            </div>
+          </div>
+          <div class="action-container">
+            <div class="action-label special">Special (스킬)</div>
+            <div class="sprite-viewport">
+              <div class="sprite-sheet-element" id="sprite-${char.id}-special"></div>
+              <div class="loading-overlay" id="loading-${char.id}-special">SCANNING</div>
+            </div>
+          </div>
+        </div>
+      `;
+      grid.appendChild(card);
+
+      // Clean background and start animation
+      cleanSpriteBackground(char.url, char.cols, char.rows, (dataUrl, activeFrames) => {
+        const specEl = document.getElementById(`spec-${char.id}`);
+        
+        // Count active frames for UI info label
+        const counts = [];
+        for (let r = 0; r < char.rows; r++) {
+          counts.push(`행${r}:${activeFrames[r] ? activeFrames[r].length : 0}프레임`);
+        }
+        specEl.innerHTML = `${char.cols}x${char.rows} 그리드 (${counts.join(", ")})`;
+        specEl.style.color = "var(--neon-cyan)";
+        specEl.style.background = "rgba(0, 242, 254, 0.08)";
+        specEl.style.borderColor = "rgba(0, 242, 254, 0.2)";
+
+        const actions = [
+          { key: "idle", row: 0 },
+          { key: "walk", row: 1 },
+          { key: "attack", row: 2 },
+          { key: "special", row: 3 }
+        ];
+
+        actions.forEach(act => {
+          const spriteEl = document.getElementById(`sprite-${char.id}-${act.key}`);
+          const loadingEl = document.getElementById(`loading-${char.id}-${act.key}`);
+          
+          if (loadingEl) loadingEl.style.display = "none";
+          if (!spriteEl) return;
+
+          // Set background
+          spriteEl.style.backgroundImage = `url('${dataUrl}')`;
+          spriteEl.style.backgroundSize = `${char.cols * 100}% ${char.rows * 100}%`;
+
+           // Set viewport background image matching the origin region with fallback
+          const viewportEl = spriteEl.parentElement;
+          if (viewportEl && window.BackgroundRenderer && char.bgId) {
+            window.BackgroundRenderer.applyBackground(viewportEl, char.bgId);
+          }
+
+          const targetRow = act.row >= char.rows ? (char.rows - 1) : act.row;
+
+          const rowActiveFrames = (activeFrames[targetRow] && activeFrames[targetRow].length > 0)
+            ? activeFrames[targetRow]
+            : Array.from({length: char.cols}, (_, i) => i);
+
+          let frameIdx = 0;
+          setInterval(() => {
+            const frame = rowActiveFrames[frameIdx];
+            const pctX = char.cols > 1 ? (frame / (char.cols - 1)) * 100 : 0;
+            const pctY = char.rows > 1 ? (targetRow / (char.rows - 1)) * 100 : 0;
+
+            spriteEl.style.backgroundPosition = `${pctX}% ${pctY}%`;
+            frameIdx = (frameIdx + 1) % rowActiveFrames.length;
+          }, 180 + Math.random() * 40); // Slightly randomized interval to prevent uniform robot-like lockstep ticks
+        });
+      });
+    });
+
+    // --- 4. Live Combat Simulator Script ---
+    let simInterval = null;
+    let playerFrameInterval = null;
+    let enemyFrameInterval = null;
+
+    function loadSimulation(regionId) {
+      if (simInterval) clearInterval(simInterval);
+      if (playerFrameInterval) clearInterval(playerFrameInterval);
+      if (enemyFrameInterval) clearInterval(enemyFrameInterval);
+
+      // Select characters based on the region
+      const pChar = characters[(parseInt(regionId) - 1) % characters.length];
+      const eChar = characters[(parseInt(regionId) + 2) % characters.length];
+
+      document.getElementById("sim-player-name").textContent = pChar.name.split(" (")[0];
+      document.getElementById("sim-enemy-name").textContent = eChar.name.split(" (")[0];
+
+      const arena = document.getElementById("sim-arena-stage");
+      if (window.BackgroundRenderer) {
+        window.BackgroundRenderer.applyBackground(arena, regionId);
+      }
+
+      const pSprite = document.getElementById("sim-player-sprite");
+      const eSprite = document.getElementById("sim-enemy-sprite");
+      const pHpBar = document.getElementById("sim-player-hp-bar");
+      const eHpBar = document.getElementById("sim-enemy-hp-bar");
+
+      pHpBar.style.width = "100%";
+      eHpBar.style.width = "100%";
+      let pHp = 100;
+      let eHp = 100;
+
+      // Slices and cleans sprites backgrounds
+      cleanSpriteBackground(pChar.url, pChar.cols, pChar.rows, (pDataUrl) => {
+        pSprite.style.backgroundImage = `url('${pDataUrl}')`;
+        pSprite.style.backgroundSize = `${pChar.cols * 100}% ${pChar.rows * 100}%`;
+        startFighterAnim("player", pSprite, pChar, 0);
+      });
+
+      cleanSpriteBackground(eChar.url, eChar.cols, eChar.rows, (eDataUrl) => {
+        eSprite.style.backgroundImage = `url('${eDataUrl}')`;
+        eSprite.style.backgroundSize = `${eChar.cols * 100}% ${eChar.rows * 100}%`;
+        eSprite.style.transform = "scaleX(-1)"; // Face left
+        startFighterAnim("enemy", eSprite, eChar, 0);
+      });
+
+      function startFighterAnim(side, spriteEl, charConfig, row) {
+        const targetRow = row >= charConfig.rows ? (charConfig.rows - 1) : row;
+        if (side === "player") {
+          if (playerFrameInterval) clearInterval(playerFrameInterval);
+          let f = 0;
+          playerFrameInterval = setInterval(() => {
+            const pctX = charConfig.cols > 1 ? (f / (charConfig.cols - 1)) * 100 : 0;
+            const pctY = charConfig.rows > 1 ? (targetRow / (charConfig.rows - 1)) * 100 : 0;
+            spriteEl.style.backgroundPosition = `${pctX}% ${pctY}%`;
+            f = (f + 1) % charConfig.cols;
+          }, 180);
+        } else {
+          if (enemyFrameInterval) clearInterval(enemyFrameInterval);
+          let f = 0;
+          enemyFrameInterval = setInterval(() => {
+            const pctX = charConfig.cols > 1 ? (f / (charConfig.cols - 1)) * 100 : 0;
+            const pctY = charConfig.rows > 1 ? (targetRow / (charConfig.rows - 1)) * 100 : 0;
+            spriteEl.style.backgroundPosition = `${pctX}% ${pctY}%`;
+            f = (f + 1) % charConfig.cols;
+          }, 180);
+        }
+      }
+
+      // Live Combat Loop
+      let turn = 0;
+      simInterval = setInterval(() => {
+        if (pHp <= 0 || eHp <= 0) return;
+
+        const pContainer = document.getElementById("sim-player-container");
+        const eContainer = document.getElementById("sim-enemy-container");
+
+        // Determine if it's a Special Attack (Skill) with 35% probability
+        const isSkill = Math.random() < 0.35;
+        const attackRow = isSkill ? 3 : 2; // Row 3 = Skill, Row 2 = Attack
+
+        if (turn === 0) {
+          // Player attacks
+          pContainer.classList.add("sim-dash-left");
+          startFighterAnim("player", pSprite, pChar, attackRow); // Set to attack/skill pose
+          
+          // Damage contact at 250ms (inside the 700ms dash)
+          setTimeout(() => {
+            if (eHp <= 0) return; // Wait for resurrection if dead
+
+            const dmg = 15 + Math.floor(Math.random() * 15);
+            eHp = Math.max(0, eHp - dmg);
+            eHpBar.style.width = `${eHp}%`;
+            
+            eContainer.classList.add("sim-hurt");
+            spawnSimDamage(eContainer, dmg, "player");
+            setTimeout(() => eContainer.classList.remove("sim-hurt"), 250);
+
+            if (eHp <= 0) {
+              // Enemy defeated: Set enemy to walk/hurt pose (row 1)
+              startFighterAnim("enemy", eSprite, eChar, 1);
+              
+              // Player victory walk: player switches to walk pose (row 1)
+              setTimeout(() => {
+                startFighterAnim("player", pSprite, pChar, 1);
+              }, 450); // Jog after returning from dash
+
+              // Resurrection timer (2 seconds)
+              setTimeout(() => {
+                eHp = 100;
+                eHpBar.style.width = "100%";
+                startFighterAnim("enemy", eSprite, eChar, 0); // Reset enemy to idle (row 0)
+                startFighterAnim("player", pSprite, pChar, 0); // Reset player to idle (row 0)
+              }, 2000);
+            }
+          }, 250);
+
+          // Return from dash at 700ms
+          setTimeout(() => {
+            pContainer.classList.remove("sim-dash-left");
+            if (eHp > 0) {
+              startFighterAnim("player", pSprite, pChar, 0); // Reset to idle
+            }
+          }, 700);
+
+          turn = 1;
+        } else {
+          // Enemy attacks
+          eContainer.classList.add("sim-dash-right");
+          startFighterAnim("enemy", eSprite, eChar, attackRow);
+          
+          // Damage contact at 250ms
+          setTimeout(() => {
+            if (pHp <= 0) return;
+
+            const dmg = 12 + Math.floor(Math.random() * 13);
+            pHp = Math.max(0, pHp - dmg);
+            pHpBar.style.width = `${pHp}%`;
+            
+            pContainer.classList.add("sim-hurt");
+            spawnSimDamage(pContainer, dmg, "enemy");
+            
+            setTimeout(() => pContainer.classList.remove("sim-hurt"), 200);
+
+            if (pHp <= 0) {
+              startFighterAnim("player", pSprite, pChar, 1);
+              setTimeout(() => {
+                pHp = 100;
+                pHpBar.style.width = "100%";
+                startFighterAnim("player", pSprite, pChar, 0);
+              }, 2000);
+            }
+          }, 150);
+          turn = 0;
+        }
+      }, 1500);
+    }
+
+    function spawnSimDamage(targetEl, dmg, side) {
+      const floatText = document.createElement("div");
+      floatText.className = "sim-floating-text";
+      floatText.style.color = side === "player" ? "var(--neon-pink)" : "var(--neon-yellow)";
+      floatText.textContent = `-${dmg} Rad!`;
+      floatText.style.left = "35%";
+      floatText.style.top = "15%";
+      targetEl.appendChild(floatText);
+      setTimeout(() => floatText.remove(), 800);
+    }
+
+    // Populate drop-down
+    const selectEl = document.getElementById("sim-region-select");
+    if (selectEl) {
+      regions.forEach(reg => {
+        const opt = document.createElement("option");
+        opt.value = reg.id;
+        opt.textContent = reg.name;
+        selectEl.appendChild(opt);
+      });
+
+      selectEl.addEventListener("change", (e) => {
+        loadSimulation(e.target.value);
+      });
+    }
+
+    // Initialize Simulator with Region 1
+    loadSimulation(1);
+
+    // --- 5. PixiJS Next-Gen WebGL Elastic Combat Demo Script ---
+    if (window.PIXI) {
+      const containerEl = document.getElementById("pixi-canvas-container");
+      
+      // Initialize Pixi Application
+      const pixiApp = new PIXI.Application({
+        width: containerEl.clientWidth || 800,
+        height: 320,
+        backgroundAlpha: 0, // Transparent canvas so background applies underneath
+        resolution: window.devicePixelRatio || 1,
+        autoDensity: true
+      });
+      containerEl.appendChild(pixiApp.view);
+
+      // Set Siberia background (Region 1) underneath
+      if (window.BackgroundRenderer) {
+        window.BackgroundRenderer.applyBackground(containerEl, 1);
+      }
+
+      // Physics Character class for PixiJS
+      class PixiElasticFighter {
+        constructor(charConfig, side, startX) {
+          this.charConfig = charConfig;
+          this.side = side;
+          this.startX = startX;
+          this.container = new PIXI.Container();
+          
+          this.sprite = null;
+          this.baseScaleX = side === 'enemy' ? -0.75 : 0.75; // Sized to 75%
+          this.baseScaleY = 0.75;
+          this.scaleY = 0.75;
+          this.targetScaleY = 0.75;
+          this.vy = 0;
+          this.k = 0.15; // Spring force
+          this.damp = 0.82; // Friction dampening
+          
+          this.time = Math.random() * 10;
+          this.isAttacking = false;
+          this.targetX = startX;
+          this.currentX = startX;
+
+          pixiApp.stage.addChild(this.container);
+          
+          // Slice the first cell (row 0, col 0) of JRPG sheet
+          cleanSpriteBackground(charConfig.url, charConfig.cols, charConfig.rows, (dataUrl) => {
+            const baseTex = PIXI.BaseTexture.from(dataUrl);
+            const setupSprite = () => {
+              const cellW = baseTex.width / charConfig.cols;
+              const cellH = baseTex.height / charConfig.rows;
+              const frameRect = new PIXI.Rectangle(0, 0, cellW, cellH);
+              const tex = new PIXI.Texture(baseTex, frameRect);
+              
+              this.sprite = new PIXI.Sprite(tex);
+              this.sprite.anchor.set(0.5, 1.0); // anchor at foot bottom center
+              this.sprite.scale.set(this.baseScaleX, this.baseScaleY);
+              
+              this.container.addChild(this.sprite);
+              this.container.x = this.startX;
+              this.container.y = 280; // Ground line
+            };
+
+            if (baseTex.valid) {
+              setupSprite();
+            } else {
+              baseTex.once('loaded', setupSprite);
+            }
+          });
+        }
+
+        update(delta) {
+          this.time += 0.05 * delta;
+
+          // X position movement interpolation
+          if (Math.abs(this.currentX - this.targetX) > 1) {
+            this.currentX += (this.targetX - this.currentX) * 0.18 * delta;
+            this.container.x = this.currentX;
+          } else {
+            this.currentX = this.targetX;
+            this.container.x = this.targetX;
+          }
+
+          if (!this.sprite) return;
+
+          // Elastic Squash and Stretch physics simulation
+          if (this.targetScaleY === 0.75) {
+            // Idle breathing sine wave
+            const breathe = Math.sin(this.time) * 0.025;
+            this.sprite.scale.y = this.baseScaleY + breathe;
+            this.sprite.scale.x = this.baseScaleX - (breathe * (this.baseScaleX > 0 ? 0.75 : -0.75));
+          } else {
+            // Active spring simulation
+            let force = (this.targetScaleY - this.scaleY) * this.k;
+            this.vy += force * delta;
+            this.vy *= this.damp;
+            this.scaleY += this.vy * delta;
+
+            this.sprite.scale.y = this.scaleY;
+            const rawScaleX = 1.5 - this.scaleY; // Volume preservation math
+            this.sprite.scale.x = rawScaleX * (this.baseScaleX > 0 ? 1 : -1);
+
+            if (Math.abs(this.scaleY - this.targetScaleY) < 0.005 && Math.abs(this.vy) < 0.005) {
+              this.scaleY = 0.75;
+              this.targetScaleY = 0.75;
+              this.vy = 0;
+            }
+          }
+        }
+
+        dashAttack(targetDestX, onHitCallback) {
+          this.isAttacking = true;
+          this.targetScaleY = 0.95; // Stretch forward
+          this.targetX = targetDestX;
+
+          // Move back after hitting
+          setTimeout(() => {
+            if (onHitCallback) onHitCallback();
+            
+            this.targetScaleY = 0.55; // Rebound squash on contact
+            this.targetX = this.startX;
+            
+            setTimeout(() => {
+              this.isAttacking = false;
+              this.targetScaleY = 0.75; // Return to idle
+            }, 300);
+          }, 350);
+        }
+
+        takeHit() {
+          this.targetScaleY = 0.45; // Extreme squash on impact
+          this.vy = -0.15; // Elastic bounce speed
+          this.targetScaleY = 0.75;
+        }
+      }
+
+      // Create Player (Plasma Beast) and Enemy (Mechanic Titan)
+      window.pFighter = new PixiElasticFighter(characters[0], 'player', 150);
+      window.eFighter = new PixiElasticFighter(characters[9], 'enemy', pixiApp.screen.width - 150);
+
+      // Particle Manager
+      const particles = [];
+      function spawnSparkParticles(x, y, color) {
+        for (let i = 0; i < 35; i++) {
+          const p = new PIXI.Graphics();
+          p.beginFill(color);
+          p.drawCircle(0, 0, 2 + Math.random() * 4);
+          p.endFill();
+          p.x = x;
+          p.y = y;
+          
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 3 + Math.random() * 6;
+          p.vx = Math.cos(angle) * speed;
+          p.vy = Math.sin(angle) * speed - 2.5; // push slightly upwards
+          p.alpha = 1.0;
+          p.gravity = 0.2;
+          
+          pixiApp.stage.addChild(p);
+          particles.push(p);
+        }
+      }
+
+      // Floating Text Manager
+      function spawnPixiDamageText(x, y, text, color) {
+        const style = new PIXI.TextStyle({
+          fontFamily: 'Orbitron',
+          fontSize: 22,
+          fill: color,
+          fontWeight: '900',
+          stroke: '#000000',
+          strokeThickness: 4,
+          dropShadow: true,
+          dropShadowColor: '#000000',
+          dropShadowBlur: 4,
+          dropShadowDistance: 2
+        });
+        
+        const textObj = new PIXI.Text(text, style);
+        textObj.anchor.set(0.5);
+        textObj.x = x;
+        textObj.y = y;
+        pixiApp.stage.addChild(textObj);
+
+        let elapsed = 0;
+        const animateText = (dt) => {
+          elapsed += 1 * dt;
+          textObj.y -= 1.8 * dt;
+          textObj.alpha -= 0.025 * dt;
+          
+          if (textObj.alpha <= 0 || elapsed > 45) {
+            pixiApp.ticker.remove(animateText);
+            pixiApp.stage.removeChild(textObj);
+            textObj.destroy();
+          }
+        };
+        pixiApp.ticker.add(animateText);
+      }
+
+      // Camera Screen Shake
+      let shakeTime = 0;
+      function triggerScreenShake(intensity = 6, duration = 15) {
+        shakeTime = duration;
+        const shakeTick = (dt) => {
+          if (shakeTime > 0) {
+            pixiApp.stage.x = (Math.random() - 0.5) * intensity;
+            pixiApp.stage.y = (Math.random() - 0.5) * intensity;
+            shakeTime -= 1 * dt;
+          } else {
+            pixiApp.stage.x = 0;
+            pixiApp.stage.y = 0;
+            pixiApp.ticker.remove(shakeTick);
+          }
+        };
+        pixiApp.ticker.add(shakeTick);
+      }
+
+      // Main Loop Ticker for animations & particles
+      pixiApp.ticker.add((dt) => {
+        // Update fighters
+        window.pFighter.update(dt);
+        window.eFighter.update(dt);
+
+        // Update particles
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          p.vy += p.gravity * dt;
+          p.alpha -= 0.028 * dt;
+
+          if (p.alpha <= 0) {
+            pixiApp.stage.removeChild(p);
+            p.destroy();
+            particles.splice(i, 1);
+          }
+        }
+      });
+
+      // Bind button events for WebGL Elastic attacks
+      document.getElementById("btn-pixi-player-atk").addEventListener("click", () => {
+        if (window.pFighter.isAttacking || window.eFighter.isAttacking) return;
+        
+        // Player dashes right to strike enemy
+        window.pFighter.dashAttack(pixiApp.screen.width - 210, () => {
+          // On Hit contact:
+          window.eFighter.takeHit();
+          triggerScreenShake(8, 12);
+          spawnSparkParticles(pixiApp.screen.width - 150, 230, 0xff007f); // Neon pink sparks
+          spawnPixiDamageText(pixiApp.screen.width - 150, 180, `-${250 + Math.floor(Math.random()*250)} Rad!`, '#ff007f');
+        });
+      });
+
+      document.getElementById("btn-pixi-enemy-atk").addEventListener("click", () => {
+        if (window.pFighter.isAttacking || window.eFighter.isAttacking) return;
+
+        // Enemy dashes left to strike player
+        window.eFighter.dashAttack(210, () => {
+          // On Hit contact:
+          window.pFighter.takeHit();
+          triggerScreenShake(7, 10);
+          spawnSparkParticles(150, 230, 0xffeb3b); // Yellow sparks
+          spawnPixiDamageText(150, 180, `-${180 + Math.floor(Math.random()*150)} Rad!`, '#ffeb3b');
+        });
+      });
+
+      // --- 6. PixiJS Joint Skeletal Rig & Skin Swapping Simulator Script ---
+      const skContainerEl = document.getElementById("pixi-skeletal-container");
+      if (skContainerEl) {
+        // Initialize Pixi Application for Skeletal Rig
+        const skApp = new PIXI.Application({
+          width: skContainerEl.clientWidth || 800,
+          height: 320,
+          backgroundAlpha: 0,
+          resolution: window.devicePixelRatio || 1,
+          autoDensity: true
+        });
+        skContainerEl.appendChild(skApp.view);
+
+        // Set Siberia background (Region 1) underneath
+        if (window.BackgroundRenderer) {
+          window.BackgroundRenderer.applyBackground(skContainerEl, 1);
+        }
+
+        // Helper function to bundle SVG snippets and definitions into full SVG Blob URLs
+        const createSvgTexture = (svgContent, width = 100, height = 120) => {
+          const fullSvg = `
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
+              <defs>
+                <linearGradient id="gold-metal-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#ffd54f" />
+                  <stop offset="50%" stop-color="#ffb300" />
+                  <stop offset="100%" stop-color="#ff8f00" />
+                </linearGradient>
+                <linearGradient id="peanut-bag-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#ffe082" />
+                  <stop offset="100%" stop-color="#bcaaa4" />
+                </linearGradient>
+                <linearGradient id="eye-top-shadow" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="rgba(0,0,0,0.6)" />
+                  <stop offset="100%" stop-color="rgba(0,0,0,0)" />
+                </linearGradient>
+              </defs>
+              ${svgContent}
+            </svg>
+          `;
+          const blob = new Blob([fullSvg], { type: 'image/svg+xml' });
+          return URL.createObjectURL(blob);
+        };
+
+        // Cache weapon texture urls
+        const textureUrls = {
+          weapon_scrap_sword: createSvgTexture(`<g transform="translate(40,40) scale(1.1)">${window.SVGRenderer.templates.weapons.scrap_sword}</g>`, 80, 80),
+          weapon_bio_claw: createSvgTexture(`<g transform="translate(40,40) scale(1.1)">${window.SVGRenderer.templates.weapons.bio_claw}</g>`, 80, 80),
+          weapon_nuclear_gun: createSvgTexture(`<g transform="translate(40,40) scale(1.1)">${window.SVGRenderer.templates.weapons.nuclear_gun}</g>`, 80, 80)
+        };
+
+        // Dynamic JRPG sprite slicing helper
+        const sliceJrpcParts = (imgUrl, cols, rows, callback) => {
+          cleanSpriteBackground(imgUrl, cols, rows, (dataUrl) => {
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.onload = () => {
+              const cellW = img.width / cols;
+              const cellH = img.height / rows;
+              
+              const canvas = document.createElement("canvas");
+              canvas.width = cellW;
+              canvas.height = cellH;
+              const ctx = canvas.getContext("2d");
+              
+              // Draw the first cell (row 0, col 0)
+              ctx.drawImage(img, 0, 0, cellW, cellH, 0, 0, cellW, cellH);
+              
+              // Slicing helper
+              const extractRect = (x, y, w, h) => {
+                const partCanvas = document.createElement("canvas");
+                partCanvas.width = w;
+                partCanvas.height = h;
+                const partCtx = partCanvas.getContext("2d");
+                partCtx.drawImage(canvas, x, y, w, h, 0, 0, w, h);
+                return partCanvas.toDataURL("image/png");
+              };
+
+              // Slice into standard humanoid parts
+              const headData = extractRect(0, 0, cellW, cellH * 0.45);
+              const torsoData = extractRect(cellW * 0.2, cellH * 0.42, cellW * 0.6, cellH * 0.38);
+              const leftArmData = extractRect(0, cellH * 0.42, cellW * 0.25, cellH * 0.38);
+              const rightArmData = extractRect(cellW * 0.75, cellH * 0.42, cellW * 0.25, cellH * 0.38);
+              const leftLegData = extractRect(cellW * 0.15, cellH * 0.78, cellW * 0.35, cellH * 0.22);
+              const rightLegData = extractRect(cellW * 0.5, cellH * 0.78, cellW * 0.35, cellH * 0.22);
+
+              callback({
+                cellW,
+                cellH,
+                head: headData,
+                torso: torsoData,
+                leftArm: leftArmData,
+                rightArm: rightArmData,
+                leftLeg: leftLegData,
+                rightLeg: rightLegData
+              });
+            };
+            img.src = dataUrl;
+          });
+        };
+
+        // Create Joint Skeletal Hierarchy Containers (Bones)
+        const skRoot = new PIXI.Container();
+        skRoot.position.set(skApp.screen.width / 2, 260); // ground base
+        skApp.stage.addChild(skRoot);
+
+        let animTime = 0;
+        let activeAnimation = "idle";
+        let attackProgress = 0;
+        let specialProgress = 0;
+        let currentSkinType = "male"; // "male", "female", or "jrpg"
+
+        // Bones tree (15-joint hierarchy)
+        const bonePelvis = new PIXI.Container();
+        const boneTorso = new PIXI.Container();
+        const boneHead = new PIXI.Container();
+        
+        const boneLeftArm = new PIXI.Container();
+        const boneLeftForearm = new PIXI.Container();
+        const boneLeftHand = new PIXI.Container();
+        
+        const boneRightArm = new PIXI.Container();
+        const boneRightForearm = new PIXI.Container();
+        const boneRightHand = new PIXI.Container();
+        
+        const boneLeftLeg = new PIXI.Container();
+        const boneLeftCalf = new PIXI.Container();
+        const boneLeftFoot = new PIXI.Container();
+        
+        const boneRightLeg = new PIXI.Container();
+        const boneRightCalf = new PIXI.Container();
+        const boneRightFoot = new PIXI.Container();
+        
+        const boneWeapon = new PIXI.Container();
+
+        // Create Sprite Placeholders for all 15 parts
+        const spritePelvis = new PIXI.Sprite();
+        const spriteTorso = new PIXI.Sprite();
+        const spriteHead = new PIXI.Sprite();
+        const spriteLeftArm = new PIXI.Sprite();
+        const spriteLeftForearm = new PIXI.Sprite();
+        const spriteLeftHand = new PIXI.Sprite();
+        const spriteRightArm = new PIXI.Sprite();
+        const spriteRightForearm = new PIXI.Sprite();
+        const spriteRightHand = new PIXI.Sprite();
+        const spriteLeftLeg = new PIXI.Sprite();
+        const spriteLeftCalf = new PIXI.Sprite();
+        const spriteLeftFoot = new PIXI.Sprite();
+        const spriteRightLeg = new PIXI.Sprite();
+        const spriteRightCalf = new PIXI.Sprite();
+        const spriteRightFoot = new PIXI.Sprite();
+        const spriteWeapon = PIXI.Sprite.from(textureUrls.weapon_scrap_sword);
+        spriteWeapon.pivot.set(40, 40);
+
+        // Setup parent-child hierarchy & Add Sprites in exact rendering order (layering)
+        // 1. Pelvis setup (Pelvis sprite rendered behind Torso and Legs)
+        skRoot.addChild(bonePelvis);
+        bonePelvis.addChild(spritePelvis);
+        bonePelvis.addChild(boneLeftLeg);
+        bonePelvis.addChild(boneRightLeg);
+        bonePelvis.addChild(boneTorso);
+        
+        // 2. Legs setup (Thigh sprite behind Calf, Calf sprite behind Foot)
+        boneLeftLeg.addChild(spriteLeftLeg);
+        boneLeftLeg.addChild(boneLeftCalf);
+        boneLeftCalf.addChild(spriteLeftCalf);
+        boneLeftCalf.addChild(boneLeftFoot);
+        boneLeftFoot.addChild(spriteLeftFoot);
+        
+        boneRightLeg.addChild(spriteRightLeg);
+        boneRightLeg.addChild(boneRightCalf);
+        boneRightCalf.addChild(spriteRightCalf);
+        boneRightCalf.addChild(boneRightFoot);
+        boneRightFoot.addChild(spriteRightFoot);
+        
+        // 3. Torso setup (Torso sprite behind Arms and Head)
+        boneTorso.addChild(spriteTorso);
+        boneTorso.addChild(boneLeftArm);
+        boneTorso.addChild(boneRightArm);
+        boneTorso.addChild(boneHead); // Head is rendered in front of Torso!
+        
+        // 4. Head setup
+        boneHead.addChild(spriteHead);
+        
+        // 5. Left Arm setup (Upper Arm behind Forearm, Forearm behind Hand, Hand behind Weapon)
+        boneLeftArm.addChild(spriteLeftArm);
+        boneLeftArm.addChild(boneLeftForearm);
+        boneLeftForearm.addChild(spriteLeftForearm);
+        boneLeftForearm.addChild(boneLeftHand);
+        boneLeftHand.addChild(spriteLeftHand);
+        boneLeftHand.addChild(boneWeapon);
+        boneWeapon.addChild(spriteWeapon);
+        
+        // 6. Right Arm setup (Upper Arm behind Forearm, Forearm behind Hand)
+        boneRightArm.addChild(spriteRightArm);
+        boneRightArm.addChild(boneRightForearm);
+        boneRightForearm.addChild(spriteRightForearm);
+        boneRightForearm.addChild(boneRightHand);
+        boneRightHand.addChild(spriteRightHand);
+
+        // Adjust scales for high resolution vector preview
+        const charScale = 1.6;
+        skRoot.scale.set(charScale);
+
+        // Define helper to setup JRPG joint positions
+        const setupJrpgJoints = () => {
+          bonePelvis.position.set(0, 0);
+          boneTorso.position.set(0, -25);
+          boneHead.position.set(0, -18);
+          boneLeftArm.position.set(-18, -12);
+          boneRightArm.position.set(18, -12);
+          boneLeftLeg.position.set(-7, -2);
+          boneRightLeg.position.set(7, -2);
+          
+          boneLeftForearm.position.set(0, 0);
+          boneLeftHand.position.set(0, 0);
+          boneRightForearm.position.set(0, 0);
+          boneRightHand.position.set(0, 0);
+          boneLeftCalf.position.set(0, 0);
+          boneLeftFoot.position.set(0, 0);
+          boneRightCalf.position.set(0, 0);
+          boneRightFoot.position.set(0, 0);
+          
+          boneWeapon.position.set(-4, 18);
+        };
+
+        // Define helper to setup Base joint positions
+        const setupBaseJoints = (isMale) => {
+          if (isMale) {
+            bonePelvis.position.set(0, -10);
+            boneTorso.position.set(0, -18);
+            boneHead.position.set(0, -22);
+            boneLeftArm.position.set(-14, -16);
+            boneLeftForearm.position.set(0, 20);
+            boneLeftHand.position.set(0, 16);
+            boneRightArm.position.set(14, -16);
+            boneRightForearm.position.set(0, 20);
+            boneRightHand.position.set(0, 16);
+            boneLeftLeg.position.set(-8, 5);
+            boneLeftCalf.position.set(0, 20);
+            boneLeftFoot.position.set(0, 18);
+            boneRightLeg.position.set(8, 5);
+            boneRightCalf.position.set(0, 20);
+            boneRightFoot.position.set(0, 18);
+            boneWeapon.position.set(-2, 10);
+          } else {
+            bonePelvis.position.set(0, -8);
+            boneTorso.position.set(0, -16);
+            boneHead.position.set(0, -18);
+            boneLeftArm.position.set(-12, -14);
+            boneLeftForearm.position.set(0, 18);
+            boneLeftHand.position.set(0, 12);
+            boneRightArm.position.set(12, -14);
+            boneRightForearm.position.set(0, 18);
+            boneRightHand.position.set(0, 12);
+            boneLeftLeg.position.set(-6, 4);
+            boneLeftCalf.position.set(0, 18);
+            boneLeftFoot.position.set(0, 14);
+            boneRightLeg.position.set(6, 4);
+            boneRightCalf.position.set(0, 18);
+            boneRightFoot.position.set(0, 14);
+            boneWeapon.position.set(-2, 8);
+          }
+        };
+
+        // Default to JRPG joints
+        setupJrpgJoints(); 
+
+        // Background cleaning helper to make pixels near white or near background color transparent
+        const makeWhiteTransparent = (canvas, bgR, bgG, bgB) => {
+          const ctx = canvas.getContext("2d");
+          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const data = imgData.data;
+          for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i+1];
+            const b = data[i+2];
+
+            // 1. Key out near-white pixels
+            const isNearWhite = (r > 230 && g > 230 && b > 230);
+            
+            // 2. Key out background color pixels within distance threshold
+            let isBgColor = false;
+            if (bgR !== undefined && bgG !== undefined && bgB !== undefined) {
+              const dist = Math.sqrt((r - bgR)**2 + (g - bgG)**2 + (b - bgB)**2);
+              if (dist < 50) {
+                isBgColor = true;
+              }
+            }
+
+            // 3. Key out light grayscale pixels (typically background/borders)
+            const max = Math.max(r, g, b);
+            const min = Math.min(r, g, b);
+            const isLightGrayscale = (max - min < 25) && (min > 110);
+
+            if (isNearWhite || isBgColor || isLightGrayscale) {
+              data[i+3] = 0;
+            }
+          }
+          ctx.putImageData(imgData, 0, 0);
+          return canvas.toDataURL("image/png");
+        };
+
+        // Load JRPG character skin
+        const loadSkeletalCharacter = (charIndex) => {
+          currentSkinType = "jrpg";
+          const charConfig = characters[charIndex];
+          sliceJrpcParts(charConfig.url, charConfig.cols, charConfig.rows, (parts) => {
+            // Update JRPG joints positions
+            setupJrpgJoints();
+
+            // Update JRPG textures
+            spritePelvis.texture = PIXI.Texture.EMPTY;
+            spriteTorso.texture = PIXI.Texture.from(parts.torso);
+            spriteHead.texture = PIXI.Texture.from(parts.head);
+            spriteLeftArm.texture = PIXI.Texture.from(parts.leftArm);
+            spriteLeftForearm.texture = PIXI.Texture.EMPTY;
+            spriteLeftHand.texture = PIXI.Texture.EMPTY;
+            spriteRightArm.texture = PIXI.Texture.from(parts.rightArm);
+            spriteRightForearm.texture = PIXI.Texture.EMPTY;
+            spriteRightHand.texture = PIXI.Texture.EMPTY;
+            spriteLeftLeg.texture = PIXI.Texture.from(parts.leftLeg);
+            spriteLeftCalf.texture = PIXI.Texture.EMPTY;
+            spriteLeftFoot.texture = PIXI.Texture.EMPTY;
+            spriteRightLeg.texture = PIXI.Texture.from(parts.rightLeg);
+            spriteRightCalf.texture = PIXI.Texture.EMPTY;
+            spriteRightFoot.texture = PIXI.Texture.EMPTY;
+
+            // Reset scales for JRPG sprites
+            const JRPG_SPRITES = [
+              spritePelvis, spriteTorso, spriteHead,
+              spriteLeftArm, spriteLeftForearm, spriteLeftHand,
+              spriteRightArm, spriteRightForearm, spriteRightHand,
+              spriteLeftLeg, spriteLeftCalf, spriteLeftFoot,
+              spriteRightLeg, spriteRightCalf, spriteRightFoot
+            ];
+            JRPG_SPRITES.forEach(s => s.scale.set(1.0));
+            spriteWeapon.scale.set(1.0);
+
+            // Ground the JRPG character and apply scale to skRoot
+            skRoot.scale.set(0.8);
+            skRoot.position.y = 242;
+
+            // Set visibility: only show JRPG main parts, hide sub-limbs and pelvis
+            spriteHead.visible = true;
+            spriteTorso.visible = true;
+            spriteLeftArm.visible = true;
+            spriteRightArm.visible = true;
+            spriteLeftLeg.visible = true;
+            spriteRightLeg.visible = true;
+
+            spritePelvis.visible = false;
+            spriteLeftForearm.visible = false;
+            spriteLeftHand.visible = false;
+            spriteRightForearm.visible = false;
+            spriteRightHand.visible = false;
+            spriteLeftCalf.visible = false;
+            spriteLeftFoot.visible = false;
+            spriteRightCalf.visible = false;
+            spriteRightFoot.visible = false;
+
+            // Update JRPG pivots dynamically based on cell dimensions
+            spriteHead.pivot.set(parts.cellW / 2, parts.cellH * 0.45);
+            spriteTorso.pivot.set(parts.cellW * 0.3, parts.cellH * 0.19);
+            spriteLeftArm.pivot.set(parts.cellW * 0.25, 0);
+            spriteRightArm.pivot.set(0, 0);
+            spriteLeftLeg.pivot.set(parts.cellW * 0.17, 0);
+            spriteRightLeg.pivot.set(parts.cellW * 0.17, 0);
+            
+            // Set unused pivots to 0
+            spritePelvis.pivot.set(0, 0);
+            spriteLeftForearm.pivot.set(0, 0);
+            spriteLeftHand.pivot.set(0, 0);
+            spriteRightForearm.pivot.set(0, 0);
+            spriteRightHand.pivot.set(0, 0);
+            spriteLeftCalf.pivot.set(0, 0);
+            spriteLeftFoot.pivot.set(0, 0);
+            spriteRightCalf.pivot.set(0, 0);
+            spriteRightFoot.pivot.set(0, 0);
+          });
+        };
+
+        const transparent1x1 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+
+        // Load pre-separated base humanoid figures (bald, underwear only)
+        const loadSkeletalBaseCharacter = (isMale) => {
+          currentSkinType = isMale ? "male" : "female";
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.onload = () => {
+            const imgW = img.width;
+            const imgH = img.height;
+
+            // Debug: Analyze image bounding boxes
+            if (isMale) {
+              const canvas = document.createElement("canvas");
+              canvas.width = imgW;
+              canvas.height = imgH;
+              const ctx = canvas.getContext("2d");
+              ctx.drawImage(img, 0, 0);
+              const imgData = ctx.getImageData(0, 0, imgW, imgH);
+              const data = imgData.data;
+              
+              const visited = new Uint8Array(imgW * imgH);
+              const components = [];
+              
+              for (let y = 0; y < imgH; y++) {
+                for (let x = 0; x < imgW; x++) {
+                  const idx = y * imgW + x;
+                  if (visited[idx]) continue;
+                  
+                  const pIdx = idx * 4;
+                  const r = data[pIdx];
+                  const g = data[pIdx+1];
+                  const b = data[pIdx+2];
+                  const a = data[pIdx+3];
+                  
+                  const isBg = (r > 240 && g > 240 && b > 240) || a < 10;
+                  
+                  if (!isBg) {
+                    const queue = [];
+                    queue.push([x, y]);
+                    visited[idx] = 1;
+                    
+                    let minX = x, maxX = x, minY = y, maxY = y;
+                    let count = 0;
+                    
+                    while (queue.length > 0) {
+                      const [cx, cy] = queue.shift();
+                      count++;
+                      
+                      if (cx < minX) minX = cx;
+                      if (cx > maxX) maxX = cx;
+                      if (cy < minY) minY = cy;
+                      if (cy > maxY) maxY = cy;
+                      
+                      const dirs = [
+                        [0, 1], [0, -1], [1, 0], [-1, 0]
+                      ];
+                      for (const [dx, dy] of dirs) {
+                        const nx = cx + dx;
+                        const ny = cy + dy;
+                        if (nx >= 0 && nx < imgW && ny >= 0 && ny < imgH) {
+                          const nIdx = ny * imgW + nx;
+                          if (!visited[nIdx]) {
+                            const npIdx = nIdx * 4;
+                            const nr = data[npIdx];
+                            const ng = data[npIdx+1];
+                            const nb = data[npIdx+2];
+                            const na = data[npIdx+3];
+                            const nisBg = (nr > 240 && ng > 240 && nb > 240) || na < 10;
+                            
+                            if (!nisBg) {
+                              visited[nIdx] = 1;
+                              queue.push([nx, ny]);
+                            }
+                          }
+                        }
+                      }
+                    }
+                    if (count > 200) { 
+                      components.push({
+                        count,
+                        minX, maxX, minY, maxY,
+                        xPct: parseFloat((minX / imgW).toFixed(4)),
+                        yPct: parseFloat((minY / imgH).toFixed(4)),
+                        wPct: parseFloat(((maxX - minX + 1) / imgW).toFixed(4)),
+                        hPct: parseFloat(((maxY - minY + 1) / imgH).toFixed(4))
+                      });
+                    }
+                  }
+                }
+              }
+              console.log("Found male base components:", JSON.stringify(components));
+            }
+
+            // Sample background color slightly inset to avoid borders
+            const bgCanvas = document.createElement("canvas");
+            bgCanvas.width = 1;
+            bgCanvas.height = 1;
+            const bgCtx = bgCanvas.getContext("2d");
+            bgCtx.drawImage(img, 10, 10, 1, 1, 0, 0, 1, 1);
+            const bgData = bgCtx.getImageData(0, 0, 1, 1).data;
+            const bgR = bgData[0];
+            const bgG = bgData[1];
+            const bgB = bgData[2];
+
+            const extractPart = (xPct, yPct, wPct, hPct) => {
+              const w = imgW * wPct;
+              const h = imgH * hPct;
+              const partCanvas = document.createElement("canvas");
+              partCanvas.width = w;
+              partCanvas.height = h;
+              const partCtx = partCanvas.getContext("2d");
+              partCtx.drawImage(img, imgW * xPct, imgH * yPct, w, h, 0, 0, w, h);
+              const dataUrl = makeWhiteTransparent(partCanvas, bgR, bgG, bgB);
+              return { dataUrl, canvas: partCanvas, width: w, height: h };
+            };
+
+            const parts = {};
+            if (isMale) {
+              // Male Base (Precise profile bounding boxes) - Derived from automated component scanning
+              parts.head = extractPart(0.4844, 0.0645, 0.1514, 0.416 * 0.42);
+              parts.torso = extractPart(0.4844, 0.0645 + 0.416 * 0.42, 0.1514, 0.416 * 0.58);
+              parts.pelvis = extractPart(0.4844, 0.4795, 0.1416, 0.1123);
+              
+              parts.leftUpperArm = extractPart(0.1641, 0.2578, 0.0791, 0.1582);
+              parts.rightUpperArm = parts.leftUpperArm;
+              
+              parts.leftForearm = extractPart(0.1641, 0.4336, 0.0566, 0.1367);
+              parts.rightForearm = parts.leftForearm;
+              
+              parts.leftHand = extractPart(0.1748, 0.584, 0.0654, 0.0869);
+              parts.rightHand = parts.leftHand;
+              
+              parts.leftThigh = extractPart(0.5137, 0.6084, 0.127, 0.3418);
+              parts.rightThigh = parts.leftThigh;
+              
+              parts.leftCalf = extractPart(0.6943, 0.7227, 0.0713, 0.1396);
+              parts.rightCalf = parts.leftCalf;
+              
+              parts.leftFoot = extractPart(0.6992, 0.8779, 0.1162, 0.0635);
+              parts.rightFoot = parts.leftFoot;
+            } else {
+              // Female Base (Precise profile bounding boxes)
+              // Component 0 contains both head and torso, so we split it vertically (top 42% is head, bottom 58% is torso)
+              parts.head = extractPart(0.4844, 0.0645, 0.1641, 0.3555 * 0.42);
+              parts.torso = extractPart(0.4844, 0.0645 + 0.3555 * 0.42, 0.1641, 0.3555 * 0.58);
+              parts.pelvis = { dataUrl: transparent1x1, width: 1, height: 1 };
+              
+              parts.leftUpperArm = extractPart(0.1641, 0.2598, 0.0742, 0.1543);
+              parts.rightUpperArm = parts.leftUpperArm;
+              
+              parts.leftForearm = extractPart(0.1641, 0.4355, 0.0547, 0.1328);
+              parts.rightForearm = parts.leftForearm;
+              
+              parts.leftHand = extractPart(0.180, 0.600, 0.0586, 0.084);
+              parts.rightHand = parts.leftHand;
+              
+              parts.leftThigh = extractPart(0.5156, 0.6094, 0.123, 0.3398);
+              parts.rightThigh = parts.leftThigh;
+              
+              parts.leftCalf = extractPart(0.706, 0.568, 0.0801, 0.1484);
+              parts.rightCalf = parts.leftCalf;
+              
+              parts.leftFoot = extractPart(0.716, 0.902, 0.1152, 0.0586);
+              parts.rightFoot = parts.leftFoot;
+            }             // Set scales and visibility for all base character parts
+             const baseScale = isMale ? 0.07 : 0.065;
+             // Assign textures for all 15 parts
+            spriteHead.texture = parts.head.canvas ? PIXI.Texture.from(parts.head.canvas) : PIXI.Texture.from(parts.head.dataUrl);
+            spriteTorso.texture = parts.torso.canvas ? PIXI.Texture.from(parts.torso.canvas) : PIXI.Texture.from(parts.torso.dataUrl);
+            spritePelvis.texture = parts.pelvis.canvas ? PIXI.Texture.from(parts.pelvis.canvas) : PIXI.Texture.from(parts.pelvis.dataUrl);
+            
+            spriteLeftArm.texture = parts.leftUpperArm.canvas ? PIXI.Texture.from(parts.leftUpperArm.canvas) : PIXI.Texture.from(parts.leftUpperArm.dataUrl);
+            spriteLeftForearm.texture = parts.leftForearm.canvas ? PIXI.Texture.from(parts.leftForearm.canvas) : PIXI.Texture.from(parts.leftForearm.dataUrl);
+            spriteLeftHand.texture = parts.leftHand.canvas ? PIXI.Texture.from(parts.leftHand.canvas) : PIXI.Texture.from(parts.leftHand.dataUrl);
+            
+            spriteRightArm.texture = parts.rightUpperArm.canvas ? PIXI.Texture.from(parts.rightUpperArm.canvas) : PIXI.Texture.from(parts.rightUpperArm.dataUrl);
+            spriteRightForearm.texture = parts.rightForearm.canvas ? PIXI.Texture.from(parts.rightForearm.canvas) : PIXI.Texture.from(parts.rightForearm.dataUrl);
+            spriteRightHand.texture = parts.rightHand.canvas ? PIXI.Texture.from(parts.rightHand.canvas) : PIXI.Texture.from(parts.rightHand.dataUrl);
+            
+            spriteLeftLeg.texture = parts.leftThigh.canvas ? PIXI.Texture.from(parts.leftThigh.canvas) : PIXI.Texture.from(parts.leftThigh.dataUrl);
+            spriteLeftCalf.texture = parts.leftCalf.canvas ? PIXI.Texture.from(parts.leftCalf.canvas) : PIXI.Texture.from(parts.leftCalf.dataUrl);
+            spriteLeftFoot.texture = parts.leftFoot.canvas ? PIXI.Texture.from(parts.leftFoot.canvas) : PIXI.Texture.from(parts.leftFoot.dataUrl);
+            
+            spriteRightLeg.texture = parts.rightThigh.canvas ? PIXI.Texture.from(parts.rightThigh.canvas) : PIXI.Texture.from(parts.rightThigh.dataUrl);
+            spriteRightCalf.texture = parts.rightCalf.canvas ? PIXI.Texture.from(parts.rightCalf.canvas) : PIXI.Texture.from(parts.rightCalf.dataUrl);
+            spriteRightFoot.texture = parts.rightFoot.canvas ? PIXI.Texture.from(parts.rightFoot.canvas) : PIXI.Texture.from(parts.rightFoot.dataUrl);
+
+            const BASE_SPRITES = [
+              spritePelvis, spriteTorso, spriteHead,
+              spriteLeftArm, spriteLeftForearm, spriteLeftHand,
+              spriteRightArm, spriteRightForearm, spriteRightHand,
+              spriteLeftLeg, spriteLeftCalf, spriteLeftFoot,
+              spriteRightLeg, spriteRightCalf, spriteRightFoot
+            ];
+            BASE_SPRITES.forEach(s => {
+              s.scale.set(baseScale);
+              s.visible = true; // Show all 15 parts for base character
+            });
+
+            // Ground the base character and apply scale to skRoot
+            skRoot.scale.set(1.6);
+            skRoot.position.y = isMale ? 204 : 233;
+
+            // Adjust proportions dynamically (unified model proportions for both genders)
+            const forearmScaleY = 1.0;
+            const calfScaleY = 1.0;
+            const thighScaleY = 0.6;
+
+            spriteLeftForearm.scale.set(baseScale, baseScale * forearmScaleY);
+            spriteRightForearm.scale.set(baseScale, baseScale * forearmScaleY);
+            spriteLeftCalf.scale.set(baseScale, baseScale * calfScaleY);
+            spriteRightCalf.scale.set(baseScale, baseScale * calfScaleY);
+            spriteLeftLeg.scale.set(baseScale, baseScale * thighScaleY);
+            spriteRightLeg.scale.set(baseScale, baseScale * thighScaleY);
+            spritePelvis.visible = false;
+
+            // Dynamically scale the weapon to match character size (baseScale * 7.5 makes it approx. 50% scale)
+            spriteWeapon.scale.set(baseScale * 7.5);
+
+            // Dynamic bone positioning based on sizes & scale (profile-view with joint center offset corrections)
+            bonePelvis.position.set(0, isMale ? 0 : 5);
+            
+            const pelvisH = 210;
+            boneTorso.position.set(0, -pelvisH * 0.45 * baseScale);
+            
+            boneHead.position.set(0, -parts.torso.height * 0.9 * baseScale);
+
+            // Shoulder joint position
+            boneLeftArm.position.set(0, -parts.torso.height * 0.8 * baseScale);
+            boneRightArm.position.set(0, -parts.torso.height * 0.8 * baseScale);
+
+            // Elbow joint position (relative to shoulder joint pivot in upper arm texture)
+            // topJointX is shoulder joint, botJointX is elbow joint in upper arm texture
+            const uArmTopX = 51.78;
+            const uArmBotX = 26.09;
+            const uArmElbowDx = (uArmBotX - uArmTopX) * baseScale;
+            const uArmElbowDy = parts.leftUpperArm.height * 0.9 * baseScale; // vertical length
+
+            boneLeftForearm.position.set(uArmElbowDx, uArmElbowDy);
+            boneRightForearm.position.set(uArmElbowDx, uArmElbowDy);
+
+            // Wrist joint position (relative to elbow joint pivot in forearm texture)
+            const foreTopX = 26.02;
+            const foreBotX = 34.00;
+            const foreWristDx = (foreBotX - foreTopX) * baseScale;
+            const foreWristDy = parts.leftForearm.height * forearmScaleY * 0.9 * baseScale;
+
+            boneLeftHand.position.set(foreWristDx, foreWristDy);
+            boneRightHand.position.set(foreWristDx, foreWristDy);
+
+            // Hip joint position on pelvis
+            boneLeftLeg.position.set(0, 0);
+            boneRightLeg.position.set(0, 0);
+
+            // Knee joint position (relative to hip joint pivot in thigh texture)
+            const thighTopX = 46.01;
+            const thighBotX = 59.43;
+            const thighKneeDx = (thighBotX - thighTopX) * baseScale;
+            const thighKneeDy = parts.leftThigh.height * thighScaleY * 0.9 * baseScale;
+
+            boneLeftCalf.position.set(thighKneeDx, thighKneeDy);
+            boneRightCalf.position.set(thighKneeDx, thighKneeDy);
+
+            // Ankle joint position (relative to knee joint pivot in calf texture)
+            const calfTopX = 59.66;
+            const calfBotX = 48.18;
+            const calfAnkleDx = (calfBotX - calfTopX) * baseScale;
+            const calfAnkleDy = parts.leftCalf.height * calfScaleY * 0.9 * baseScale;
+
+            boneLeftFoot.position.set(calfAnkleDx, calfAnkleDy);
+            boneRightFoot.position.set(calfAnkleDx, calfAnkleDy);
+
+            boneWeapon.position.set(-2, isMale ? 10 : 8);
+
+            // Update pivots dynamically using known widths/heights (aligned to exact joint pixel centers)
+            const updatePivots = (
+              head, torso, pelvis, uArm, forearm, hand, thigh, calf, foot,
+              uArmTopX, foreTopX, thighTopX, calfTopX,
+              sHead, sTorso, sPelvis, sLArm, sLFore, sLHand, sRArm, sRFore, sRHand, sLLeg, sLCalf, sLFoot, sRLeg, sRCalf, sRFoot
+            ) => {
+              sHead.pivot.set(head.width / 2, head.height * 0.9);
+              sTorso.pivot.set(torso.width / 2, torso.height * 0.95);
+              sPelvis.pivot.set(pelvis.width / 2, pelvis.height / 2);
+              
+              sLArm.pivot.set(uArmTopX, uArm.height * 0.1);
+              sLFore.pivot.set(foreTopX, forearm.height * 0.1);
+              sLHand.pivot.set(hand.width / 2, hand.height * 0.1);
+              
+              sRArm.pivot.set(uArmTopX, uArm.height * 0.1);
+              sRFore.pivot.set(foreTopX, forearm.height * 0.1);
+              sRHand.pivot.set(hand.width / 2, hand.height * 0.1);
+              
+              sLLeg.pivot.set(thighTopX, thigh.height * 0.1);
+              sLCalf.pivot.set(calfTopX, calf.height * 0.1);
+              sLFoot.pivot.set(foot.width * 0.2, foot.height * 0.2); // ankle joint is at back-top of foot
+              
+              sRLeg.pivot.set(thighTopX, thigh.height * 0.1);
+              sRCalf.pivot.set(calfTopX, calf.height * 0.1);
+              sRFoot.pivot.set(foot.width * 0.2, foot.height * 0.2);
+            };
+
+            updatePivots(
+              parts.head, parts.torso, parts.pelvis,
+              parts.leftUpperArm, parts.leftForearm, parts.leftHand,
+              parts.leftThigh, parts.leftCalf, parts.leftFoot,
+              uArmTopX, foreTopX, thighTopX, calfTopX,
+              spriteHead, spriteTorso, spritePelvis,
+              spriteLeftArm, spriteLeftForearm, spriteLeftHand,
+              spriteRightArm, spriteRightForearm, spriteRightHand,
+              spriteLeftLeg, spriteLeftCalf, spriteLeftFoot,
+              spriteRightLeg, spriteRightCalf, spriteRightFoot
+            );
+          };
+          img.src = (isMale ? "/male_base_parts.jpg" : "/female_base_parts.jpg") + "?v=" + Date.now();
+        };
+
+        // Load male base figure as default skeletal skin
+        loadSkeletalBaseCharacter(true);
+
+        // Expose debug interface
+        window.skDebug = {
+          skApp,
+          spritePelvis,
+          spriteTorso,
+          spriteHead,
+          spriteLeftArm,
+          spriteLeftForearm,
+          spriteLeftHand,
+          spriteRightArm,
+          spriteRightForearm,
+          spriteRightHand,
+          spriteLeftLeg,
+          spriteLeftCalf,
+          spriteLeftFoot,
+          spriteRightLeg,
+          spriteRightCalf,
+          spriteRightFoot,
+          spriteWeapon,
+          loadSkeletalBaseCharacter,
+          loadSkeletalCharacter
+        };
+
+        // Graphics layer for drawing bone skeleton overlays (similar to Spine Editor)
+        const bonesGraphics = new PIXI.Graphics();
+        skApp.stage.addChild(bonesGraphics);
+
+        // Dropdowns & Controls bindings
+        document.getElementById("sel-skeletal-anim").addEventListener("change", (e) => {
+          activeAnimation = e.target.value;
+          if (activeAnimation === "attack") {
+            attackProgress = 0;
+          } else if (activeAnimation === "special") {
+            specialProgress = 0;
+          }
+        });
+
+        document.getElementById("sel-skeletal-char").addEventListener("change", (e) => {
+          const val = e.target.value;
+          if (val === "male_base") {
+            loadSkeletalBaseCharacter(true);
+          } else if (val === "female_base") {
+            loadSkeletalBaseCharacter(false);
+          } else {
+            loadSkeletalCharacter(parseInt(val));
+          }
+        });
+
+        document.getElementById("sel-skeletal-weapon").addEventListener("change", (e) => {
+          const val = e.target.value;
+          spriteWeapon.texture = PIXI.Texture.from(textureUrls["weapon_" + val]);
+        });
+
+        // Ticker Loop for Skeletal Animations
+        skApp.ticker.add((delta) => {
+          // Pixi v7 ticker callback provides float deltaTime directly
+          animTime += 0.05 * delta;
+
+          // Reset rotations
+          let torsoBob = 0;
+          let headRot = 0;
+          
+          let lArmRot = 0;
+          let lForearmRot = 0;
+          let lHandRot = 0;
+          
+          let rArmRot = 0;
+          let rForearmRot = 0;
+          let rHandRot = 0;
+          
+          let lLegRot = 0;
+          let lCalfRot = 0;
+          let lFootRot = 0;
+          
+          let rLegRot = 0;
+          let rCalfRot = 0;
+          let rFootRot = 0;
+          
+          let torsoRot = 0;
+          let weaponRot = 0;
+
+          const isJRPG = (currentSkinType === "jrpg");
+          const baseArmOffset = (currentSkinType === "male" || currentSkinType === "female") ? -0.0 : 0.0;
+
+          if (activeAnimation === "idle") {
+            // 1. Idle breathing (Sine wave rotations)
+            torsoBob = Math.sin(animTime) * 1.0;
+            torsoRot = Math.sin(animTime) * 0.02;
+            headRot = Math.cos(animTime) * 0.03;
+            
+            lArmRot = baseArmOffset + Math.sin(animTime) * 0.05;
+            lForearmRot = Math.sin(animTime + 0.5) * 0.05 + 0.1;
+            rArmRot = baseArmOffset - Math.sin(animTime) * 0.05;
+            rForearmRot = isJRPG ? (-Math.sin(animTime + 0.5) * 0.05 + 0.1) : lForearmRot;
+
+            lLegRot = 0;
+            lCalfRot = 0.05;
+            rLegRot = 0;
+            rCalfRot = 0.05;
+            
+            bonePelvis.scale.y = 1.0 + Math.sin(animTime) * 0.01;
+            bonePelvis.scale.x = 1.0 - Math.sin(animTime) * 0.005;
+          } 
+          else if (activeAnimation === "walk") {
+            // 2. Walking swing cycle (opposite leg/arm swings)
+            torsoBob = Math.abs(Math.sin(animTime * 2.0)) * 1.5; // hip bounce
+            torsoRot = Math.sin(animTime) * 0.03;
+            headRot = -Math.sin(animTime) * 0.04;
+            
+            lArmRot = baseArmOffset + Math.sin(animTime) * 0.3;
+            rArmRot = baseArmOffset - Math.sin(animTime) * 0.3;
+            
+            lForearmRot = (Math.sin(animTime + Math.PI/2) * 0.15 + 0.2); 
+            rForearmRot = (-Math.sin(animTime + Math.PI/2) * 0.15 + 0.2);
+
+            lLegRot = -Math.sin(animTime) * 0.35;
+            lCalfRot = (Math.cos(animTime) > 0 ? Math.cos(animTime) * 0.4 : 0) + 0.1;
+            
+            rLegRot = Math.sin(animTime) * 0.35;
+            rCalfRot = (Math.cos(animTime + Math.PI) > 0 ? Math.cos(animTime + Math.PI) * 0.4 : 0) + 0.1;
+
+            lFootRot = Math.sin(animTime) * 0.1;
+            rFootRot = -Math.sin(animTime) * 0.1;
+
+            bonePelvis.scale.set(1.0);
+          }
+          else if (activeAnimation === "attack") {
+            // 3. Swing Attack Cycle (Raise arm to 90 deg and bounce up by 15 deg)
+            attackProgress += 1.8 * delta;
+            
+            if (attackProgress < 20) {
+              // Raise arm to 90 degrees (1.57 rad)
+              const ratio = attackProgress / 20;
+              lArmRot = baseArmOffset + ratio * 1.57;
+              lForearmRot = ratio * 0.3;
+              lHandRot = -ratio * 0.1;
+              weaponRot = ratio * 0.2;
+            } else if (attackProgress < 25) {
+              // Bounce up by 15 degrees (0.26 rad) quickly
+              const ratio = (attackProgress - 20) / 5;
+              lArmRot = baseArmOffset + 1.57 + ratio * 0.26;
+              lForearmRot = 0.3 - ratio * 0.2;
+              lHandRot = -0.1 + ratio * 0.3;
+              weaponRot = 0.2 + ratio * 0.4;
+            } else if (attackProgress < 30) {
+              // Return from bounce quickly
+              const ratio = (attackProgress - 25) / 5;
+              lArmRot = baseArmOffset + 1.83 - ratio * 0.26;
+              lForearmRot = 0.1 + ratio * 0.2;
+              lHandRot = 0.2 - ratio * 0.3;
+              weaponRot = 0.6 - ratio * 0.4;
+            } else if (attackProgress < 50) {
+              // Slow recovery
+              const ratio = (attackProgress - 30) / 20;
+              lArmRot = baseArmOffset + 1.57 - ratio * 1.57;
+              lForearmRot = 0.3 - ratio * 0.3;
+              lHandRot = -ratio * 0.0;
+              weaponRot = 0.2 - ratio * 0.2;
+            } else {
+              attackProgress = 0;
+            }
+
+            // Symmetrize the right arm/forearm/wrist rotations to balance the swing in profile view
+            rArmRot = baseArmOffset - (lArmRot - baseArmOffset) * 0.5;
+            rForearmRot = -lForearmRot * 0.5;
+            rHandRot = -lHandRot * 0.5;
+          }
+          else if (activeAnimation === "special") {
+            // 4. Special Action (Both arms raised then thrust forward)
+            specialProgress += 1.8 * delta;
+            
+            if (specialProgress < 25) {
+              // 1. Raise both arms above head (wind-up)
+              const ratio = specialProgress / 25;
+              lArmRot = baseArmOffset - ratio * 2.2;
+              rArmRot = baseArmOffset - ratio * 2.0; // slightly offset for depth
+              lForearmRot = ratio * 0.5;
+              rForearmRot = ratio * 0.5;
+              torsoRot = -ratio * 0.2;
+              headRot = -ratio * 0.1;
+              weaponRot = -ratio * 0.5;
+            } else if (specialProgress < 35) {
+              // 2. Thrust forward quickly
+              const ratio = (specialProgress - 25) / 10;
+              lArmRot = baseArmOffset - 2.2 + ratio * 3.4; // goes from -2.2 to 1.2
+              rArmRot = baseArmOffset - 2.0 + ratio * 3.2; // goes from -2.0 to 1.2
+              lForearmRot = 0.5 - ratio * 0.5;
+              rForearmRot = 0.5 - ratio * 0.5;
+              torsoRot = -0.2 + ratio * 0.45;
+              headRot = -0.1 + ratio * 0.2;
+              weaponRot = -0.5 + ratio * 2.0;
+              torsoBob = -ratio * 5.0; // lunge forward
+            } else if (specialProgress < 60) {
+              // 3. Recover to idle
+              const ratio = (specialProgress - 35) / 25;
+              lArmRot = baseArmOffset + 1.2 - ratio * 1.2;
+              rArmRot = baseArmOffset + 1.2 - ratio * 1.2;
+              lForearmRot = ratio * 0.1;
+              rForearmRot = ratio * 0.1;
+              torsoRot = 0.25 - ratio * 0.25;
+              headRot = 0.1 - ratio * 0.1;
+              weaponRot = 1.5 - ratio * 1.5;
+              torsoBob = -5.0 + ratio * 5.0;
+            } else {
+              specialProgress = 0;
+            }
+          }
+
+          // Apply calculated values to bones containers
+          let pelvisY = 0;
+          if (currentSkinType === "male") pelvisY = 0;
+          else if (currentSkinType === "female") pelvisY = 5;
+
+          bonePelvis.position.y = pelvisY + torsoBob;
+          boneTorso.rotation = torsoRot;
+          boneHead.rotation = headRot;
+          
+          boneLeftArm.rotation = lArmRot;
+          boneLeftForearm.rotation = lForearmRot;
+          boneLeftHand.rotation = lHandRot;
+          
+          boneRightArm.rotation = rArmRot;
+          boneRightForearm.rotation = rForearmRot;
+          boneRightHand.rotation = rHandRot;
+          
+          boneLeftLeg.rotation = lLegRot;
+          boneLeftCalf.rotation = lCalfRot;
+          boneLeftFoot.rotation = lFootRot;
+          
+          boneRightLeg.rotation = rLegRot;
+          boneRightCalf.rotation = rCalfRot;
+          boneRightFoot.rotation = rFootRot;
+          
+          boneWeapon.rotation = weaponRot;
+
+          // Draw Bone lines overlay if checked
+          bonesGraphics.clear();
+          if (document.getElementById("chk-skeletal-bones").checked) {
+            bonesGraphics.lineStyle(2, 0x00e5ff, 0.8);
+
+            // Get global positions of joints
+            const rootPos = skRoot.toGlobal(new PIXI.Point(0, 0));
+            const pelvisPos = skRoot.toGlobal(bonePelvis.position);
+            const torsoPos = bonePelvis.toGlobal(boneTorso.position);
+            const headPos = boneTorso.toGlobal(boneHead.position);
+            
+            const shL = boneTorso.toGlobal(boneLeftArm.position);
+            const elbowL = boneLeftArm.toGlobal(boneLeftForearm.position);
+            const handL = boneLeftForearm.toGlobal(boneLeftHand.position);
+            
+            const shR = boneTorso.toGlobal(boneRightArm.position);
+            const elbowR = boneRightArm.toGlobal(boneRightForearm.position);
+            const handR = boneRightForearm.toGlobal(boneRightHand.position);
+            
+            const hipL = bonePelvis.toGlobal(boneLeftLeg.position);
+            const kneeL = boneLeftLeg.toGlobal(boneLeftCalf.position);
+            const footL = boneLeftCalf.toGlobal(boneLeftFoot.position);
+            
+            const hipR = bonePelvis.toGlobal(boneRightLeg.position);
+            const kneeR = boneRightLeg.toGlobal(boneRightCalf.position);
+            const footR = boneRightCalf.toGlobal(boneRightFoot.position);
+
+            // Draw lines
+            bonesGraphics.moveTo(rootPos.x, rootPos.y);
+            bonesGraphics.lineTo(pelvisPos.x, pelvisPos.y);
+            bonesGraphics.lineTo(torsoPos.x, torsoPos.y);
+            bonesGraphics.lineTo(headPos.x, headPos.y);
+
+            // Left Arm
+            bonesGraphics.moveTo(torsoPos.x, torsoPos.y);
+            bonesGraphics.lineTo(shL.x, shL.y);
+            bonesGraphics.lineTo(elbowL.x, elbowL.y);
+            bonesGraphics.lineTo(handL.x, handL.y);
+
+            // Right Arm
+            bonesGraphics.moveTo(torsoPos.x, torsoPos.y);
+            bonesGraphics.lineTo(shR.x, shR.y);
+            bonesGraphics.lineTo(elbowR.x, elbowR.y);
+            bonesGraphics.lineTo(handR.x, handR.y);
+
+            // Left Leg
+            bonesGraphics.moveTo(pelvisPos.x, pelvisPos.y);
+            bonesGraphics.lineTo(hipL.x, hipL.y);
+            bonesGraphics.lineTo(kneeL.x, kneeL.y);
+            bonesGraphics.lineTo(footL.x, footL.y);
+
+            // Right Leg
+            bonesGraphics.moveTo(pelvisPos.x, pelvisPos.y);
+            bonesGraphics.lineTo(hipR.x, hipR.y);
+            bonesGraphics.lineTo(kneeR.x, kneeR.y);
+            bonesGraphics.lineTo(footR.x, footR.y);
+
+            // Draw joint dots
+            const joints = [rootPos, pelvisPos, torsoPos, headPos, shL, elbowL, handL, shR, elbowR, handR, hipL, kneeL, footL, hipR, kneeR, footR];
+            joints.forEach(j => {
+              bonesGraphics.beginFill(0xff007f);
+              bonesGraphics.drawCircle(j.x, j.y, 4);
+              bonesGraphics.endFill();
+            });
+          }
+        });
+      }
+    }
+  </script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const tabButtons = document.querySelectorAll(".diag-tab-btn");
+      const tabContents = document.querySelectorAll(".diag-tab-content");
+
+      tabButtons.forEach(btn => {
+        btn.addEventListener("click", () => {
+          const targetTab = btn.getAttribute("data-tab");
+
+          // Remove active class from buttons
+          tabButtons.forEach(b => b.classList.remove("active"));
+          // Hide all contents
+          tabContents.forEach(c => c.classList.remove("active-content"));
+
+          // Add active class to clicked button
+          btn.classList.add("active");
+          // Show active content
+          const activeEl = document.getElementById(targetTab);
+          if (activeEl) {
+            activeEl.classList.add("active-content");
+          }
+
+          // Trigger window resize to adjust PixiJS WebGL canvas layout inside tabs
+          setTimeout(() => {
+            window.dispatchEvent(new Event("resize"));
+          }, 50);
+        });
+      });
+    });
+  </script>
+</body>
+</html>

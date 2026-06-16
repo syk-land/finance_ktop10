@@ -1,11 +1,15 @@
 {
-  "name": "ninthinning",
+  "name": "project-2100",
   "private": true,
+  "version": "1.0.0",
   "type": "module",
-  "description": "정적 웹 게임 — probe.mjs 실행을 위해 ESM 모드만 지정. 빌드/의존성 없음.",
   "scripts": {
-    "probe": "node probe.mjs",
-    "probe:career": "node probe-career.mjs",
-    "probe:regression": "node probe-regression.mjs"
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0",
+    "ws": "^8.21.0"
   }
 }
