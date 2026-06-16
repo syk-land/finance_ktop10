@@ -767,6 +767,8 @@
             </select>
           </div>
 
+
+
           <!-- Show Bones -->
           <div style="display:flex; align-items:center; gap:8px; color:#fff; font-size:11px;">
             <input type="checkbox" id="chk-skeletal-bones" checked>
@@ -774,6 +776,7 @@
           </div>
         </div>
 
+        <!-- Canvas Container -->
         <div id="pixi-skeletal-container" style="width: 100%; height: 320px; border: 2px solid var(--neon-pink); border-radius: 8px; overflow: hidden; background: #07090e; position: relative; box-shadow: 0 0 20px rgba(255, 0, 127, 0.15);"></div>
       </div>
     </div>
@@ -1624,6 +1627,42 @@
                   <stop offset="0%" stop-color="rgba(0,0,0,0.6)" />
                   <stop offset="100%" stop-color="rgba(0,0,0,0)" />
                 </linearGradient>
+                <linearGradient id="cyan-plasma-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#00f2fe" />
+                  <stop offset="100%" stop-color="#4facfe" />
+                </linearGradient>
+                <linearGradient id="quantum-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#2196f3" />
+                  <stop offset="100%" stop-color="#0d47a1" />
+                </linearGradient>
+                <linearGradient id="blood-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#d50000" />
+                  <stop offset="100%" stop-color="#5d0000" />
+                </linearGradient>
+                <linearGradient id="bone-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#fffff0" />
+                  <stop offset="100%" stop-color="#d7ccc8" />
+                </linearGradient>
+                <linearGradient id="fire-grad" x1="0%" y1="100%" x2="0%" y2="0%">
+                  <stop offset="0%" stop-color="#ff3d00" />
+                  <stop offset="50%" stop-color="#ff9100" />
+                  <stop offset="100%" stop-color="#ffea00" />
+                </linearGradient>
+                <linearGradient id="aurora-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#00e5ff" />
+                  <stop offset="50%" stop-color="#00e676" />
+                  <stop offset="100%" stop-color="#d500f9" />
+                </linearGradient>
+                <linearGradient id="steel-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#b0bec5" />
+                  <stop offset="50%" stop-color="#78909c" />
+                  <stop offset="100%" stop-color="#37474f" />
+                </linearGradient>
+                <radialGradient id="void-aura-grad" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="rgba(186,104,200,0.8)" />
+                  <stop offset="70%" stop-color="rgba(74,20,140,0.4)" />
+                  <stop offset="100%" stop-color="rgba(0,0,0,0)" />
+                </radialGradient>
               </defs>
               ${svgContent}
             </svg>
@@ -1743,7 +1782,7 @@
         spriteWeapon.pivot.set(40, 40);
 
         // Setup parent-child hierarchy & Add Sprites in exact rendering order (layering)
-        // 1. Pelvis setup (Pelvis sprite rendered behind Torso and Legs)
+        // 1. Pelvis setup (Pelvis sprite rendered behind Torso and Legs, Aura rendered under character)
         skRoot.addChild(bonePelvis);
         bonePelvis.addChild(spritePelvis);
         bonePelvis.addChild(boneLeftLeg);
@@ -1967,6 +2006,8 @@
             spriteLeftFoot.pivot.set(0, 0);
             spriteRightCalf.pivot.set(0, 0);
             spriteRightFoot.pivot.set(0, 0);
+            
+
           });
         };
 
@@ -2317,6 +2358,175 @@
         const bonesGraphics = new PIXI.Graphics();
         skApp.stage.addChild(bonesGraphics);
 
+        // Particles layer for Skeletal Rig effects
+        const skParticlesContainer = new PIXI.Container();
+        skApp.stage.addChild(skParticlesContainer);
+        const skParticles = [];
+
+        // Function to spawn visual shooting effects based on equipped weapon (firing to the right)
+        function spawnSkeletalShootEffect(x, y, isSpecial = false) {
+          const weaponVal = document.getElementById("sel-skeletal-weapon").value;
+          
+          if (weaponVal === "nuclear_gun") {
+            // 정신 파동 링 (Mind Blaster) - Cyan/Magenta pulse rings and plasma bullets
+            const bulletColor = 0x00e5ff;
+            const sparkColor = 0xe040fb;
+            
+            const ringCount = isSpecial ? 3 : 1;
+            for (let r = 0; r < ringCount; r++) {
+              const ring = new PIXI.Graphics();
+              ring.lineStyle(3, bulletColor, 0.8 - r * 0.2);
+              ring.drawCircle(0, 0, 10);
+              ring.x = x;
+              ring.y = y;
+              ring.alpha = 1.0;
+              ring.scaleSpeed = 1.5 + r * 0.6;
+              ring.fadeSpeed = 0.06;
+              ring.vx = 0;
+              ring.vy = 0;
+              ring.gravity = 0;
+              skParticlesContainer.addChild(ring);
+              skParticles.push(ring);
+            }
+            
+            const bulletCount = isSpecial ? 6 : 2;
+            for (let b = 0; b < bulletCount; b++) {
+              const bullet = new PIXI.Graphics();
+              bullet.beginFill(bulletColor);
+              bullet.drawEllipse(0, 0, isSpecial ? 18 : 12, isSpecial ? 6 : 4);
+              bullet.endFill();
+              bullet.x = x;
+              bullet.y = y + (bulletCount > 1 ? (b - (bulletCount-1)/2) * 8 : 0);
+              bullet.vx = 15 + Math.random() * 5; // Fire to the right (positive vx)
+              bullet.vy = (Math.random() - 0.5) * 1.5;
+              bullet.alpha = 1.0;
+              bullet.fadeSpeed = 0.025;
+              bullet.gravity = 0;
+              skParticlesContainer.addChild(bullet);
+              skParticles.push(bullet);
+            }
+            
+            const sparkCount = isSpecial ? 35 : 18;
+            for (let i = 0; i < sparkCount; i++) {
+              const p = new PIXI.Graphics();
+              p.beginFill(Math.random() > 0.5 ? bulletColor : sparkColor);
+              p.drawCircle(0, 0, 2 + Math.random() * 3);
+              p.endFill();
+              p.x = x;
+              p.y = y;
+              
+              const angle = (Math.random() - 0.5) * 1.0; // Spread to the right (around 0 rad)
+              const speed = 4 + Math.random() * 8;
+              p.vx = Math.cos(angle) * speed;
+              p.vy = Math.sin(angle) * speed;
+              p.alpha = 1.0;
+              p.gravity = 0.05;
+              p.fadeSpeed = 0.03 + Math.random() * 0.03;
+              skParticlesContainer.addChild(p);
+              skParticles.push(p);
+            }
+          }
+          else if (weaponVal === "scrap_sword") {
+            // 키메라 요술봉 (Scrap Wand) - Pink/Gold stars & sparkles
+            const primaryColor = 0xff4081;
+            const secondaryColor = 0xffd54f;
+            
+            const starProjCount = isSpecial ? 3 : 1;
+            for (let s = 0; s < starProjCount; s++) {
+              const star = new PIXI.Graphics();
+              star.beginFill(primaryColor);
+              star.drawCircle(0, 0, isSpecial ? 14 : 10);
+              star.endFill();
+              star.x = x;
+              star.y = y + (starProjCount > 1 ? (s - (starProjCount-1)/2) * 10 : 0);
+              star.vx = 10 + Math.random() * 4; // Fire to the right (positive vx)
+              star.vy = (Math.random() - 0.5) * 1.5;
+              star.alpha = 1.0;
+              star.scaleSpeed = -0.01;
+              star.fadeSpeed = 0.02;
+              star.gravity = 0;
+              skParticlesContainer.addChild(star);
+              skParticles.push(star);
+            }
+            
+            const starCount = isSpecial ? 30 : 15;
+            for (let i = 0; i < starCount; i++) {
+              const p = new PIXI.Graphics();
+              p.beginFill(Math.random() > 0.5 ? primaryColor : secondaryColor);
+              p.moveTo(0, -5);
+              p.lineTo(1.5, -1.5);
+              p.lineTo(5, 0);
+              p.lineTo(1.5, 1.5);
+              p.lineTo(0, 5);
+              p.lineTo(-1.5, 1.5);
+              p.lineTo(-5, 0);
+              p.lineTo(-1.5, -1.5);
+              p.closePath();
+              p.endFill();
+              p.x = x;
+              p.y = y;
+              
+              const angle = (Math.random() - 0.5) * 1.6; // Spread to the right
+              const speed = 3 + Math.random() * 6;
+              p.vx = Math.cos(angle) * speed;
+              p.vy = Math.sin(angle) * speed - 1.0;
+              p.alpha = 1.0;
+              p.gravity = 0.08;
+              p.fadeSpeed = 0.02 + Math.random() * 0.02;
+              p.vr = (Math.random() - 0.5) * 0.15;
+              skParticlesContainer.addChild(p);
+              skParticles.push(p);
+            }
+          }
+          else if (weaponVal === "bio_claw") {
+            // 땅콩 주머니 (Peanut Bag) - Yellow/Brown peanut projectile bursts
+            const peanutColor = 0xffe082;
+            const outlineColor = 0xbcaaa4;
+            
+            const bulletCount = isSpecial ? 8 : 4;
+            for (let i = 0; i < bulletCount; i++) {
+              const p = new PIXI.Graphics();
+              p.beginFill(peanutColor);
+              p.lineStyle(1.5, outlineColor, 1.0);
+              p.drawEllipse(0, 0, 6, 3.5);
+              p.endFill();
+              p.x = x;
+              p.y = y + (Math.random() - 0.5) * 16;
+              
+              const angle = (Math.random() - 0.5) * 0.35; // Fire to the right
+              const speed = 11 + Math.random() * 7;
+              p.vx = Math.cos(angle) * speed;
+              p.vy = Math.sin(angle) * speed;
+              p.rotation = angle;
+              p.alpha = 1.0;
+              p.gravity = 0.06;
+              p.fadeSpeed = 0.02;
+              skParticlesContainer.addChild(p);
+              skParticles.push(p);
+            }
+            
+            const dustCount = isSpecial ? 20 : 10;
+            for (let i = 0; i < dustCount; i++) {
+              const p = new PIXI.Graphics();
+              p.beginFill(0xffe082);
+              p.drawCircle(0, 0, 1.5 + Math.random() * 2);
+              p.endFill();
+              p.x = x;
+              p.y = y;
+              
+              const angle = (Math.random() - 0.5) * 1.4; // Spread to the right
+              const speed = 2 + Math.random() * 4;
+              p.vx = Math.cos(angle) * speed;
+              p.vy = Math.sin(angle) * speed;
+              p.alpha = 0.8;
+              p.gravity = 0.05;
+              p.fadeSpeed = 0.025;
+              skParticlesContainer.addChild(p);
+              skParticles.push(p);
+            }
+          }
+        }
+
         // Dropdowns & Controls bindings
         document.getElementById("sel-skeletal-anim").addEventListener("change", (e) => {
           activeAnimation = e.target.value;
@@ -2343,10 +2553,35 @@
           spriteWeapon.texture = PIXI.Texture.from(textureUrls["weapon_" + val]);
         });
 
+
+
         // Ticker Loop for Skeletal Animations
         skApp.ticker.add((delta) => {
           // Pixi v7 ticker callback provides float deltaTime directly
           animTime += 0.05 * delta;
+
+          // Update skeletal particles
+          for (let i = skParticles.length - 1; i >= 0; i--) {
+            const p = skParticles[i];
+            p.x += p.vx * delta;
+            p.y += p.vy * delta;
+            p.vy += p.gravity * delta;
+            p.alpha -= p.fadeSpeed * delta;
+            
+            if (p.scaleSpeed) {
+              p.scale.x += p.scaleSpeed * delta;
+              p.scale.y += p.scaleSpeed * delta;
+            }
+            if (p.vr) {
+              p.rotation += p.vr * delta;
+            }
+
+            if (p.alpha <= 0 || p.scale.x <= 0) {
+              skParticlesContainer.removeChild(p);
+              p.destroy();
+              skParticles.splice(i, 1);
+            }
+          }
 
           // Reset rotations
           let torsoBob = 0;
@@ -2417,39 +2652,62 @@
             bonePelvis.scale.set(1.0);
           }
           else if (activeAnimation === "attack") {
-            // 3. Swing Attack Cycle (Raise arm to 90 deg and bounce up by 15 deg)
+            // 3. Shooting Attack Cycle (Raise weapon arm to 90 deg right, fire with recoil bounce, recover)
+            const prevProgress = attackProgress;
             attackProgress += 1.8 * delta;
             
-            if (attackProgress < 20) {
-              // Raise arm to 90 degrees (1.57 rad)
-              const ratio = attackProgress / 20;
-              lArmRot = baseArmOffset + ratio * 1.57;
-              lForearmRot = ratio * 0.3;
-              lHandRot = -ratio * 0.1;
-              weaponRot = ratio * 0.2;
-            } else if (attackProgress < 25) {
-              // Bounce up by 15 degrees (0.26 rad) quickly
-              const ratio = (attackProgress - 20) / 5;
-              lArmRot = baseArmOffset + 1.57 + ratio * 0.26;
-              lForearmRot = 0.3 - ratio * 0.2;
-              lHandRot = -0.1 + ratio * 0.3;
-              weaponRot = 0.2 + ratio * 0.4;
-            } else if (attackProgress < 30) {
-              // Return from bounce quickly
-              const ratio = (attackProgress - 25) / 5;
-              lArmRot = baseArmOffset + 1.83 - ratio * 0.26;
-              lForearmRot = 0.1 + ratio * 0.2;
-              lHandRot = 0.2 - ratio * 0.3;
-              weaponRot = 0.6 - ratio * 0.4;
-            } else if (attackProgress < 50) {
-              // Slow recovery
-              const ratio = (attackProgress - 30) / 20;
-              lArmRot = baseArmOffset + 1.57 - ratio * 1.57;
-              lForearmRot = 0.3 - ratio * 0.3;
-              lHandRot = -ratio * 0.0;
-              weaponRot = 0.2 - ratio * 0.2;
+            if (attackProgress < 15) {
+              // Raise arm to 90 degrees right (-1.57 rad)
+              const ratio = attackProgress / 15;
+              lArmRot = baseArmOffset - ratio * 1.57;
+              lForearmRot = ratio * 0.1;
+              lHandRot = -ratio * 0.05;
+              weaponRot = -ratio * 0.1;
+              torsoRot = ratio * 0.04;
+              headRot = ratio * 0.02;
+            } else if (attackProgress < 18) {
+              // Hold aim for firing
+              lArmRot = baseArmOffset - 1.57;
+              lForearmRot = 0.1;
+              lHandRot = -0.05;
+              weaponRot = -0.1;
+              torsoRot = 0.04;
+              headRot = 0.02;
+            } else if (attackProgress < 23) {
+              // Recoil: bounce up by 20 degrees (-0.35 rad) quickly after firing at 18 (goes from -1.57 to -1.92 rad)
+              const ratio = (attackProgress - 18) / 5;
+              lArmRot = baseArmOffset - 1.57 - ratio * 0.35;
+              lForearmRot = 0.1 - ratio * 0.15;
+              lHandRot = -0.05 + ratio * 0.2;
+              weaponRot = -0.1 - ratio * 0.3;
+              torsoRot = 0.04 - ratio * 0.08;
+              headRot = 0.02 - ratio * 0.05;
+            } else if (attackProgress < 28) {
+              // Recover from bounce back to aiming pose
+              const ratio = (attackProgress - 23) / 5;
+              lArmRot = baseArmOffset - 1.92 + ratio * 0.35;
+              lForearmRot = -0.05 + ratio * 0.15;
+              lHandRot = 0.15 - ratio * 0.2;
+              weaponRot = -0.4 + ratio * 0.3;
+              torsoRot = -0.04 + ratio * 0.08;
+              headRot = -0.03 + ratio * 0.05;
+            } else if (attackProgress < 48) {
+              // Slow recovery to resting pose
+              const ratio = (attackProgress - 28) / 20;
+              lArmRot = baseArmOffset - 1.57 + ratio * 1.57;
+              lForearmRot = 0.1 - ratio * 0.1;
+              lHandRot = -0.05 + ratio * 0.05;
+              weaponRot = -0.1 + ratio * 0.1;
+              torsoRot = 0.04 - ratio * 0.04;
+              headRot = 0.02 - ratio * 0.02;
             } else {
               attackProgress = 0;
+            }
+
+            // Trigger firing effect at progress 18
+            if (prevProgress < 18 && attackProgress >= 18) {
+              const muzzlePos = boneWeapon.toGlobal(new PIXI.Point(-30, 0));
+              spawnSkeletalShootEffect(muzzlePos.x, muzzlePos.y, false);
             }
 
             // Symmetrize the right arm/forearm/wrist rotations to balance the swing in profile view
@@ -2458,43 +2716,72 @@
             rHandRot = -lHandRot * 0.5;
           }
           else if (activeAnimation === "special") {
-            // 4. Special Action (Both arms raised then thrust forward)
+            // 4. Special Action (Raise both arms high above head then lower to 90 deg right to shoot with recoil)
+            const prevProgress = specialProgress;
             specialProgress += 1.8 * delta;
             
             if (specialProgress < 25) {
-              // 1. Raise both arms above head (wind-up)
+              // 1. Raise both arms high above head (wind-up, fully straight arms)
               const ratio = specialProgress / 25;
-              lArmRot = baseArmOffset - ratio * 2.2;
-              rArmRot = baseArmOffset - ratio * 2.0; // slightly offset for depth
-              lForearmRot = ratio * 0.5;
-              rForearmRot = ratio * 0.5;
-              torsoRot = -ratio * 0.2;
-              headRot = -ratio * 0.1;
-              weaponRot = -ratio * 0.5;
-            } else if (specialProgress < 35) {
-              // 2. Thrust forward quickly
-              const ratio = (specialProgress - 25) / 10;
-              lArmRot = baseArmOffset - 2.2 + ratio * 3.4; // goes from -2.2 to 1.2
-              rArmRot = baseArmOffset - 2.0 + ratio * 3.2; // goes from -2.0 to 1.2
-              lForearmRot = 0.5 - ratio * 0.5;
-              rForearmRot = 0.5 - ratio * 0.5;
-              torsoRot = -0.2 + ratio * 0.45;
-              headRot = -0.1 + ratio * 0.2;
-              weaponRot = -0.5 + ratio * 2.0;
-              torsoBob = -ratio * 5.0; // lunge forward
-            } else if (specialProgress < 60) {
-              // 3. Recover to idle
-              const ratio = (specialProgress - 35) / 25;
-              lArmRot = baseArmOffset + 1.2 - ratio * 1.2;
-              rArmRot = baseArmOffset + 1.2 - ratio * 1.2;
+              lArmRot = baseArmOffset - ratio * 2.9; // Pointing almost straight up
+              rArmRot = baseArmOffset - ratio * 2.7; 
+              lForearmRot = -ratio * 0.1; // Keep forearm straight
+              rForearmRot = -ratio * 0.1;
+              lHandRot = 0;
+              rHandRot = 0;
+              torsoRot = -ratio * 0.18; // Lean back significantly
+              headRot = -ratio * 0.15;  // Look upwards
+              weaponRot = -ratio * 1.2;  // Weapon pointing straight up
+            } else if (specialProgress < 37) {
+              // 2. Lower arms from head-height to 90 degrees right (-1.57 rad)
+              const ratio = (specialProgress - 25) / 12;
+              lArmRot = baseArmOffset - 2.9 + ratio * 1.33; // Bring down to -1.57 rad
+              rArmRot = baseArmOffset - 2.7 + ratio * 1.13;
+              lForearmRot = -0.1 + ratio * 0.2;
+              rForearmRot = -0.1 + ratio * 0.2;
+              lHandRot = 0;
+              rHandRot = 0;
+              torsoRot = -0.18 + ratio * 0.28; // Lean slightly forward (+0.1)
+              headRot = -0.15 + ratio * 0.17;  // Look straight forward
+              weaponRot = -1.2 + ratio * 1.1;  // Weapon pointing right (-0.1 rad)
+            } else if (specialProgress < 43) {
+              // 3. Recoil: bounce up by 25 degrees quickly after firing (goes from -1.57 to -2.02 rad)
+              const ratio = (specialProgress - 37) / 6;
+              lArmRot = baseArmOffset - 1.57 - ratio * 0.45;
+              rArmRot = baseArmOffset - 1.57 - ratio * 0.45;
+              lForearmRot = 0.1 - ratio * 0.1;
+              rForearmRot = 0.1 - ratio * 0.1;
+              weaponRot = -0.1 - ratio * 0.6;
+              torsoRot = 0.1 - ratio * 0.25; // Lean back from recoil
+              headRot = 0.02 - ratio * 0.15;
+            } else if (specialProgress < 49) {
+              // 4. Recover from bounce back to aiming pose
+              const ratio = (specialProgress - 43) / 6;
+              lArmRot = baseArmOffset - 2.02 + ratio * 0.45;
+              rArmRot = baseArmOffset - 2.02 + ratio * 0.45;
               lForearmRot = ratio * 0.1;
               rForearmRot = ratio * 0.1;
-              torsoRot = 0.25 - ratio * 0.25;
-              headRot = 0.1 - ratio * 0.1;
-              weaponRot = 1.5 - ratio * 1.5;
-              torsoBob = -5.0 + ratio * 5.0;
+              weaponRot = -0.7 + ratio * 0.6;
+              torsoRot = -0.15 + ratio * 0.1;
+              headRot = -0.13 + ratio * 0.05;
+            } else if (specialProgress < 75) {
+              // 5. Slow recovery to resting pose
+              const ratio = (specialProgress - 49) / 26;
+              lArmRot = baseArmOffset - 1.57 + ratio * 1.57;
+              rArmRot = baseArmOffset - 1.57 + ratio * 1.57;
+              lForearmRot = ratio * 0.1;
+              rForearmRot = ratio * 0.1;
+              torsoRot = -0.05 + ratio * 0.05;
+              headRot = -0.08 + ratio * 0.08;
+              weaponRot = -0.1 + ratio * 0.1;
             } else {
               specialProgress = 0;
+            }
+
+            // Trigger special firing effect at progress 37
+            if (prevProgress < 37 && specialProgress >= 37) {
+              const muzzlePos = boneWeapon.toGlobal(new PIXI.Point(-30, 0));
+              spawnSkeletalShootEffect(muzzlePos.x, muzzlePos.y, true);
             }
           }
 
