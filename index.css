@@ -1,0 +1,1341 @@
+/* -------------------------------------------------------------
+ * 🧬 PROJECT 2100 - 사이버 아포칼립스 포레저 스타일 CSS (Dark Cyber-Apocalypse)
+ * 테마: 2100년 핵전쟁 폐허, 방사능 네온, 단말기 택티컬 슬레이트
+ * ------------------------------------------------------------- */
+
+:root {
+    --bg-dark: #090a0c;       /* 어두운 황무지 밤/낙진 공기 */
+    --bg-light: #16191d;      /* 콘크리트 슬레이트 */
+    --bg-panel: #1b1e22;      /* 생존 기갑 패널 (어두운 카본 회색) */
+    --border-color: #050608;  /* 굵고 무거운 강철 테두리 */
+    
+    --color-yellow: #facc15;  /* 경고 및 기폭 옐로우 */
+    --color-green: #39ff14;   /* 방사능 네온 (Rad Toxic Green) */
+    --color-red: #f87171;     /* 멜트다운 붉은 경고 */
+    --color-blue: #00f0ff;    /* 사이버네틱 일렉트릭 블루 */
+    --color-purple: #d946ef;  /* 불안정한 전자기 보라 */
+    --color-grey: #2e3440;    /* 폐고철 철판 회색 */
+    
+    --font-primary: 'Outfit', 'Noto Sans KR', sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    image-rendering: pixelated;
+}
+
+/* CRT 모니터 스캔라인 효과 오버레이 */
+body.forager-theme {
+    background-color: var(--bg-dark);
+    background-image: 
+        radial-gradient(circle at 10% 20%, rgba(0, 240, 255, 0.05) 0%, transparent 40%),
+        radial-gradient(circle at 90% 90%, rgba(57, 255, 20, 0.05) 0%, transparent 40%),
+        linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%),
+        linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+    background-size: 100% 100%, 100% 100%, 100% 4px, 6px 100%;
+    color: #e2e8f0;
+    font-family: var(--font-primary);
+    min-height: 100vh;
+    overflow-x: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+/* 메인 프레임 */
+.game-container {
+    width: 100%;
+    max-width: 1080px;
+    height: 760px;
+    background: var(--bg-panel);
+    border: 5px solid var(--border-color);
+    box-shadow: 
+        8px 8px 0px var(--border-color),
+        0 0 20px rgba(0, 240, 255, 0.1);
+    border-radius: 16px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* =============================================================
+ * 📱 화면 관리 (SCREEN LAYOUTS)
+ * ============================================================= */
+
+.game-screen {
+    display: none;
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    padding: 24px;
+    flex-direction: column;
+    animation: fadeIn 0.25s ease-out;
+}
+
+.game-screen.active {
+    display: flex;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.98); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.screen-header {
+    margin-bottom: 16px;
+    border-bottom: 4px dashed rgba(255, 255, 255, 0.1);
+    padding-bottom: 12px;
+}
+
+.screen-header h2 {
+    font-size: 1.6rem;
+    font-weight: 900;
+    color: #ffffff;
+    text-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+    letter-spacing: -0.5px;
+}
+
+.screen-header p {
+    font-size: 0.85rem;
+    color: #94a3b8;
+    font-weight: 500;
+    margin-top: 4px;
+}
+
+/* =============================================================
+ * 🎨 포레저 스타일 어두운 기갑 버튼 (FORAGER CYBER BUTTONS)
+ * ============================================================= */
+
+.btn-forager {
+    background: #252a34;
+    border: 4px solid var(--border-color);
+    border-radius: 10px;
+    color: #e2e8f0;
+    padding: 10px 18px;
+    font-family: var(--font-primary);
+    font-size: 0.95rem;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 3px 3px 0px var(--border-color);
+    transition: transform 0.12s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.12s, border-color 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    outline: none;
+}
+
+.btn-forager:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 5px 5px 0px var(--border-color), 0 0 10px rgba(0, 240, 255, 0.25);
+    background: #2e3542;
+    border-color: var(--color-blue);
+    color: #ffffff;
+}
+
+.btn-forager:active {
+    transform: translateY(2px) scale(0.98);
+    box-shadow: 1px 1px 0px var(--border-color);
+}
+
+.btn-forager:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: 3px 3px 0px var(--border-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+.btn-yellow { 
+    background: #3a3212; 
+    border-color: var(--color-yellow); 
+    color: var(--color-yellow); 
+}
+.btn-yellow:hover { 
+    background: var(--color-yellow); 
+    color: #000;
+    box-shadow: 5px 5px 0px var(--border-color), 0 0 12px rgba(250, 204, 21, 0.4);
+}
+
+.btn-green { 
+    background: #11381b; 
+    border-color: var(--color-green); 
+    color: var(--color-green); 
+}
+.btn-green:hover { 
+    background: var(--color-green); 
+    color: #000; 
+    box-shadow: 5px 5px 0px var(--border-color), 0 0 12px rgba(57, 255, 20, 0.4);
+}
+
+.btn-red { 
+    background: #3d1b1b; 
+    border-color: var(--color-red); 
+    color: var(--color-red); 
+}
+.btn-red:hover { 
+    background: var(--color-red); 
+    color: #fff; 
+    box-shadow: 5px 5px 0px var(--border-color), 0 0 12px rgba(248, 113, 113, 0.4);
+}
+
+.btn-large {
+    font-size: 1.3rem;
+    padding: 14px 32px;
+    border-radius: 12px;
+    box-shadow: 4px 4px 0px var(--border-color);
+}
+.btn-large:hover {
+    box-shadow: 6px 6px 0px var(--border-color);
+}
+
+.btn-full {
+    width: 100%;
+}
+
+/* =============================================================
+ * ☣️ SCREEN 1: START SCREEN (첫화면)
+ * ============================================================= */
+
+#screen-start {
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(135deg, #16191f 0%, #0d0f12 100%);
+    padding: 0;
+}
+
+.start-bg-overlay {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background-image: 
+        radial-gradient(circle at 50% 50%, rgba(57, 255, 20, 0.05) 0%, transparent 60%),
+        repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.25) 0px, rgba(0, 0, 0, 0.25) 4px, transparent 4px, transparent 12px);
+}
+
+.start-content {
+    z-index: 10;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+    animation: bounceIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.logo-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.logo-sub {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: var(--color-green);
+    border: 3px solid var(--color-green);
+    background: rgba(57, 255, 20, 0.1);
+    padding: 4px 14px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    box-shadow: 0 0 10px rgba(57, 255, 20, 0.3);
+    letter-spacing: 1px;
+}
+
+.logo-title {
+    font-size: 3.8rem;
+    font-weight: 900;
+    color: #ffffff;
+    text-shadow: 
+        -4px -4px 0px var(--border-color),
+        4px -4px 0px var(--border-color),
+        -4px 4px 0px var(--border-color),
+        4px 4px 0px var(--border-color),
+        0px 0px 20px rgba(0, 240, 255, 0.6);
+    letter-spacing: -1px;
+}
+
+.logo-line {
+    width: 150px;
+    height: 6px;
+    background: var(--color-blue);
+    border-radius: 3px;
+    margin-top: 12px;
+    box-shadow: 0 0 12px rgba(0, 240, 255, 0.8);
+}
+
+.start-menu {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+.start-hint {
+    font-size: 0.85rem;
+    color: #94a3b8;
+    font-weight: 700;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+@keyframes bounceIn {
+    0% { transform: scale(0.3); opacity: 0; }
+    50% { transform: scale(1.05); }
+    70% { transform: scale(0.9); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* =============================================================
+ * 🗺️ SCREEN 2: EURASIA MAP SCREEN (유라시아 전역지도)
+ * ============================================================= */
+
+.map-viewport {
+    flex: 1;
+    border: 4px solid var(--border-color);
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 
+        inset 0 0 30px rgba(0,0,0,0.8),
+        0 0 15px rgba(0, 240, 255, 0.05);
+}
+
+.map-canvas {
+    width: 100%;
+    height: 100%;
+    background-image: url('assets/ui/eurasia_map.png');
+    background-size: cover;
+    background-position: center;
+    position: relative;
+}
+
+/* 지도 위 작전 핀 */
+.map-pin {
+    position: absolute;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 3px solid var(--border-color);
+    background: var(--color-grey);
+    cursor: pointer;
+    box-shadow: 0 4px 0px rgba(0,0,0,0.4);
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), background-color 0.2s, box-shadow 0.2s;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 0.72rem;
+    font-weight: 900;
+    color: #ffffff;
+}
+
+.map-pin:hover {
+    transform: scale(1.3) translateY(-3px);
+    box-shadow: 0 6px 0px rgba(0,0,0,0.5), 0 0 10px var(--color-blue);
+    z-index: 100;
+}
+
+.map-pin.unlocked {
+    background: var(--color-blue);
+    border-color: #ffffff;
+    animation: pin-pulse 1.8s infinite;
+}
+
+.map-pin.cleared {
+    background: var(--color-green);
+    border-color: var(--border-color);
+}
+
+.map-pin.locked {
+    background: #475569;
+    cursor: not-allowed;
+    opacity: 0.6;
+    border-color: rgba(0,0,0,0.4);
+}
+
+@keyframes pin-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(0, 240, 255, 0.7), 0 4px 0px rgba(0,0,0,0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(0, 240, 255, 0), 0 4px 0px rgba(0,0,0,0.4); }
+    100% { box-shadow: 0 0 0 0 rgba(0, 240, 255, 0), 0 4px 0px rgba(0,0,0,0.4); }
+}
+
+/* =============================================================
+ * ⚔️ SCREEN 3: BATTLE SCREEN (전투 화면)
+ * ============================================================= */
+
+.battle-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.battle-info-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.battle-region-name {
+    font-size: 1.1rem;
+    font-weight: 900;
+    color: #ffffff;
+    text-shadow: 0 0 8px rgba(0, 240, 255, 0.3);
+}
+
+.battle-progress-badge {
+    background: var(--color-blue);
+    color: #000;
+    font-size: 0.75rem;
+    font-weight: 900;
+    padding: 3px 10px;
+    border-radius: 6px;
+}
+
+.btn-speed {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+}
+
+.battle-stage-container {
+    flex: 1;
+    border: 4px solid var(--border-color);
+    border-radius: 12px;
+    background: #111317;
+    position: relative;
+    overflow: hidden;
+    box-shadow: inset 0 0 40px rgba(0,0,0,0.95);
+}
+
+.battle-screen-flash {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--color-red);
+    opacity: 0;
+    z-index: 100;
+    pointer-events: none;
+    transition: opacity 0.08s ease;
+}
+
+.battle-stage-field {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 80px;
+    background-image: 
+        radial-gradient(circle at center, rgba(30, 41, 59, 0.1) 0%, rgba(15, 23, 42, 0.8) 100%),
+        repeating-linear-gradient(90deg, rgba(57, 255, 20, 0.01) 0px, rgba(57, 255, 20, 0.01) 1px, transparent 1px, transparent 30px);
+}
+
+/* 액터 공통 카드 */
+.actor-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 10;
+    transition: transform 0.08s linear;
+}
+
+.actor-hp-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100px;
+    margin-bottom: 6px;
+}
+
+.hp-label {
+    font-size: 0.65rem;
+    font-weight: 900;
+    color: #e2e8f0;
+    text-shadow: 1px 1px 0px #000;
+    margin-bottom: 2px;
+    max-width: 90px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.hp-bar-outer {
+    width: 80px;
+    height: 8px;
+    background: #1a1e24;
+    border: 2px solid var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+.hp-bar-inner {
+    height: 100%;
+    width: 100%;
+    transition: width 0.15s ease-out;
+}
+.hp-bar-inner.agent-hp { 
+    background: var(--color-green); 
+    box-shadow: 0 0 6px rgba(57, 255, 20, 0.8);
+}
+.hp-bar-inner.monster-hp { 
+    background: var(--color-red); 
+    box-shadow: 0 0 6px rgba(248, 113, 113, 0.8);
+}
+
+.hp-num-text {
+    font-size: 0.6rem;
+    font-weight: 800;
+    color: #94a3b8;
+    margin-top: 1px;
+}
+
+.actor-sprite-shadow {
+    width: 50px;
+    height: 6px;
+    background: rgba(0,0,0,0.7);
+    border-radius: 50%;
+    filter: blur(2px);
+    margin-top: -3px;
+    z-index: 1;
+}
+
+/* 10프레임 조립용 아바타 뷰어 */
+.agent-avatar-assembled {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    transform-origin: bottom center;
+}
+
+.part {
+    position: absolute;
+    background-repeat: no-repeat;
+    background-size: contain;
+    background-position: center bottom;
+    image-rendering: pixelated;
+    transition: transform 0.08s linear;
+    transform-origin: center bottom;
+}
+
+/* 10프레임 기본 파츠 오프셋 및 스케일 */
+#battle-torso { width: 48px; height: 48px; left: 36px; top: 38px; z-index: 10; }
+#battle-head { width: 48px; height: 48px; left: 36px; top: 2px; z-index: 12; }
+#battle-r-arm { width: 24px; height: 40px; left: 66px; top: 34px; z-index: 14; }
+#battle-l-arm { width: 24px; height: 40px; left: 30px; top: 34px; z-index: 4; }
+#battle-legs { width: 36px; height: 32px; left: 42px; top: 82px; z-index: 9; }
+
+/* 디폴트 2D 픽셀아트 드로잉 파츠 - 아포칼립스 기갑 컬러 적용 */
+.part.drawn {
+    border: 3px solid var(--border-color);
+    border-radius: 4px;
+    box-shadow: 
+        inset -4px -4px 0px rgba(0,0,0,0.3),
+        0 0 5px rgba(0, 240, 255, 0.2);
+}
+.part.drawn-torso { background: #334155; }
+.part.drawn-head { background: #475569; border-radius: 8px; }
+.part.drawn-arm { background: var(--color-blue); }
+.part.drawn-legs { background: #1e293b; }
+
+/* 몬스터 파티 세로 정렬 */
+.battle-monster-party {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    height: 100%;
+    gap: 12px;
+}
+
+.monster-sprite-box {
+    width: 72px;
+    height: 72px;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: bottom center;
+    transform: scaleX(-1); /* 요원을 바라보도록 반전 */
+    transform-origin: bottom center;
+    animation: monster-idle-bounce 2s infinite ease-in-out;
+}
+
+/* 피격 시 깜빡임 */
+.actor-card.hit-blink {
+    filter: brightness(0.2) sepia(1) saturate(100) hue-rotate(-50deg) drop-shadow(0 0 15px #ff0000);
+}
+
+/* 사망 쓰러짐 */
+.agent-avatar-assembled.defeated, .monster-sprite-box.defeated {
+    transform: translateY(30px) rotate(90deg) !important;
+    filter: grayscale(1) opacity(0.4) !important;
+    animation: none !important;
+}
+
+/* 하단 콘솔 (모노크롬 레트로 터미널) */
+.battle-console-log {
+    height: 90px;
+    background: #090b0e;
+    border: 3px solid var(--border-color);
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin: 10px 0;
+    overflow-y: auto;
+    font-size: 0.72rem;
+    font-family: monospace;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    box-shadow: 
+        inset 0 0 12px rgba(0,0,0,0.95),
+        0 0 8px rgba(0, 240, 255, 0.05);
+    border-color: #1e293b;
+}
+
+.log-item { color: #94a3b8; }
+.log-item.system { color: var(--color-blue); text-shadow: 0 0 4px rgba(0, 240, 255, 0.3); }
+.log-item.damage { color: var(--color-red); text-shadow: 0 0 4px rgba(248, 113, 113, 0.3); }
+.log-item.warning { color: var(--color-yellow); text-shadow: 0 0 4px rgba(250, 204, 21, 0.3); }
+
+.battle-ui-footer {
+    display: flex;
+    gap: 12px;
+}
+
+.battle-ui-footer button {
+    flex: 1;
+}
+
+/* 클리어 팝업 오버레이 */
+.screen-overlay-clear {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(9, 10, 12, 0.85);
+    z-index: 500;
+    display: none;
+    justify-content: center;
+    align-items: center;
+}
+
+.clear-popup {
+    background: var(--bg-panel);
+    border: 5px solid var(--border-color);
+    border-radius: 12px;
+    padding: 32px;
+    text-align: center;
+    box-shadow: 
+        8px 8px 0px rgba(0,0,0,0.6),
+        0 0 30px rgba(57, 255, 20, 0.2);
+    animation: popup-bounce 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    border-color: var(--color-green);
+}
+
+.clear-popup h2 {
+    font-size: 2rem;
+    color: var(--color-green);
+    text-shadow: 0 0 10px rgba(57, 255, 20, 0.5);
+}
+
+/* =============================================================
+ * 🏪 SCREEN 4: TOWN SCREEN (마을 화면)
+ * ============================================================= */
+
+.town-viewport {
+    flex: 1;
+    border: 4px solid var(--border-color);
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 0 30px rgba(0,0,0,0.8);
+}
+
+.town-map-canvas {
+    width: 100%;
+    height: 100%;
+    background-image: url('assets/ui/town_map.png');
+    background-size: cover;
+    background-position: center;
+    position: relative;
+}
+
+/* 건물 핀 - 러프 강철 패널 스타일 */
+.town-building {
+    position: absolute;
+    padding: 10px 18px;
+    background: #1f232b;
+    border: 4px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 4px 4px 0px var(--border-color);
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 900;
+    color: #ffffff;
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), border-color 0.2s;
+}
+
+.town-building:hover {
+    transform: scale(1.1) translateY(-4px);
+    box-shadow: 6px 6px 0px var(--border-color), 0 0 12px rgba(57, 255, 20, 0.3);
+    background: #252d3a;
+    border-color: var(--color-green);
+}
+
+/* 건물 고정 오프셋 위치 */
+.town-building.shop { left: 20%; top: 40%; }
+.town-building.lab { left: 55%; top: 30%; }
+.town-building.travel { left: 40%; top: 70%; background: #1c3d42; border-color: var(--color-blue); }
+.town-building.travel:hover { border-color: var(--color-blue); background: #234e54; }
+
+.town-footer-status {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+    border-top: 4px dashed rgba(255, 255, 255, 0.1);
+    padding-top: 12px;
+}
+
+.currency-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--color-green);
+}
+
+.currency-icon {
+    width: 32px;
+    height: 32px;
+}
+
+.town-menu-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+/* =============================================================
+ * 📦 모달 공용 디자인 (MODAL SYSTEM - Dark Slate)
+ * ============================================================= */
+
+.modal-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(9, 10, 12, 0.7);
+    z-index: 1000;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    padding: 40px;
+}
+
+.modal-overlay.active {
+    display: flex;
+}
+
+.modal-content {
+    background: var(--bg-panel);
+    border: 5px solid var(--border-color);
+    border-radius: 16px;
+    box-shadow: 
+        6px 6px 0px var(--border-color),
+        0 0 25px rgba(0, 240, 255, 0.1);
+    width: 100%;
+    max-width: 580px;
+    max-height: 90%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: popup-bounce 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* 노란색/검은색 빗금 경고 경고창 띠 헤더 (Hazard stripes) */
+.modal-header {
+    padding: 14px 20px;
+    background: repeating-linear-gradient(
+        45deg,
+        #eab308 0px,
+        #eab308 12px,
+        #1e1e1e 12px,
+        #1e1e1e 24px
+    );
+    border-bottom: 5px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h3 {
+    font-size: 1.15rem;
+    font-weight: 900;
+    color: #ffffff;
+    background: #000000;
+    padding: 3px 12px;
+    border-radius: 6px;
+    border: 2px solid var(--border-color);
+}
+
+.btn-close {
+    background: #000000;
+    border: 2px solid var(--border-color);
+    border-radius: 50%;
+    width: 26px;
+    height: 26px;
+    font-size: 0.8rem;
+    font-weight: 900;
+    cursor: pointer;
+    color: #ffffff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: transform 0.15s, background-color 0.15s;
+}
+.btn-close:hover {
+    transform: scale(1.2);
+    border-color: var(--color-red);
+}
+
+.modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.modal-body h4 {
+    font-size: 0.95rem;
+    font-weight: 900;
+    margin-bottom: 8px;
+    color: #ffffff;
+    border-left: 5px solid var(--color-blue);
+    padding-left: 8px;
+}
+
+/* =============================================================
+ * 🎒 MODAL 1: INVENTORY WINDOW (인벤토리창)
+ * ============================================================= */
+
+.equipped-section {
+    margin-bottom: 10px;
+}
+
+.equipped-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+.equip-slot-box {
+    height: 72px;
+    border: 3px solid var(--border-color);
+    border-radius: 10px;
+    background: #111317;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    box-shadow: 2px 2px 0px var(--border-color);
+    transition: transform 0.15s, background-color 0.15s, border-color 0.15s;
+    position: relative;
+    padding: 6px;
+}
+
+.equip-slot-box:hover {
+    transform: translateY(-2px);
+    background: #1d212a;
+    border-color: var(--color-blue);
+}
+
+.slot-placeholder {
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: #64748b;
+}
+
+/* 가방 아이템 슬롯 그리드 */
+.inventory-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    background: rgba(0,0,0,0.3);
+    border: 3px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 12px;
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+.inv-slot {
+    aspect-ratio: 1;
+    border: 3px solid var(--border-color);
+    border-radius: 8px;
+    background: #111317;
+    cursor: pointer;
+    box-shadow: 2px 2px 0px var(--border-color);
+    transition: transform 0.12s, box-shadow 0.12s;
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 4px;
+}
+
+.inv-slot:hover {
+    transform: scale(1.08) translateY(-2px);
+    box-shadow: 3px 3px 0px var(--border-color);
+    z-index: 10;
+}
+
+.inv-slot.empty {
+    background: #1f242e;
+    border-style: dashed;
+    box-shadow: none;
+    cursor: default;
+}
+.inv-slot.empty:hover {
+    transform: none;
+}
+
+/* 등급별 아이템 배경 및 테두리 (Nuclear Rarity) */
+.rarity-common { 
+    background: #27272a; 
+    border-color: #52525b; 
+}
+.rarity-rare { 
+    background: #1e3a8a; 
+    border-color: #3b82f6; 
+    box-shadow: 2px 2px 0px var(--border-color), 0 0 5px rgba(59, 130, 246, 0.4);
+}
+.rarity-epic { 
+    background: #581c87; 
+    border-color: #a855f7; 
+    box-shadow: 2px 2px 0px var(--border-color), 0 0 5px rgba(168, 85, 247, 0.4);
+}
+.rarity-legendary { 
+    background: #78350f; 
+    border-color: #f59e0b; 
+    box-shadow: 2px 2px 0px var(--border-color), 0 0 5px rgba(245, 158, 11, 0.4);
+}
+
+.item-icon-img {
+    width: 100%;
+    height: 100%;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+}
+
+/* =============================================================
+ * 📊 MODAL 3: STAT WINDOW (능력치창)
+ * ============================================================= */
+
+.stats-overview {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: #111317;
+    padding: 12px;
+    border-radius: 10px;
+    border: 3px solid rgba(255,255,255,0.05);
+}
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 2px dashed rgba(255,255,255,0.06);
+}
+.stat-row:last-child {
+    border-bottom: none;
+}
+
+.stat-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.stat-icon {
+    font-size: 1.1rem;
+}
+
+.stat-value {
+    font-size: 1.05rem;
+    font-weight: 900;
+    color: #ffffff;
+}
+
+.upgrade-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.btn-upgrade {
+    width: 100%;
+    flex-direction: column;
+    padding: 12px;
+    font-size: 0.9rem;
+    line-height: 1.3;
+}
+
+.btn-upgrade .cost {
+    font-size: 0.72rem;
+    color: var(--color-green);
+    font-weight: 800;
+    background: rgba(0,0,0,0.3);
+    padding: 2px 8px;
+    border-radius: 6px;
+    margin-top: 4px;
+    border: 1px solid rgba(57, 255, 20, 0.2);
+}
+
+/* =============================================================
+ * 🧬 MODAL 4: TRAIT INFO WINDOW (특성정보창)
+ * ============================================================= */
+
+.traits-summary-panel {
+    display: flex;
+    justify-content: space-around;
+    background: #111317;
+    padding: 10px;
+    border: 3px solid var(--border-color);
+    border-radius: 10px;
+    font-size: 0.85rem;
+    font-weight: 800;
+}
+
+.traits-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(105px, 1fr));
+    gap: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.trait-item-chip {
+    border: 3px solid var(--border-color);
+    border-radius: 8px;
+    padding: 6px;
+    background: #111317;
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-align: center;
+    box-shadow: 2px 2px 0px var(--border-color);
+    transition: transform 0.15s;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    color: #94a3b8;
+}
+
+.trait-item-chip:hover {
+    transform: scale(1.05);
+}
+
+.trait-item-chip.acquired {
+    background: #2b1d42;
+    border-color: var(--color-purple);
+    color: #ffffff;
+    box-shadow: 2px 2px 0px var(--border-color), 0 0 6px rgba(217, 70, 239, 0.4);
+}
+
+.trait-item-chip .category {
+    font-size: 0.55rem;
+    text-transform: uppercase;
+    opacity: 0.8;
+}
+
+.fusion-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+.fusion-item-chip {
+    border: 3px dashed #475569;
+    border-radius: 8px;
+    padding: 8px;
+    background: rgba(0,0,0,0.2);
+    font-size: 0.7rem;
+    font-weight: 800;
+    opacity: 0.5;
+    transition: opacity 0.3s;
+    color: #94a3b8;
+}
+
+.fusion-item-chip.active {
+    border-style: solid;
+    border-color: var(--color-yellow);
+    background: #3e3212;
+    color: #ffffff;
+    opacity: 1;
+    box-shadow: 2px 2px 0px var(--border-color), 0 0 6px rgba(250, 204, 21, 0.4);
+}
+
+.fusion-item-chip .f-title {
+    font-weight: 900;
+    font-size: 0.75rem;
+    margin-bottom: 2px;
+    color: var(--color-yellow);
+}
+
+/* =============================================================
+ * 🧪 MODAL 6: TRAIT LAB WINDOW (특성진화소)
+ * ============================================================= */
+
+.trait-lab-card {
+    max-width: 780px;
+}
+
+.lab-desc {
+    font-size: 0.82rem;
+    color: #94a3b8;
+    font-weight: 600;
+}
+
+.lab-workspace {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 16px;
+    flex: 1;
+}
+
+.lab-traits-section, .lab-fusions-section {
+    display: flex;
+    flex-direction: column;
+}
+
+.lab-traits-section .traits-grid {
+    max-height: 280px;
+}
+
+.lab-fusions-section .fusion-list {
+    grid-template-columns: 1fr;
+    max-height: 280px;
+}
+
+.lab-nemesis-zone {
+    margin-top: 10px;
+}
+
+.nemesis-card {
+    position: relative;
+    background: radial-gradient(circle, #2d2d2d 0%, #0d0f11 100%);
+    border: 4px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+    overflow: hidden;
+    color: #fff;
+    box-shadow: 4px 4px 0px var(--border-color);
+    border-color: var(--color-purple);
+}
+
+.nemesis-glow {
+    position: absolute;
+    width: 200%;
+    height: 200%;
+    top: -50%;
+    left: -50%;
+    background: radial-gradient(circle, rgba(217, 70, 239, 0.15) 0%, transparent 60%);
+}
+
+.nemesis-card h3 {
+    color: var(--color-purple);
+    font-size: 1.2rem;
+    font-weight: 900;
+    margin-bottom: 4px;
+    text-shadow: 0 0 8px rgba(217, 70, 239, 0.6);
+}
+
+.nemesis-card p {
+    font-size: 0.72rem;
+    color: #cbd5e1;
+    margin-bottom: 12px;
+}
+
+.btn-nemesis.active {
+    background: #fff;
+    color: #000;
+    border-color: #fff;
+    box-shadow: 0 0 20px rgba(255,255,255,0.8);
+}
+
+/* =============================================================
+ * 🏪 MODAL 5: TOWN SHOP WINDOW (상점)
+ * ============================================================= */
+
+.shop-tabs {
+    display: flex;
+    gap: 10px;
+    border-bottom: 3px solid var(--border-color);
+    padding-bottom: 8px;
+}
+
+.shop-tabs button {
+    flex: 1;
+    padding: 8px;
+    font-size: 0.85rem;
+}
+
+.shop-tabs button.active {
+    background: var(--color-blue);
+    color: #000;
+}
+
+.shop-item-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 8px 0;
+}
+
+.shop-item-card {
+    border: 3px solid var(--border-color);
+    border-radius: 10px;
+    background: #111317;
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 2px 2px 0px var(--border-color);
+    cursor: pointer;
+    transition: transform 0.15s, border-color 0.15s;
+}
+
+.shop-item-card:hover {
+    transform: scale(1.03) translateY(-2px);
+    background: #1a1e26;
+    border-color: var(--color-blue);
+}
+
+.shop-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+}
+
+.shop-item-name {
+    font-weight: 900;
+    font-size: 0.85rem;
+    color: #ffffff;
+}
+
+.shop-item-cost {
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: var(--color-green);
+}
+
+/* =============================================================
+ * 📝 MODAL 2: ITEM INFO MODAL (아이템 상세 및 액션)
+ * ============================================================= */
+
+.secondary-modal {
+    z-index: 1100;
+}
+
+.item-info-card {
+    max-width: 420px;
+}
+
+.item-detail-row {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+}
+
+.item-image-large {
+    width: 80px;
+    height: 80px;
+    border: 3px solid var(--border-color);
+    border-radius: 12px;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-color: #111317;
+}
+
+.item-stats-desc {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+
+.item-rarity-badge {
+    align-self: flex-start;
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: #000;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--color-blue);
+}
+
+.item-effect-values {
+    font-size: 1.1rem;
+    font-weight: 900;
+    color: #ffffff;
+}
+
+.item-lore {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    line-height: 1.4;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.modal-actions button {
+    flex: 1;
+}
+
+/* 몬스터 카드 및 라인 썸네일 노출용 */
+.monster-preview-row {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 4px 0;
+}
+
+.monster-thumb {
+    width: 48px;
+    height: 48px;
+    border: 2px solid var(--border-color);
+    border-radius: 6px;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-color: #111317;
+}
