@@ -922,16 +922,47 @@ app.post('/api/generate-forecast-text', async (req, res) => {
 });
 
 // Expose DART report text generator API for client bypass send
-app.post('/api/generate-dart-report-text', (req, res) => {
+app.post('/api/generate-dart-report-text', async (req, res) => {
   try {
-    const cache = readCache();
+    let attempts = 0;
+    let isAllSummarized = false;
+    let cache = readCache();
+
+    while (attempts < 30) {
+      isAllSummarized = true;
+      cache = readCache();
+
+      for (const cid of Object.keys(TICKER_MAP)) {
+        const entry = cache[cid];
+        const disclosures = entry?.dartData || [];
+        
+        // If there's no cached dartData, or any disclosure's summary is still empty/missing
+        if (disclosures.length === 0 || disclosures.some(d => !d.summary)) {
+          isAllSummarized = false;
+          break;
+        }
+      }
+
+      if (isAllSummarized) {
+        console.log('[DARTTextAPI] Perfect! All AI DART summaries are fully generated in cache.');
+        break;
+      }
+
+      console.log(`[DARTTextAPI] Waiting for AI summaries to complete in background cache... (Attempt ${attempts + 1}/30)`);
+      attempts++;
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+
+    if (!isAllSummarized) {
+      console.warn('[DARTTextAPI] Timeout reached while waiting for complete AI summaries. Dispatching available summaries.');
+    }
+
     let text = `📋 [K-TOP 10 기업 DART 주요 의무공시 요약]\n\n`;
     Object.keys(COMPANY_NAME_MAP).forEach((cid, idx) => {
       const name = COMPANY_NAME_MAP[cid];
-      
-      // Try cached summaries first, fallback to mock DB
       const cachedEntry = cache[cid];
       let disclosures = cachedEntry?.dartData || [];
+      
       if (disclosures.length === 0) {
         disclosures = COMPANY_DART_MOCK[cid] || [];
       }
@@ -945,6 +976,7 @@ app.post('/api/generate-dart-report-text', (req, res) => {
         text += `\n`;
       }
     });
+
     res.json({ success: true, report: text.trim() });
   } catch (err) {
     console.error('[DARTTextAPI] Error generating report:', err.message);
