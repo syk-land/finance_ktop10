@@ -1,0 +1,10 @@
+{
+  "notifications": [],
+  "priceTracker": {
+    "samsung": {
+      "dayOpenPrice": 289500,
+      "lastNotifiedPrice": 289500,
+      "notifiedBands": []
+    }
+  }
+}

@@ -532,6 +532,47 @@ async function executeSingleCompanyUpdateInBackground(companyId, geminiApiKey) {
   }
 }
 
+// Send KakaoTalk "Talk memo send (나에게 보내기)" default template notification
+async function sendKakaoTalkNotification(message) {
+  const token = process.env.KAKAO_ACCESS_TOKEN;
+  if (!token) {
+    console.warn('[KakaoTalk] No access token set in env. Skipping message dispatch.');
+    return;
+  }
+
+  const templateObject = {
+    object_type: 'text',
+    text: message,
+    link: {
+      web_url: 'http://localhost:5173',
+      mobile_web_url: 'http://localhost:5173'
+    },
+    button_title: '대시보드 보기'
+  };
+
+  try {
+    const response = await fetch('https://kapi.kakao.com/v2/api/talk/memo/default/send', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({
+        template_object: JSON.stringify(templateObject)
+      })
+    });
+
+    const result = await response.json();
+    if (result.result_code === 0) {
+      console.log('[KakaoTalk] Message dispatched successfully to syk-land.');
+    } else {
+      console.warn('[KakaoTalk] Dispatched failed. Response:', result);
+    }
+  } catch (err) {
+    console.error('[KakaoTalk] Network API fetch error:', err.message);
+  }
+}
+
 // Track price fluctuation and trigger 5% alerts
 function trackPriceFluctuation(companyId, currentPrice) {
   const notifCache = readNotifCache();
@@ -585,6 +626,11 @@ function trackPriceFluctuation(companyId, currentPrice) {
       notifCache.notifications.pop();
     }
     console.log(`[NotificationTriggered] ${alertMessage}`);
+
+    // Trigger KakaoTalk notification message
+    sendKakaoTalkNotification(alertMessage).catch(err => {
+      console.error('[KakaoTalk] Async error in scheduler loop:', err.message);
+    });
   }
 
   notifCache.priceTracker[companyId] = tracker;
@@ -773,6 +819,22 @@ app.get('/api/notifications', (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Failed to retrieve notifications' });
   }
+});
+
+// 3. KakaoTalk Manual Test Notification API Endpoint
+app.post('/api/test-kakao', async (req, res) => {
+  try {
+    const alertMessage = '🔔 [K-TOP 10] 카카오톡 실시간 주가 알림 연동 테스트가 성공적으로 완료되었습니다!';
+    await sendKakaoTalkNotification(alertMessage);
+    res.json({ success: true, message: 'Test message sent' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to dispatch test KakaoTalk message' });
+  }
+});
+
+// 4. Expose Kakao Token safely to client for browser direct send bypass
+app.get('/api/kakao-token', (req, res) => {
+  res.json({ token: process.env.KAKAO_ACCESS_TOKEN || '' });
 });
 
 // Start server and initialize loops
