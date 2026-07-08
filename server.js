@@ -837,6 +837,89 @@ app.get('/api/kakao-token', (req, res) => {
   res.json({ token: process.env.KAKAO_ACCESS_TOKEN || '' });
 });
 
+// Daily AI Forecast Generator
+async function generateDailyForecastReport(geminiApiKey) {
+  const cache = readCache();
+  const companiesList = [];
+
+  for (const cid of Object.keys(TICKER_MAP)) {
+    const entry = cache[cid];
+    const name = COMPANY_NAME_MAP[cid];
+    const lastClose = entry?.stockData?.[entry.stockData.length - 1]?.close || 100000;
+    
+    companiesList.push({
+      id: cid,
+      name,
+      price: lastClose,
+      financials: COMPANY_FINANCIALS[cid]
+    });
+  }
+
+  const prompt = `
+당신은 대한민국 대표 AI 계량투자 모델입니다.
+제시된 10대 기업들의 현재가와 3개년 재무 정보를 종합 검토하여, 단기(향후 1주일) 주가 방향을 "상승(▲)" 또는 "하락(▼)" 또는 "보합(●)"으로 단정적으로 예측하고, 그 예측 이유를 각 기업당 1줄(30자 내외)로 명쾌하게 규명해 주세요.
+
+- 분석 대상 기업 목록:
+${JSON.stringify(companiesList, null, 2)}
+
+---
+[출력 템플릿 규격 (이 포맷 그대로 텍스트를 반환할 것, 불필요한 서론/결론 배제)]
+📊 [K-TOP 10 데일리 AI 주가 전망]
+
+1. 삼성전자: [현재가]원 ([예측 기호])
+- [한줄 근거]
+
+2. SK하이닉스: [현재가]원 ([예측 기호])
+- [한줄 근거]
+...
+  `;
+
+  let lastError = null;
+  if (geminiApiKey) {
+    const genAI = new GoogleGenerativeAI(geminiApiKey);
+    for (const modelName of GEMINI_MODELS) {
+      try {
+        console.log(`[GeminiAPI] [DailyForecast] Generating report using ${modelName}...`);
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const result = await model.generateContent(prompt);
+        return result.response.text().trim();
+      } catch (err) {
+        console.warn(`[GeminiAPI] [DailyForecast] Model ${modelName} failed:`, err.message);
+        lastError = err;
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+  }
+
+  console.log(`[DailyForecast] Using offline mock generator for daily report.`);
+  let reportText = `📊 [K-TOP 10 데일리 AI 주가 전망 (오프라인 데모)]\n\n`;
+  companiesList.forEach((c, idx) => {
+    const symbols = ['▲ 상승 예상', '▼ 하락 예상', '● 보합 예상'];
+    const selectedSymbol = symbols[idx % 3];
+    const reasons = [
+      '3개년 영업이익률 개선 흐름 지속 관측.',
+      '글로벌 수요 둔화 우려 및 원자재 마진 압박.',
+      '수급 균형 상태 및 분기 가이드라인 부합 예정.'
+    ];
+    reportText += `${idx + 1}. ${c.name}: ${c.price.toLocaleString()}원 (${selectedSymbol})\n- ${reasons[idx % 3]}\n\n`;
+  });
+  return reportText.trim();
+}
+
+// 5. Trigger Daily Forecast Manually via POST API
+// Expose forecast text generator API for client bypass send
+app.post('/api/generate-forecast-text', async (req, res) => {
+  try {
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    console.log('[DailyForecast] Generating text for client bypass send...');
+    const reportText = await generateDailyForecastReport(geminiApiKey);
+    res.json({ success: true, report: reportText });
+  } catch (err) {
+    console.error('[DailyForecast] Text generation failed:', err.message);
+    res.status(500).json({ error: 'Failed to generate forecast text' });
+  }
+});
+
 // Start server and initialize loops
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`[Server] Finance AI Backend is running on http://127.0.0.1:${PORT}`);
@@ -863,5 +946,32 @@ app.listen(PORT, '0.0.0.0', () => {
     setInterval(() => {
       executeSynchronizationCycle();
     }, 60000);
+
+    // Schedule Daily AI Forecast auto-dispatch at 3:00 PM (15:00) every day
+    console.log('[CacheScheduler] Daily AI Forecast scheduled for 3:00 PM KST.');
+    let dailyReportSentToday = false;
+    setInterval(async () => {
+      try {
+        const now = new Date();
+        const hours = now.getHours();
+        const minutes = now.getMinutes();
+
+        // Reset sent flag at midnight
+        if (hours === 0 && minutes === 0) {
+          dailyReportSentToday = false;
+        }
+
+        // Trigger at 15:00 (오후 3시)
+        if (hours === 15 && minutes === 0 && !dailyReportSentToday) {
+          dailyReportSentToday = true;
+          console.log('[DailyScheduler] 3:00 PM reached. Generating and sending daily AI forecast...');
+          const geminiApiKey = process.env.GEMINI_API_KEY;
+          const report = await generateDailyForecastReport(geminiApiKey);
+          await sendKakaoTalkNotification(report);
+        }
+      } catch (err) {
+        console.error('[DailyScheduler] Scheduled 3:00 PM dispatch failed:', err.message);
+      }
+    }, 60000); // Check every minute
   }, 3000);
 });

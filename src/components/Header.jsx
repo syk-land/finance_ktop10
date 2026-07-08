@@ -51,10 +51,19 @@ export default function Header({ isLive, isAiLive }) {
         return;
       }
 
-      // 2. Dispatch post request directly to Kakao API from browser
+      // 2. Fetch the 10-company AI stock forecast report text from backend
+      alert('📊 10대 기업 실시간 주가 및 AI 단기 전망 보고서를 생성하고 있습니다...\n(완료 시 자동으로 카톡 발송이 시작됩니다.)');
+      const textRes = await fetch('http://localhost:5005/api/generate-forecast-text', { method: 'POST' });
+      if (!textRes.ok) {
+        alert('❌ AI 전망 보고서 생성에 실패했습니다. Gemini 할당량 또는 API 연결을 확인해 주세요.');
+        return;
+      }
+      const { report } = await textRes.json();
+
+      // 3. Dispatch post request directly to Kakao API from browser
       const templateObject = {
         object_type: 'text',
-        text: '🔔 [K-TOP 10] 브라우저 우회 연동을 통한 카카오톡 테스트 메시지가 정상 수신되었습니다!',
+        text: report,
         link: {
           web_url: window.location.origin,
           mobile_web_url: window.location.origin
@@ -75,7 +84,7 @@ export default function Header({ isLive, isAiLive }) {
 
       const result = await res.json();
       if (result.result_code === 0) {
-        alert('🔔 카카오톡 테스트 메시지가 정상 전송되었습니다! 스마트폰 카톡방을 확인해 보세요.');
+        alert('📊 10대 기업 주가 & AI 상승/하락 전망 카톡이 정상 전송되었습니다!');
       } else {
         alert(`❌ 전송 실패: ${result.msg || '인증 오류가 발생했습니다.'}`);
       }
