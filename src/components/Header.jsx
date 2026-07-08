@@ -4,6 +4,7 @@ export default function Header({ isLive, isAiLive }) {
   const [time, setTime] = useState(new Date());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [kakaoToken, setKakaoToken] = useState('');
+  const [sendingType, setSendingType] = useState(null); // 'forecast', 'dart', 'financials' or null
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -37,6 +38,8 @@ export default function Header({ isLive, isAiLive }) {
   };
 
   const triggerKakaoTest = async () => {
+    if (sendingType) return;
+    setSendingType('forecast');
     try {
       // 1. Get Access Token from localStorage first, then fallback to backend
       let token = localStorage.getItem('kakao_access_token');
@@ -48,14 +51,15 @@ export default function Header({ isLive, isAiLive }) {
 
       if (!token) {
         alert('❌ 설정에서 카카오 액세스 토큰을 먼저 등록해 주세요.');
+        setSendingType(null);
         return;
       }
 
       // 2. Fetch the 10-company AI stock forecast report text from backend
-      alert('📊 10대 기업 실시간 주가 및 AI 단기 전망 보고서를 생성하고 있습니다...\n(완료 시 자동으로 카톡 발송이 시작됩니다.)');
       const textRes = await fetch('http://localhost:5005/api/generate-forecast-text', { method: 'POST' });
       if (!textRes.ok) {
         alert('❌ AI 전망 보고서 생성에 실패했습니다. Gemini 할당량 또는 API 연결을 확인해 주세요.');
+        setSendingType(null);
         return;
       }
       const { report } = await textRes.json();
@@ -84,16 +88,20 @@ export default function Header({ isLive, isAiLive }) {
 
       const result = await res.json();
       if (result.result_code === 0) {
-        alert('📊 10대 기업 주가 & AI 상승/하락 전망 카톡이 정상 전송되었습니다!');
+        alert('📊 K-TOP 10대 기업 주가 및 AI 전망 카톡 발송이 성공적으로 완료되었습니다!');
       } else {
         alert(`❌ 전송 실패: ${result.msg || '인증 오류가 발생했습니다.'}`);
       }
     } catch (err) {
       alert('❌ 통신 중 오류가 발생했습니다.');
+    } finally {
+      setSendingType(null);
     }
   };
 
   const triggerDartTalk = async () => {
+    if (sendingType) return;
+    setSendingType('dart');
     try {
       let token = localStorage.getItem('kakao_access_token');
       if (!token) {
@@ -104,13 +112,14 @@ export default function Header({ isLive, isAiLive }) {
 
       if (!token) {
         alert('❌ 설정에서 카카오 액세스 토큰을 먼저 등록해 주세요.');
+        setSendingType(null);
         return;
       }
 
-      alert('📋 10대 기업 DART 공시 요약 비교표를 생성하고 있습니다...');
       const textRes = await fetch('http://localhost:5005/api/generate-dart-report-text', { method: 'POST' });
       if (!textRes.ok) {
         alert('❌ DART 공시 요약 생성에 실패했습니다.');
+        setSendingType(null);
         return;
       }
       const { report } = await textRes.json();
@@ -138,16 +147,20 @@ export default function Header({ isLive, isAiLive }) {
 
       const result = await res.json();
       if (result.result_code === 0) {
-        alert('📋 10대 기업 DART 공시 요약 카톡이 정상 전송되었습니다!');
+        alert('📋 10대 기업 DART 공시 요약 카톡 전송이 성공적으로 완료되었습니다!');
       } else {
         alert(`❌ 전송 실패: ${result.msg || '인증 오류가 발생했습니다.'}`);
       }
     } catch (err) {
       alert('❌ 통신 중 오류가 발생했습니다.');
+    } finally {
+      setSendingType(null);
     }
   };
 
   const triggerFinancialsTalk = async () => {
+    if (sendingType) return;
+    setSendingType('financials');
     try {
       let token = localStorage.getItem('kakao_access_token');
       if (!token) {
@@ -158,13 +171,14 @@ export default function Header({ isLive, isAiLive }) {
 
       if (!token) {
         alert('❌ 설정에서 카카오 액세스 토큰을 먼저 등록해 주세요.');
+        setSendingType(null);
         return;
       }
 
-      alert('📉 10대 기업 핵심 재무제표 요약표를 생성하고 있습니다...');
       const textRes = await fetch('http://localhost:5005/api/generate-financials-report-text', { method: 'POST' });
       if (!textRes.ok) {
         alert('❌ 재무제표 요약 생성에 실패했습니다.');
+        setSendingType(null);
         return;
       }
       const { report } = await textRes.json();
@@ -192,12 +206,14 @@ export default function Header({ isLive, isAiLive }) {
 
       const result = await res.json();
       if (result.result_code === 0) {
-        alert('📉 10대 기업 핵심 재무제표 요약 카톡이 정상 전송되었습니다!');
+        alert('📉 10대 기업 핵심 재무제표 요약 카톡 전송이 성공적으로 완료되었습니다!');
       } else {
         alert(`❌ 전송 실패: ${result.msg || '인증 오류가 발생했습니다.'}`);
       }
     } catch (err) {
       alert('❌ 통신 중 오류가 발생했습니다.');
+    } finally {
+      setSendingType(null);
     }
   };
 
@@ -248,77 +264,83 @@ export default function Header({ isLive, isAiLive }) {
           <button 
             className="kakao-test-btn" 
             onClick={triggerKakaoTest}
+            disabled={sendingType !== null}
             style={{
-              background: '#FEE500',
-              color: '#191919',
+              background: sendingType === 'forecast' ? '#555555' : '#FEE500',
+              color: sendingType === 'forecast' ? '#ffffff' : '#191919',
               border: 'none',
               padding: '6px 12px',
               borderRadius: '20px',
               fontSize: '12px',
               fontWeight: 'bold',
-              cursor: 'pointer',
+              cursor: sendingType !== null ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
+              opacity: sendingType !== null && sendingType !== 'forecast' ? 0.4 : 1,
               boxShadow: '0 2px 6px rgba(254, 229, 0, 0.2)',
-              transition: 'transform 0.15s ease'
+              transition: 'all 0.15s ease'
             }}
-            onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-            onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+            onMouseOver={(e) => sendingType === null && (e.currentTarget.style.transform = 'scale(1.05)')}
+            onMouseOut={(e) => sendingType === null && (e.currentTarget.style.transform = 'scale(1)')}
           >
-            <span>💬 전망 톡</span>
+            <span>{sendingType === 'forecast' ? '⏳ 분석 중...' : '💬 전망 톡'}</span>
           </button>
 
           {/* DART Talk Trigger Button */}
           <button 
             className="kakao-dart-btn" 
             onClick={triggerDartTalk}
+            disabled={sendingType !== null}
             style={{
-              background: '#E6FFE6',
-              color: '#006600',
-              border: '1px solid rgba(0, 102, 0, 0.2)',
+              background: sendingType === 'dart' ? '#555555' : '#E6FFE6',
+              color: sendingType === 'dart' ? '#ffffff' : '#006600',
+              border: sendingType === 'dart' ? 'none' : '1px solid rgba(0, 102, 0, 0.2)',
               padding: '6px 12px',
               borderRadius: '20px',
               fontSize: '12px',
               fontWeight: 'bold',
-              cursor: 'pointer',
+              cursor: sendingType !== null ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
+              opacity: sendingType !== null && sendingType !== 'dart' ? 0.4 : 1,
               boxShadow: '0 2px 6px rgba(0, 102, 0, 0.1)',
-              transition: 'transform 0.15s ease',
+              transition: 'all 0.15s ease',
               marginLeft: '4px'
             }}
-            onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-            onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+            onMouseOver={(e) => sendingType === null && (e.currentTarget.style.transform = 'scale(1.05)')}
+            onMouseOut={(e) => sendingType === null && (e.currentTarget.style.transform = 'scale(1)')}
           >
-            <span>📋 DART 톡</span>
+            <span>{sendingType === 'dart' ? '⏳ 분석 중...' : '📋 DART 톡'}</span>
           </button>
 
           {/* Financials Talk Trigger Button */}
           <button 
             className="kakao-fin-btn" 
             onClick={triggerFinancialsTalk}
+            disabled={sendingType !== null}
             style={{
-              background: '#E6F0FF',
-              color: '#0044cc',
-              border: '1px solid rgba(0, 68, 204, 0.2)',
+              background: sendingType === 'financials' ? '#555555' : '#E6F0FF',
+              color: sendingType === 'financials' ? '#ffffff' : '#0044cc',
+              border: sendingType === 'financials' ? 'none' : '1px solid rgba(0, 68, 204, 0.2)',
               padding: '6px 12px',
               borderRadius: '20px',
               fontSize: '12px',
               fontWeight: 'bold',
-              cursor: 'pointer',
+              cursor: sendingType !== null ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
+              opacity: sendingType !== null && sendingType !== 'financials' ? 0.4 : 1,
               boxShadow: '0 2px 6px rgba(0, 68, 204, 0.1)',
-              transition: 'transform 0.15s ease',
+              transition: 'all 0.15s ease',
               marginLeft: '4px'
             }}
-            onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-            onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+            onMouseOver={(e) => sendingType === null && (e.currentTarget.style.transform = 'scale(1.05)')}
+            onMouseOut={(e) => sendingType === null && (e.currentTarget.style.transform = 'scale(1)')}
           >
-            <span>📉 재무 톡</span>
+            <span>{sendingType === 'financials' ? '⏳ 분석 중...' : '📉 재무 톡'}</span>
           </button>
 
           {/* Settings Modal Trigger Button */}
