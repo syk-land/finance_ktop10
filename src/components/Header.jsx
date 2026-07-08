@@ -229,37 +229,6 @@ export default function Header({ isLive, isAiLive }) {
         </div>
 
         <div className="header-status">
-          {/* Real-time Data Source Badge */}
-          {isLive ? (
-            <div className="data-source-badge live">
-              <span className="source-dot"></span>
-              <span>네이버 실시간 시세 연동</span>
-            </div>
-          ) : (
-            <div className="data-source-badge demo">
-              <span className="source-dot"></span>
-              <span>⚠️ 데모/오프라인 모드</span>
-            </div>
-          )}
-
-          {/* AI Connection dynamic badge (Static view only, no settings modal trigger) */}
-          {isAiLive ? (
-            <div className="api-key-badge active" style={{ cursor: 'default' }}>
-              <span className="key-icon">🔑</span>
-              <span>Gemini 모델 연결됨</span>
-            </div>
-          ) : (
-            <div className="api-key-badge inactive" style={{ cursor: 'default' }}>
-              <span className="key-icon">⚠️</span>
-              <span>AI 모델 오프라인 데모</span>
-            </div>
-          )}
-
-          <div className="status-indicator">
-            <span className="pulse-dot"></span>
-            <span className="status-label">AI Engine Active</span>
-          </div>
-
           {/* KakaoTalk Test Notification Trigger Button */}
           <button 
             className="kakao-test-btn" 

@@ -1,4 +1,50 @@
 {
   "notifications": [],
-  "priceTracker": {}
+  "priceTracker": {
+    "samsung": {
+      "dayOpenPrice": 288000,
+      "lastNotifiedPrice": 288000,
+      "notifiedBands": []
+    },
+    "skhynix": {
+      "dayOpenPrice": 2259000,
+      "lastNotifiedPrice": 2259000,
+      "notifiedBands": []
+    },
+    "hyundai": {
+      "dayOpenPrice": 470000,
+      "lastNotifiedPrice": 470000,
+      "notifiedBands": []
+    },
+    "samsungbiologics": {
+      "dayOpenPrice": 1388000,
+      "lastNotifiedPrice": 1388000,
+      "notifiedBands": []
+    },
+    "kia": {
+      "dayOpenPrice": 157300,
+      "lastNotifiedPrice": 157300,
+      "notifiedBands": []
+    },
+    "celltrion": {
+      "dayOpenPrice": 180100,
+      "lastNotifiedPrice": 180100,
+      "notifiedBands": []
+    },
+    "kbfg": {
+      "dayOpenPrice": 174100,
+      "lastNotifiedPrice": 174100,
+      "notifiedBands": []
+    },
+    "posco": {
+      "dayOpenPrice": 309500,
+      "lastNotifiedPrice": 309500,
+      "notifiedBands": []
+    },
+    "naver": {
+      "dayOpenPrice": 194100,
+      "lastNotifiedPrice": 194100,
+      "notifiedBands": []
+    }
+  }
 }
