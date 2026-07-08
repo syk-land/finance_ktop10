@@ -14,13 +14,14 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 dotenv.config();
 
-const app = reportAppAndStart();
+const app = express();
 const PORT = process.env.PORT || 5005;
 
 app.use(cors());
 app.use(express.json());
 
 const CACHE_FILE = path.join(process.cwd(), 'analysis_cache.json');
+const NOTIF_FILE = path.join(process.cwd(), 'notifications_cache.json');
 
 // Supported Gemini Models (Fallback order to handle RPM/RPD limits)
 const GEMINI_MODELS = [
@@ -33,94 +34,45 @@ const GEMINI_MODELS = [
   'gemini-1.5-flash'
 ];
 
-// Fallback Helper: Query Gemini Live API via WebSocket (RPM/RPD Unlimited Bypass)
-async function queryGeminiLiveApi(geminiApiKey, prompt, targetModel = 'models/gemini-2.5-flash-native-audio-dialog') {
-  return new Promise((resolve, reject) => {
-    const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${geminiApiKey}`;
-    
-    console.log(`[GeminiLiveAPI] Opening WebSocket connection to ${targetModel}...`);
-    const ws = new WebSocket(wsUrl);
-    let fullText = '';
-    let timeoutId = null;
-
-    ws.onopen = () => {
-      // 1. Send Setup frame
-      const setupFrame = {
-        setup: {
-          model: targetModel,
-          generationConfig: {
-            responseMimeType: 'application/json'
-          }
-        }
-      };
-      ws.send(JSON.stringify(setupFrame));
-
-      // 2. Send actual text query prompt
-      const contentFrame = {
-        clientContent: {
-          turns: [
-            {
-              role: 'user',
-              parts: [{ text: prompt }]
-            }
-          ],
-          turnComplete: true
-        }
-      };
-      ws.send(JSON.stringify(contentFrame));
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        
-        // Extract text chunks from server turn
-        const parts = data.serverContent?.modelTurn?.parts;
-        if (parts && Array.isArray(parts)) {
-          for (const part of parts) {
-            if (part.text) {
-              fullText += part.text;
-            }
-          }
-        }
-
-        // Close on turn completion
-        if (data.serverContent?.turnComplete) {
-          console.log(`[GeminiLiveAPI] Turn complete signal received. Closing socket.`);
-          clearTimeout(timeoutId);
-          ws.close();
-          resolve(fullText.trim());
-        }
-      } catch (err) {
-        console.error('[GeminiLiveAPI] Frame parse error:', err.message);
-      }
-    };
-
-    ws.onerror = (err) => {
-      console.error('[GeminiLiveAPI] Socket error occurred:', err);
-      clearTimeout(timeoutId);
-      reject(new Error('WebSocket connection failed'));
-    };
-
-    ws.onclose = () => {
-      console.log('[GeminiLiveAPI] Socket connection closed.');
-      clearTimeout(timeoutId);
-      if (fullText) {
-        resolve(fullText.trim());
-      } else {
-        reject(new Error('Connection closed without output text'));
-      }
-    };
-
-    // 15 seconds safety timeout
-    timeoutId = setTimeout(() => {
-      console.warn('[GeminiLiveAPI] Query execution hit safety timeout. Forcing resolution.');
-      ws.close();
-      if (fullText) resolve(fullText.trim());
-      else reject(new Error('Query timed out'));
-    }, 15000);
-  });
-}
+// DART Mock source data for 10 companies
+const COMPANY_DART_MOCK = {
+  samsung: [
+    { date: '2026-05-15', title: '분기보고서 (2026.03)', reporter: '삼성전자', content: '매출액 78.5조원, 영업이익 10.2조원 기록. AI 반도체 HBM 사업부 매출이 전년 동기 대비 140% 성장하며 실적 호조 견인. 파운드리 부문 수율 개선으로 적자 폭 대폭 축소.' },
+    { date: '2026-04-20', title: '특허 취득 (반도체 패키징 기술)', reporter: '삼성전자', content: '3D 실리콘 관통전극(TSV)을 활용한 초고대역폭 메모리 적층 특허 취득. 차세대 AI 가속기 시장의 독점적 기술 우위 확보를 목적으로 함.' },
+    { date: '2026-03-12', title: '주주총회결과', reporter: '삼성전자', content: '사내이사 선임의 건 및 배당금 총액 9.8조원 배당 안건 원안대로 가결. 온디바이스 AI 및 스마트가전 연계 생태계 확장 계획 발표.' }
+  ],
+  skhynix: [
+    { date: '2026-05-15', title: '분기보고서 (2026.03)', reporter: 'SK하이닉스', content: '매출액 15.2조원, 영업이익 3.2조원 달성. 고성능 HBM3E 및 서버용 DDR5 판매 호조로 어닝 서프라이즈 기록. 순이익 2.1조원으로 흑자 턴어라운드 안착.' },
+    { date: '2026-04-10', title: '단일판매ㆍ공급계약체결 (AI 가속기용 메모리)', reporter: 'SK하이닉스', content: '글로벌 주요 테크사향 차세대 AI 가속기용 HBM 대규모 장기 공급 계약 체결. 계약 금액은 경영상 비밀로 유보하였으나 직전 매출액의 15% 이상으로 추정.' },
+    { date: '2026-03-25', title: '주주총회결과', reporter: 'SK하이닉스', content: '재무제표 승인 및 신임 사외이사 선임 완료. 초고다층 3D NAND 개발 및 첨단 패키징 설비 확충을 위한 투자 재원 확보 승인.' }
+  ],
+  hyundai: [
+    { date: '2026-05-15', title: '분기보고서 (2026.03)', reporter: '현대자동차', content: '매출액 42.1조원, 영업이익 3.9조원 기록. 북미 및 유럽향 하이브리드(HEV) 차량 판매 급증 및 고부가가치 제네시스 차종 비중 확대로 이익률 방어 성공.' },
+    { date: '2026-04-05', title: '신규시설투자계획 (친환경 라인 증설)', reporter: '현대자동차', content: '미국 조지아 메타플랜트 내에 하이브리드 전용 생산 라인 증설 결정. 총 투자 금액 8,500억 원 규모로 친환경차 수요 다변화 대응 목적.' }
+  ],
+  samsungbiologics: [
+    { date: '2026-05-15', title: '분기보고서 (2026.03)', reporter: '삼성바이오로직스', content: '매출액 9,800억원, 영업이익 3,100억원 기록. 4공장 가동률 상승 및 글로벌 제약사 수주 물량 확대. 부채비율 60% 이하로 재무안전성 유지.' },
+    { date: '2026-04-18', title: '단일판매ㆍ공급계약체결 (의약품 위탁생산)', reporter: '삼성바이오로직스', content: '미국 소재 글로벌 제약사와 3,400억 원 규모의 바이오 의약품 위탁생산(CMO) 계약 체결. 5공장 조기 가동 로드맵에 따른 추가 캐파 확보 완료.' }
+  ],
+  kia: [
+    { date: '2026-05-15', title: '분기보고서 (2026.03)', reporter: '기아', content: '매출액 26.2조원, 영업이익 2.8조원 달성. 미국 레저용 차량(RV) 중심 판매 믹스 개선 및 친환경차 인센티브 하락으로 분기 사상 최대 이익률 달성.' }
+  ],
+  celltrion: [
+    { date: '2026-05-15', title: '분기보고서 (2026.03)', reporter: '셀트리온', content: '매출액 6,200억원, 영업이익 1,500억원 기록. 자가면역질환 치료제 램시마SC의 미국 짐펜트라 신규 런칭 매출 본격화. 마진율 24% 수준 회복.' }
+  ],
+  kbfg: [
+    { date: '2026-05-15', title: '분기보고서 (2026.03)', reporter: 'KB금융', content: '당기순이익 1.2조원 기록. 비이자이익 수수료 부문 회복 및 선제적 대손충당금 적립 완료. 보통주자본(CET1) 비율 13.5%로 주주환원 확대 가능.' }
+  ],
+  posco: [
+    { date: '2026-05-15', title: '분기보고서 (2026.03)', reporter: 'POSCO홀딩스', content: '매출액 18.9조원, 영업이익 8,900억원 기록. 철강 시황 회복 지연에 따라 실적이 다소 횡보하였으나 리튬 등 이차전지 소재 공장 순차 가동 개시.' }
+  ],
+  naver: [
+    { date: '2026-05-15', title: '분기보고서 (2026.03)', reporter: 'NAVER', content: '매출액 2.5조원, 영업이익 4,200억원 기록. 서치플랫폼 검색 광고 매출 회복 및 AI 기반 맞춤형 타겟 광고 고도화 성공. 네이버웹툰 글로벌 유료 가입자 성장세 유지.' }
+  ],
+  lgchem: [
+    { date: '2026-05-15', title: '분기보고서 (2026.03)', reporter: 'LG화학', content: '매출액 12.8조원, 영업이익 4,500억원 기록. 석유화학 범용 스프레드 악화에도 불구하고 첨단소재 양극재 물량 본격 양산으로 실적 방어 성공.' }
+  ]
+};
 
 // K-TOP 10 Stock ticker mapping
 const TICKER_MAP = {
@@ -149,7 +101,7 @@ const COMPANY_NAME_MAP = {
   lgchem: 'LG화학'
 };
 
-// Outstanding shares (상장주식수) for real-time market cap calculation
+// Outstanding shares for real-time market cap calculation
 const OUTSTANDING_SHARES = {
   samsung: 5969782550,
   skhynix: 728002365,
@@ -216,30 +168,37 @@ const COMPANY_FINANCIALS = {
   ]
 };
 
-function reportAppAndStart() {
-  return express();
-}
-
-// JSON Cache read/write utilities
-const readCache = () => {
+// JSON cache helper
+const readJsonFile = (filePath) => {
   try {
-    if (fs.existsSync(CACHE_FILE)) {
-      const data = fs.readFileSync(CACHE_FILE, 'utf8');
+    if (fs.existsSync(filePath)) {
+      const data = fs.readFileSync(filePath, 'utf8');
       return JSON.parse(data);
     }
   } catch (err) {
-    console.error('[Cache] Read error:', err.message);
+    console.error(`[FileIO] Read error for ${filePath}:`, err.message);
   }
   return {};
 };
 
-const writeCache = (cacheData) => {
+const writeJsonFile = (filePath, data) => {
   try {
-    fs.writeFileSync(CACHE_FILE, JSON.stringify(cacheData, null, 2), 'utf8');
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
   } catch (err) {
-    console.error('[Cache] Write error:', err.message);
+    console.error(`[FileIO] Write error for ${filePath}:`, err.message);
   }
 };
+
+const readCache = () => readJsonFile(CACHE_FILE);
+const writeCache = (data) => writeJsonFile(CACHE_FILE, data);
+
+const readNotifCache = () => {
+  const data = readJsonFile(NOTIF_FILE);
+  if (!data.notifications) data.notifications = [];
+  if (!data.priceTracker) data.priceTracker = {};
+  return data;
+};
+const writeNotifCache = (data) => writeJsonFile(NOTIF_FILE, data);
 
 const getRelativeTime = (date) => {
   const diffMs = new Date() - date;
@@ -252,7 +211,7 @@ const getRelativeTime = (date) => {
   return `${diffDays}일 전`;
 };
 
-// Fallback stock/news generators
+// Fallback generators
 const generateMockStockHistory = (companyId) => {
   const data = [];
   const today = new Date();
@@ -380,7 +339,27 @@ async function fetchNewsData(companyName) {
   }
 }
 
-// Generate real Gemini Stock causation analysis with model fallback
+// Generate DART summary via Gemini
+async function generateDartSummary(geminiApiKey, title, content) {
+  if (!geminiApiKey) {
+    return `[데모 요약] ${title}에 관해 공시된 사항입니다.`;
+  }
+  const prompt = `
+당신은 DART 기업 공시 분석가입니다. 주주들을 위해 다음 공시의 핵심 요약문 1문장(50자 내외)만 명확히 써주세요. 설명이나 인사말 없이 결과 문장만 리턴하세요.
+- 공시 제목: ${title}
+- 공시 내용: ${content}
+  `;
+  try {
+    const genAI = new GoogleGenerativeAI(geminiApiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const result = await model.generateContent(prompt);
+    return result.response.text().trim();
+  } catch (err) {
+    return `[데모 요약] ${title}: 핵심 사업 및 재무 성과 연계 공시.`;
+  }
+}
+
+// Generate real Gemini Stock causation analysis
 async function generateGeminiAnalysis(geminiApiKey, companyName, financials, newsData, stockData) {
   const closes = stockData.map(d => d.close);
   const startPrice = closes[0];
@@ -426,7 +405,6 @@ async function generateGeminiAnalysis(geminiApiKey, companyName, financials, new
   const genAI = new GoogleGenerativeAI(geminiApiKey);
   let lastError = null;
 
-  // 1. Try REST Models
   for (const modelName of GEMINI_MODELS) {
     try {
       console.log(`[GeminiAPI] [Causation] Querying ${modelName} for ${companyName}...`);
@@ -447,27 +425,11 @@ async function generateGeminiAnalysis(geminiApiKey, companyName, financials, new
     }
   }
 
-  // 2. Try WebSocket Live API (Unlimited Bypass)
-  console.log(`[GeminiAPI] [Causation] REST models failed. Trying Unlimited Live API (WebSocket)...`);
-  const liveModels = ['models/gemini-2.5-flash-native-audio-dialog', 'models/gemini-3-flash-live'];
-  for (const liveModel of liveModels) {
-    try {
-      const responseText = await queryGeminiLiveApi(geminiApiKey, prompt, liveModel);
-      const parsed = JSON.parse(responseText.trim());
-      console.log(`[GeminiAPI] [Causation] [LiveAPI] Successfully retrieved analysis using ${liveModel}!`);
-      return parsed;
-    } catch (err) {
-      console.warn(`[GeminiAPI] [Causation] [LiveAPI] Web socket query failed using ${liveModel}:`, err.message);
-      lastError = err;
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-  }
-
-  console.error(`[GeminiAPI] All models and Live API exhausted for ${companyName} causation report.`);
+  console.error(`[GeminiAPI] All models exhausted for ${companyName} causation report.`);
   throw lastError;
 }
 
-// Generate static Gemini Finance analysis with model fallback
+// Generate static Gemini Finance analysis
 async function generateGeminiFinanceAnalysis(geminiApiKey, companyName, financials) {
   if (!geminiApiKey) {
     return getMockFinanceAnalysis(companyName);
@@ -493,7 +455,6 @@ async function generateGeminiFinanceAnalysis(geminiApiKey, companyName, financia
   const genAI = new GoogleGenerativeAI(geminiApiKey);
   let lastError = null;
 
-  // 1. Try REST Models
   for (const modelName of GEMINI_MODELS) {
     try {
       console.log(`[GeminiAPI] [Finance] Querying ${modelName} for ${companyName}...`);
@@ -514,27 +475,11 @@ async function generateGeminiFinanceAnalysis(geminiApiKey, companyName, financia
     }
   }
 
-  // 2. Try WebSocket Live API (Unlimited Bypass)
-  console.log(`[GeminiAPI] [Finance] REST models failed. Trying Unlimited Live API (WebSocket)...`);
-  const liveModels = ['models/gemini-2.5-flash-native-audio-dialog', 'models/gemini-3-flash-live'];
-  for (const liveModel of liveModels) {
-    try {
-      const responseText = await queryGeminiLiveApi(geminiApiKey, prompt, liveModel);
-      const parsed = JSON.parse(responseText.trim());
-      console.log(`[GeminiAPI] [Finance] [LiveAPI] Successfully retrieved analysis using ${liveModel}!`);
-      return parsed;
-    } catch (err) {
-      console.warn(`[GeminiAPI] [Finance] [LiveAPI] Web socket query failed using ${liveModel}:`, err.message);
-      lastError = err;
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-  }
-
-  console.error(`[GeminiAPI] All models and Live API exhausted for ${companyName} finance report.`);
+  console.error(`[GeminiAPI] All models exhausted for ${companyName} finance report.`);
   throw lastError;
 }
 
-// Background Async Updater (Forces rebuild quietly after responding to client)
+// Background Async Updater
 async function executeSingleCompanyUpdateInBackground(companyId, geminiApiKey) {
   const ticker = TICKER_MAP[companyId];
   const companyName = COMPANY_NAME_MAP[companyId];
@@ -547,6 +492,15 @@ async function executeSingleCompanyUpdateInBackground(companyId, geminiApiKey) {
 
     const latestPrice = stockRes.data[stockRes.data.length - 1]?.close || 100000;
     const latestNewsTitle = newsRes.data[0]?.title || '';
+
+    // Generate summaries for DART mock articles
+    const dartData = COMPANY_DART_MOCK[companyId] || [];
+    const summarizedDart = await Promise.all(
+      dartData.map(async (item) => ({
+        ...item,
+        aiSummary: await generateDartSummary(geminiApiKey, item.title, item.content)
+      }))
+    );
 
     const [aiReport, financeReport] = await Promise.all([
       generateGeminiAnalysis(geminiApiKey, companyName, financials, newsRes.data, stockRes.data),
@@ -564,13 +518,77 @@ async function executeSingleCompanyUpdateInBackground(companyId, geminiApiKey) {
       newsData: newsRes.data,
       aiReport,
       financeReport,
+      dartData: summarizedDart,
       isAiLive: !!geminiApiKey
     };
     writeCache(cache);
+
+    // Track price fluctuations for 5% notifications
+    trackPriceFluctuation(companyId, latestPrice);
+
     console.log(`[AsyncUpdater] Success! Cached updated for ${companyName}.`);
   } catch (err) {
     console.error(`[AsyncUpdater] Background pipeline failed for ${companyName}:`, err.message);
   }
+}
+
+// Track price fluctuation and trigger 5% alerts
+function trackPriceFluctuation(companyId, currentPrice) {
+  const notifCache = readNotifCache();
+  const companyName = COMPANY_NAME_MAP[companyId];
+
+  if (!notifCache.priceTracker[companyId]) {
+    notifCache.priceTracker[companyId] = {
+      dayOpenPrice: currentPrice,
+      lastNotifiedPrice: currentPrice,
+      notifiedBands: []
+    };
+    writeNotifCache(notifCache);
+    return;
+  }
+
+  const tracker = notifCache.priceTracker[companyId];
+  const openPrice = tracker.dayOpenPrice || currentPrice;
+  const lastPrice = tracker.lastNotifiedPrice || openPrice;
+
+  const pctFromOpen = ((currentPrice - openPrice) / openPrice) * 100;
+  const pctFromLast = ((currentPrice - lastPrice) / lastPrice) * 100;
+
+  let triggerAlert = false;
+  let alertMessage = '';
+
+  // 1. Initial 5% change from open
+  if (Math.abs(pctFromOpen) >= 5 && !tracker.notifiedBands.includes('open_5')) {
+    triggerAlert = true;
+    tracker.notifiedBands.push('open_5');
+    alertMessage = `⚠️ [${companyName}] 주가 급등락! 시작가(${openPrice.toLocaleString()}원) 대비 ${pctFromOpen.toFixed(1)}% 변동 (현재가: ${currentPrice.toLocaleString()}원)`;
+  } 
+  // 2. Subsequent 5% changes from last notified price
+  else if (Math.abs(pctFromLast) >= 5) {
+    triggerAlert = true;
+    alertMessage = `⚠️ [${companyName}] 주가 추가 변동! 직전 알림가(${lastPrice.toLocaleString()}원) 대비 ${pctFromLast.toFixed(1)}% 변동 (현재가: ${currentPrice.toLocaleString()}원)`;
+  }
+
+  if (triggerAlert) {
+    tracker.lastNotifiedPrice = currentPrice;
+    const notification = {
+      id: Date.now().toString() + '_' + Math.random().toString(36).substr(2, 5),
+      companyId,
+      companyName,
+      type: 'price_fluctuation',
+      message: alertMessage,
+      timestamp: new Date().toISOString()
+    };
+    notifCache.notifications.unshift(notification);
+    // Keep max 30 recent alerts
+    if (notifCache.notifications.length > 30) {
+      notifCache.notifications.pop();
+    }
+    console.log(`[NotificationTriggered] ${alertMessage}`);
+  }
+
+  notifCache.priceTracker[companyId] = tracker;
+  writeNotifCache(notifCache);
 }
 
 // Combined dynamic synchronization logic (Pre-fetch & 1-minute interval update)
@@ -584,7 +602,6 @@ async function executeSynchronizationCycle(forcedApiKey = null, isInitialRun = f
       const companyName = COMPANY_NAME_MAP[companyId];
       const financials = COMPANY_FINANCIALS[companyId];
 
-      // 1. Fetch latest raw data
       const stockRes = await fetchStockData(companyId, TICKER_MAP[companyId]);
       const newsRes = await fetchNewsData(companyName);
 
@@ -594,8 +611,6 @@ async function executeSynchronizationCycle(forcedApiKey = null, isInitialRun = f
       const cached = cache[companyId];
       let needsReanalysis = true;
 
-      // Invalidation logic: news title changes OR price fluctuates by >= 5%
-      // If it's the initial run of the server, we bypass this check to force build and log everything!
       if (!isInitialRun && cached && cached.aiReport && cached.financeReport) {
         const priceChangePct = Math.abs((latestPrice - cached.lastPrice) / cached.lastPrice) * 100;
         const isNewsSame = latestNewsTitle === cached.lastNewsTitle;
@@ -606,9 +621,16 @@ async function executeSynchronizationCycle(forcedApiKey = null, isInitialRun = f
       }
 
       if (needsReanalysis) {
-        console.log(`[CacheScheduler] [REBUILD REQUIRED] Generating AI reports for ${companyName} (InitialRun: ${isInitialRun})...`);
+        console.log(`[CacheScheduler] [REBUILD REQUIRED] Generating AI reports for ${companyName}...`);
         
-        // Execute Gemini requests
+        const dartData = COMPANY_DART_MOCK[companyId] || [];
+        const summarizedDart = await Promise.all(
+          dartData.map(async (item) => ({
+            ...item,
+            aiSummary: await generateDartSummary(geminiApiKey, item.title, item.content)
+          }))
+        );
+
         const aiReport = await generateGeminiAnalysis(
           geminiApiKey,
           companyName,
@@ -623,7 +645,6 @@ async function executeSynchronizationCycle(forcedApiKey = null, isInitialRun = f
           financials
         );
 
-        // Update cache entry
         cache[companyId] = {
           lastUpdated: new Date().toISOString(),
           lastPrice: latestPrice,
@@ -634,24 +655,27 @@ async function executeSynchronizationCycle(forcedApiKey = null, isInitialRun = f
           newsData: newsRes.data,
           aiReport,
           financeReport,
+          dartData: summarizedDart,
           isAiLive: !!geminiApiKey
         };
         writeCache(cache);
         console.log(`[CacheScheduler] Cache database entry updated & saved for ${companyName}.`);
 
-        // Wait to prevent API rate limit burst
         if (geminiApiKey) {
           await new Promise(resolve => setTimeout(resolve, 4000));
         }
       } else {
         console.log(`[CacheScheduler] Cache hit! ${companyName} data is already up-to-date. Skipping AI regeneration.`);
-        // Just update structural source mappings if changed, but keep AI reports
         cache[companyId].stockSource = stockRes.source;
         cache[companyId].newsSource = newsRes.source;
         cache[companyId].stockData = stockRes.data;
         cache[companyId].newsData = newsRes.data;
         writeCache(cache);
       }
+
+      // Track price fluctuations
+      trackPriceFluctuation(companyId, latestPrice);
+
     } catch (err) {
       console.error(`[CacheScheduler] Failed synchronization for ${companyId}:`, err.message);
     }
@@ -659,7 +683,7 @@ async function executeSynchronizationCycle(forcedApiKey = null, isInitialRun = f
   console.log('[CacheScheduler] Synchronization cycle completed.');
 }
 
-// 1. Single Unified GET Endpoint: returns stock, news, causation AI, and finance AI instantly (0ms Stale Serve)
+// 1. Unified GET Endpoint (0ms Stale Serve)
 app.get('/api/stock/:companyId', async (req, res) => {
   const { companyId } = req.params;
   const ticker = TICKER_MAP[companyId];
@@ -688,9 +712,7 @@ app.get('/api/stock/:companyId', async (req, res) => {
       }
     }
 
-    // 1. FAST-PATH (Serve Cache IMMEDIATELY - 0ms Waiting)
     if (cached && cached.aiReport && cached.financeReport) {
-      // Instantly calculate and return response from cached file
       const latestClose = cached.stockData[cached.stockData.length - 1]?.close || 100000;
       const sharesCount = OUTSTANDING_SHARES[companyId] || 100000000;
       const calculatedMarketCap = latestClose * sharesCount;
@@ -705,14 +727,14 @@ app.get('/api/stock/:companyId', async (req, res) => {
         newsData: cached.newsData,
         aiReport: cached.aiReport,
         financeReport: cached.financeReport,
+        dartData: cached.dartData || [],
         lastUpdated: cached.lastUpdated,
         marketCap: marketCapTrillion,
         allMarketCaps
       });
     }
 
-    // 2. SLOW-PATH FALLBACK (Only hit if cache is missing from disk entirely - 0ms mockup fallback)
-    console.log(`[API /stock] Cache missing for ${companyName}. Serving quick mock and launching background generator.`);
+    console.log(`[API /stock] Cache missing for ${companyName}. Serving quick mock.`);
     const mockData = generateMockStockHistory(companyId);
     const mockNews = generateMockNews(companyName);
     const mockCausation = getMockCausationAnalysis(companyName, '보합세', mockNews);
@@ -727,14 +749,14 @@ app.get('/api/stock/:companyId', async (req, res) => {
       newsData: mockNews,
       aiReport: mockCausation,
       financeReport: mockFinance,
+      dartData: COMPANY_DART_MOCK[companyId] || [],
       lastUpdated: new Date().toISOString(),
       marketCap: '계산 불가',
       allMarketCaps
     });
 
-    // Populate actual data in the background silently
     executeSingleCompanyUpdateInBackground(companyId, geminiApiKey).catch(err => {
-      console.error(`[API /stock] Background initial pre-fetch failed for ${companyName}:`, err.message);
+      console.error(`[API /stock] Background pre-fetch failed for ${companyName}:`, err.message);
     });
 
   } catch (error) {
@@ -743,13 +765,27 @@ app.get('/api/stock/:companyId', async (req, res) => {
   }
 });
 
+// 2. Notifications Pull API Endpoint
+app.get('/api/notifications', (req, res) => {
+  try {
+    const notifCache = readNotifCache();
+    res.json(notifCache.notifications || []);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to retrieve notifications' });
+  }
+});
+
 // Start server and initialize loops
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`[Server] Finance AI Backend is running on http://127.0.0.1:${PORT}`);
   
-  // 1. Kick off immediate initial pre-fetch after 3 seconds
   setTimeout(async () => {
-    // Clear old invalid/corrupt caches and rebuild with fresh, correct mappings
+    // Reset notification tracker on startup
+    const notifCache = readNotifCache();
+    notifCache.notifications = [];
+    notifCache.priceTracker = {};
+    writeNotifCache(notifCache);
+
     if (fs.existsSync(CACHE_FILE)) {
       try {
         fs.unlinkSync(CACHE_FILE);
@@ -761,7 +797,6 @@ app.listen(PORT, '0.0.0.0', () => {
 
     await executeSynchronizationCycle(null, true);
     
-    // 2. Schedule synchronization check cycle every 60 seconds (1 minute)
     console.log('[CacheScheduler] Scheduling 1-minute interval cache updates.');
     setInterval(() => {
       executeSynchronizationCycle();

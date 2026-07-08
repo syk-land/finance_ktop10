@@ -87,14 +87,14 @@
 - [x] 다크 금융 포털 디자인과 조화되는 네이버 금융 아웃링크 탑재 (종목별 동적 타겟 연계)
 - [x] 왼쪽 기업 카드 목록 시가총액 금액을 네이버 실시간 주가와 발행주식수가 계산된 실시간 시가총액 데이터로 전체 자동 동기화
 - [x] Strict Mode 상의 마운트 레이스 컨디션을 방지하는 `prev.length` 기반 타이핑 스트리밍 제거 및 즉시 렌더링 전환
+- [x] 기업별 DART 주요 의무공시 비교 및 **BOM 인코딩이 적용된 CSV 로컬 내보내기/다운로드** 기능 완비
+- [x] 시작가 대비 5% 변동 및 직전 알림 대비 5% 변동 시 작동하는 **주가 급등락 실시간 알림 스케줄러** 탑재 (Notification API 연동)
 
 ## 참조한 컨텍스트
-- [server.js](file:///D:/workspace/newfolder/server.js) (Express API Endpoints & Scheduler)
+- [server.js](file:///D:/workspace/newfolder/server.js) (Express API Endpoints, Scheduler, DART Mock, Price Tracking)
 - [src/App.jsx](file:///D:/workspace/newfolder/src/App.jsx) (State Synchronization Hub)
-- [src/components/Header.jsx](file:///D:/workspace/newfolder/src/components/Header.jsx) (Main Header Interface)
-- [src/components/FinancialDashboard.jsx](file:///D:/workspace/newfolder/src/components/FinancialDashboard.jsx) (Naver Outlink integration)
-- [src/components/AIAnalystReport.jsx](file:///D:/workspace/newfolder/src/components/AIAnalystReport.jsx) (Static render without typing latency)
-- [src/components/CompanySidebar.jsx](file:///D:/workspace/newfolder/src/components/CompanySidebar.jsx) (Dynamic sidebar list integration)
+- [src/components/DartViewer.jsx](file:///D:/workspace/newfolder/src/components/DartViewer.jsx) (DART disclosures renderer & CSV generation)
+- [src/components/NotificationToast.jsx](file:///D:/workspace/newfolder/src/components/NotificationToast.jsx) (Real-time polling & Toast notification trigger)
 
 ## 검증 결과
 - 빌드 상태: [Success] (Vite 정적 컴파일 및 청크 빌드 0 Error 완벽 통과)
@@ -102,12 +102,11 @@
 - 린트 상태: [0 Warnings / 0 Errors]
 
 ## 변경 파일
-- [server.js](file:///D:/workspace/newfolder/server.js) (수정, 770라인)
-- [src/App.jsx](file:///D:/workspace/newfolder/src/App.jsx) (수정, 188라인)
-- [src/components/Header.jsx](file:///D:/workspace/newfolder/src/components/Header.jsx) (수정, 63라인)
-- [src/components/FinancialDashboard.jsx](file:///D:/workspace/newfolder/src/components/FinancialDashboard.jsx) (수정, 391라인)
-- [src/components/AIAnalystReport.jsx](file:///D:/workspace/newfolder/src/components/AIAnalystReport.jsx) (수정, 240라인)
-- [.env](file:///D:/workspace/newfolder/.env) (수정, 3라인)
+- [server.js](file:///D:/workspace/newfolder/server.js) (수정, 995라인)
+- [src/App.jsx](file:///D:/workspace/newfolder/src/App.jsx) (수정, 203라인)
+- [src/App.css](file:///D:/workspace/newfolder/src/App.css) (수정, 1720라인)
+- [src/components/DartViewer.jsx](file:///D:/workspace/newfolder/src/components/DartViewer.jsx) (신규 생성, 85라인)
+- [src/components/NotificationToast.jsx](file:///D:/workspace/newfolder/src/components/NotificationToast.jsx) (신규 생성, 65라인)
 
 ## 다음 단계 또는 승인 요청
 - 최종 깃 애드 및 커밋, 리모트 푸시 명령 실행 완료. 모든 리액트 서비스 및 백엔드 0-Delay 최적화 릴리즈 배포 완료.

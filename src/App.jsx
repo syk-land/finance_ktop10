@@ -5,6 +5,8 @@ import CompanySidebar from './components/CompanySidebar';
 import FinancialDashboard from './components/FinancialDashboard';
 import AIAnalystReport from './components/AIAnalystReport';
 import NewsSentiment from './components/NewsSentiment';
+import DartViewer from './components/DartViewer';
+import NotificationToast from './components/NotificationToast';
 import './App.css';
 
 const BACKEND_URL = 'http://localhost:5005';
@@ -22,6 +24,7 @@ function App() {
   const [lastUpdated, setLastUpdated] = useState('');
   const [marketCap, setMarketCap] = useState('');
   const [companies, setCompanies] = useState(companiesData);
+  const [dartData, setDartData] = useState([]);
   
   const [aiLoading, setAiLoading] = useState(false);
   const [isLive, setIsLive] = useState(false); // Stock/News connection status
@@ -49,6 +52,7 @@ function App() {
         setNewsData(stockResult.newsData);
         setAiReport(stockResult.aiReport);
         setFinanceReport(stockResult.financeReport);
+        setDartData(stockResult.dartData || []);
         setLastUpdated(stockResult.lastUpdated || '');
         setMarketCap(stockResult.marketCap || selectedCompany.marketCap);
 
@@ -90,6 +94,7 @@ function App() {
         setIsAiLive(false);
         setLastUpdated(new Date().toISOString());
         setMarketCap(selectedCompany.marketCap);
+        setDartData([]);
 
         const mockCloses = generateLocalMockStock(selectedId);
         setStockData(mockCloses);
@@ -159,6 +164,7 @@ function App() {
 
   return (
     <div className="app-container">
+      <NotificationToast />
       <Header isLive={isLive} isAiLive={isAiLive} />
       <div className="app-layout">
         <CompanySidebar
@@ -187,6 +193,10 @@ function App() {
           <NewsSentiment
             news={newsAnalysis.length > 0 ? newsAnalysis : selectedCompany.news}
             isLive={isLive}
+          />
+          <DartViewer
+            companyName={selectedCompany.name}
+            dartData={dartData}
           />
         </main>
       </div>
