@@ -947,20 +947,21 @@ app.post('/api/generate-financials-report-text', (req, res) => {
     let text = `📉 [K-TOP 10 기업 핵심 재무제표 비교 요약]\n\n`;
     Object.keys(COMPANY_NAME_MAP).forEach((cid, idx) => {
       const name = COMPANY_NAME_MAP[cid];
-      const fin = COMPANY_FINANCIALS[cid] || {};
-      const years = fin.years || ['2021', '2022', '2023'];
-      const rev = fin.revenue || [0, 0, 0];
-      const op = fin.operatingProfit || [0, 0, 0];
+      const finList = COMPANY_FINANCIALS[cid] || [];
       
-      const latestIdx = years.length - 1;
-      const latestYear = years[latestIdx];
-      const latestRev = rev[latestIdx];
-      const latestOp = op[latestIdx];
-      const opMargin = ((latestOp / latestRev) * 100).toFixed(1);
+      if (finList.length > 0) {
+        const latestFin = finList[finList.length - 1];
+        const year = latestFin.year;
+        const rev = latestFin.revenue;
+        const op = latestFin.operatingProfit;
+        const opMargin = ((op / rev) * 100).toFixed(1);
 
-      text += `${idx + 1}. ${name} (${latestYear}년 기준)\n`;
-      text += `  • 매출액: ${latestRev.toLocaleString()}억 원\n`;
-      text += `  • 영업이익: ${latestOp.toLocaleString()}억 원 (영업이익률 ${opMargin}%)\n\n`;
+        text += `${idx + 1}. ${name} (${year}년 기준)\n`;
+        text += `  • 매출액: ${rev.toFixed(1)}조 원\n`;
+        text += `  • 영업이익: ${op.toFixed(1)}조 원 (영업이익률 ${opMargin}%)\n\n`;
+      } else {
+        text += `${idx + 1}. ${name}: 재무 데이터 없음\n\n`;
+      }
     });
     res.json({ success: true, report: text.trim() });
   } catch (err) {
