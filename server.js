@@ -923,20 +923,30 @@ app.post('/api/generate-forecast-text', async (req, res) => {
 // Expose DART report text generator API for client bypass send
 app.post('/api/generate-dart-report-text', (req, res) => {
   try {
+    const cache = readCache();
     let text = `📋 [K-TOP 10 기업 DART 주요 의무공시 요약]\n\n`;
     Object.keys(COMPANY_NAME_MAP).forEach((cid, idx) => {
       const name = COMPANY_NAME_MAP[cid];
-      const disclosures = DART_MOCK_DATA[cid] || [];
+      
+      // Try cached summaries first, fallback to mock DB
+      const cachedEntry = cache[cid];
+      let disclosures = cachedEntry?.dartData || [];
+      if (disclosures.length === 0) {
+        disclosures = COMPANY_DART_MOCK[cid] || [];
+      }
+
       if (disclosures.length > 0) {
         text += `${idx + 1}. ${name}\n`;
         disclosures.slice(0, 2).forEach(d => {
-          text += `  • [${d.date}] ${d.title}\n    👉 ${d.summary}\n`;
+          const summaryText = d.summary || '의무 공시 항목 (요약 대기)';
+          text += `  • [${d.date}] ${d.title}\n    👉 ${summaryText}\n`;
         });
         text += `\n`;
       }
     });
     res.json({ success: true, report: text.trim() });
   } catch (err) {
+    console.error('[DARTTextAPI] Error generating report:', err.message);
     res.status(500).json({ error: 'Failed to generate DART report text' });
   }
 });
