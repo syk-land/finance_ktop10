@@ -920,6 +920,54 @@ app.post('/api/generate-forecast-text', async (req, res) => {
   }
 });
 
+// Expose DART report text generator API for client bypass send
+app.post('/api/generate-dart-report-text', (req, res) => {
+  try {
+    let text = `📋 [K-TOP 10 기업 DART 주요 의무공시 요약]\n\n`;
+    Object.keys(COMPANY_NAME_MAP).forEach((cid, idx) => {
+      const name = COMPANY_NAME_MAP[cid];
+      const disclosures = DART_MOCK_DATA[cid] || [];
+      if (disclosures.length > 0) {
+        text += `${idx + 1}. ${name}\n`;
+        disclosures.slice(0, 2).forEach(d => {
+          text += `  • [${d.date}] ${d.title}\n    👉 ${d.summary}\n`;
+        });
+        text += `\n`;
+      }
+    });
+    res.json({ success: true, report: text.trim() });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to generate DART report text' });
+  }
+});
+
+// Expose financials report text generator API for client bypass send
+app.post('/api/generate-financials-report-text', (req, res) => {
+  try {
+    let text = `📉 [K-TOP 10 기업 핵심 재무제표 비교 요약]\n\n`;
+    Object.keys(COMPANY_NAME_MAP).forEach((cid, idx) => {
+      const name = COMPANY_NAME_MAP[cid];
+      const fin = COMPANY_FINANCIALS[cid] || {};
+      const years = fin.years || ['2021', '2022', '2023'];
+      const rev = fin.revenue || [0, 0, 0];
+      const op = fin.operatingProfit || [0, 0, 0];
+      
+      const latestIdx = years.length - 1;
+      const latestYear = years[latestIdx];
+      const latestRev = rev[latestIdx];
+      const latestOp = op[latestIdx];
+      const opMargin = ((latestOp / latestRev) * 100).toFixed(1);
+
+      text += `${idx + 1}. ${name} (${latestYear}년 기준)\n`;
+      text += `  • 매출액: ${latestRev.toLocaleString()}억 원\n`;
+      text += `  • 영업이익: ${latestOp.toLocaleString()}억 원 (영업이익률 ${opMargin}%)\n\n`;
+    });
+    res.json({ success: true, report: text.trim() });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to generate financials report text' });
+  }
+});
+
 // Start server and initialize loops
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`[Server] Finance AI Backend is running on http://127.0.0.1:${PORT}`);

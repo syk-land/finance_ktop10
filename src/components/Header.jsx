@@ -93,6 +93,114 @@ export default function Header({ isLive, isAiLive }) {
     }
   };
 
+  const triggerDartTalk = async () => {
+    try {
+      let token = localStorage.getItem('kakao_access_token');
+      if (!token) {
+        const tokenRes = await fetch('http://localhost:5005/api/kakao-token');
+        const { token: fallbackToken } = await tokenRes.json();
+        token = fallbackToken;
+      }
+
+      if (!token) {
+        alert('❌ 설정에서 카카오 액세스 토큰을 먼저 등록해 주세요.');
+        return;
+      }
+
+      alert('📋 10대 기업 DART 공시 요약 비교표를 생성하고 있습니다...');
+      const textRes = await fetch('http://localhost:5005/api/generate-dart-report-text', { method: 'POST' });
+      if (!textRes.ok) {
+        alert('❌ DART 공시 요약 생성에 실패했습니다.');
+        return;
+      }
+      const { report } = await textRes.json();
+
+      const templateObject = {
+        object_type: 'text',
+        text: report,
+        link: {
+          web_url: window.location.origin,
+          mobile_web_url: window.location.origin
+        },
+        button_title: '대시보드 보기'
+      };
+
+      const res = await fetch('https://kapi.kakao.com/v2/api/talk/memo/default/send', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          template_object: JSON.stringify(templateObject)
+        })
+      });
+
+      const result = await res.json();
+      if (result.result_code === 0) {
+        alert('📋 10대 기업 DART 공시 요약 카톡이 정상 전송되었습니다!');
+      } else {
+        alert(`❌ 전송 실패: ${result.msg || '인증 오류가 발생했습니다.'}`);
+      }
+    } catch (err) {
+      alert('❌ 통신 중 오류가 발생했습니다.');
+    }
+  };
+
+  const triggerFinancialsTalk = async () => {
+    try {
+      let token = localStorage.getItem('kakao_access_token');
+      if (!token) {
+        const tokenRes = await fetch('http://localhost:5005/api/kakao-token');
+        const { token: fallbackToken } = await tokenRes.json();
+        token = fallbackToken;
+      }
+
+      if (!token) {
+        alert('❌ 설정에서 카카오 액세스 토큰을 먼저 등록해 주세요.');
+        return;
+      }
+
+      alert('📉 10대 기업 핵심 재무제표 요약표를 생성하고 있습니다...');
+      const textRes = await fetch('http://localhost:5005/api/generate-financials-report-text', { method: 'POST' });
+      if (!textRes.ok) {
+        alert('❌ 재무제표 요약 생성에 실패했습니다.');
+        return;
+      }
+      const { report } = await textRes.json();
+
+      const templateObject = {
+        object_type: 'text',
+        text: report,
+        link: {
+          web_url: window.location.origin,
+          mobile_web_url: window.location.origin
+        },
+        button_title: '대시보드 보기'
+      };
+
+      const res = await fetch('https://kapi.kakao.com/v2/api/talk/memo/default/send', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          template_object: JSON.stringify(templateObject)
+        })
+      });
+
+      const result = await res.json();
+      if (result.result_code === 0) {
+        alert('📉 10대 기업 핵심 재무제표 요약 카톡이 정상 전송되었습니다!');
+      } else {
+        alert(`❌ 전송 실패: ${result.msg || '인증 오류가 발생했습니다.'}`);
+      }
+    } catch (err) {
+      alert('❌ 통신 중 오류가 발생했습니다.');
+    }
+  };
+
   return (
     <>
       <header className="main-header">
@@ -158,7 +266,59 @@ export default function Header({ isLive, isAiLive }) {
             onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
             onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
           >
-            <span>💬 카톡 테스트</span>
+            <span>💬 전망 톡</span>
+          </button>
+
+          {/* DART Talk Trigger Button */}
+          <button 
+            className="kakao-dart-btn" 
+            onClick={triggerDartTalk}
+            style={{
+              background: '#E6FFE6',
+              color: '#006600',
+              border: '1px solid rgba(0, 102, 0, 0.2)',
+              padding: '6px 12px',
+              borderRadius: '20px',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              boxShadow: '0 2px 6px rgba(0, 102, 0, 0.1)',
+              transition: 'transform 0.15s ease',
+              marginLeft: '4px'
+            }}
+            onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+            onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+          >
+            <span>📋 DART 톡</span>
+          </button>
+
+          {/* Financials Talk Trigger Button */}
+          <button 
+            className="kakao-fin-btn" 
+            onClick={triggerFinancialsTalk}
+            style={{
+              background: '#E6F0FF',
+              color: '#0044cc',
+              border: '1px solid rgba(0, 68, 204, 0.2)',
+              padding: '6px 12px',
+              borderRadius: '20px',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              boxShadow: '0 2px 6px rgba(0, 68, 204, 0.1)',
+              transition: 'transform 0.15s ease',
+              marginLeft: '4px'
+            }}
+            onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+            onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+          >
+            <span>📉 재무 톡</span>
           </button>
 
           {/* Settings Modal Trigger Button */}
